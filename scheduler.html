@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>轮播调度器</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            background: #f5f5f5;
+        }
+        .container {
+            text-align: center;
+            background: white;
+            padding: 40px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            max-width: 400px;
+        }
+        .loading {
+            font-size: 16px;
+            color: #333;
+            margin-bottom: 16px;
+        }
+        .spinner {
+            display: inline-block;
+            width: 24px;
+            height: 24px;
+            border: 3px solid #e0e0e0;
+            border-top-color: #1976d2;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        .error {
+            color: #d32f2f;
+            text-align: left;
+            background: #ffebee;
+            padding: 16px;
+            border-radius: 4px;
+            border-left: 4px solid #d32f2f;
+            white-space: pre-wrap;
+            word-break: break-word;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        .error-title {
+            font-weight: bold;
+            margin-bottom: 8px;
+            color: #b71c1c;
+        }
+    </style>
+</head>
+<body>
+    <div class="container" id="app">
+        <div class="loading">
+            <div class="spinner"></div>
+            <p>启动轮播中...</p>
+        </div>
+    </div>
+
+    <script data-urls='["https://example.com/page1", "https://example.com/page2"]' data-interval="300" data-cycle="3600">
+        (function() {
+            const scriptEl = document.currentScript;
+            
+            // 读取配置
+            let urls, interval, cycle;
+            try {
+                const urlsStr = scriptEl.dataset.urls;
+                if (!urlsStr) {
+                    throw new Error('缺少必需的配置：data-urls 属性未定义');
+                }
+                urls = JSON.parse(urlsStr);
+                if (!Array.isArray(urls) || urls.length === 0) {
+                    throw new Error('data-urls 必须是非空数组');
+                }
+                interval = parseInt(scriptEl.dataset.interval) || 300;
+                cycle = parseInt(scriptEl.dataset.cycle) || 3600;
+                
+                // 验证间隔参数
+                if (interval <= 0 || cycle <= 0) {
+                    throw new Error('interval 和 cycle 必须大于 0');
+                }
+            } catch (err) {
+                displayError(err.message);
+                return;
+            }
+
+            // 构建状态 hash
+            const state = {
+                _ci: 0,
+                _ct: Date.now(),
+                _iv: interval,
+                _cy: cycle,
+                _cu: btoa(JSON.stringify(urls))
+            };
+
+            // 跳转到第一个 URL
+            try {
+                // 解析目标 URL，合并已有 hash
+                let targetUrl;
+                try {
+                    targetUrl = new URL(urls[0], window.location.href);
+                } catch (e) {
+                    targetUrl = new URL(urls[0]);
+                }
+
+                // 合并原有 hash 和 carousel 状态参数
+                const mergedParams = new URLSearchParams(targetUrl.hash.substring(1));
+                Object.entries(state).forEach(([k, v]) => {
+                    mergedParams.set(k, v);
+                });
+
+                targetUrl.hash = mergedParams.toString();
+                window.location.href = targetUrl.toString();
+            } catch (err) {
+                displayError('跳转失败：' + err.message);
+            }
+
+            function displayError(msg) {
+                const app = document.getElementById('app');
+                app.innerHTML = `
+                    <div class="container">
+                        <div class="error">
+                            <div class="error-title">⚠️ 启动失败</div>
+                            ${msg}
+                        </div>
+                    </div>
+                `;
+            }
+        })();
+    </script>
+</body>
+</html>
