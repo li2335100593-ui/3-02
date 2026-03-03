@@ -6,24 +6,29 @@
   <title>Exposure Journal</title>
   <style>
     :root {
-      --bg: #f2efe9;
-      --ink: #161616;
-      --muted: #666;
-      --card: #fffdf8;
-      --line: #d8d1c4;
-      --accent: #1e6bd6;
+      --bg: #f6f1e8;
+      --ink: #191714;
+      --muted: #6f675c;
+      --card: #fffaf1;
+      --line: #d9cdbb;
+      --accent: #b54c2e;
+      --accent-soft: #f3d7cb;
+      --shadow: 0 8px 24px rgba(25, 23, 20, 0.07);
     }
     * { box-sizing: border-box; }
     body {
       margin: 0;
-      font-family: "Times New Roman", Georgia, serif;
       color: var(--ink);
-      background: radial-gradient(circle at 20% 10%, #f9f6ef, var(--bg));
+      font-family: "Times New Roman", Georgia, serif;
+      background:
+        radial-gradient(900px 500px at 5% 0%, #fff5e8 0%, transparent 62%),
+        radial-gradient(700px 380px at 98% 6%, #f8eadd 0%, transparent 66%),
+        var(--bg);
     }
     .wrap {
-      max-width: 1200px;
+      max-width: 1240px;
       margin: 0 auto;
-      padding: 28px 20px 40px;
+      padding: 28px 20px 44px;
     }
     .masthead {
       border-top: 3px solid var(--ink);
@@ -38,7 +43,7 @@
     }
     .title {
       margin: 0;
-      font-size: clamp(28px, 5vw, 54px);
+      font-size: clamp(30px, 5vw, 56px);
       letter-spacing: 1px;
       line-height: 1;
       text-transform: uppercase;
@@ -46,9 +51,9 @@
     .subtitle {
       margin: 0;
       color: var(--muted);
-      font: 14px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font: 700 13px/1.35 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       text-transform: uppercase;
-      letter-spacing: 1.4px;
+      letter-spacing: 1.5px;
     }
     .toolbar {
       display: grid;
@@ -60,7 +65,7 @@
       font: 14px/1.2 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       padding: 10px 12px;
       border: 1px solid var(--line);
-      background: #fff;
+      background: #fffdf8;
       color: var(--ink);
     }
     button {
@@ -84,10 +89,11 @@
       border: 1px solid var(--line);
       padding: 16px;
       min-height: 106px;
+      box-shadow: var(--shadow);
     }
     .kpi h4 {
       margin: 0 0 8px;
-      font: 12px/1.2 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font: 700 12px/1.2 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       letter-spacing: 1.2px;
       text-transform: uppercase;
       color: var(--muted);
@@ -99,17 +105,18 @@
     }
     .grid {
       display: grid;
-      grid-template-columns: 2fr 1fr;
+      grid-template-columns: 1.45fr 1fr;
       gap: 14px;
     }
     .panel {
       background: var(--card);
       border: 1px solid var(--line);
       padding: 14px;
+      box-shadow: var(--shadow);
     }
     .panel h3 {
       margin: 0 0 12px;
-      font: 700 18px/1.2 Georgia, serif;
+      font: 700 20px/1.2 Georgia, serif;
       border-bottom: 1px solid var(--line);
       padding-bottom: 8px;
     }
@@ -125,7 +132,7 @@
       vertical-align: top;
     }
     th {
-      font-weight: 600;
+      font-weight: 700;
       color: var(--muted);
       text-transform: uppercase;
       letter-spacing: 0.6px;
@@ -135,21 +142,113 @@
       word-break: break-all;
       max-width: 0;
     }
-    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace; font-size: 12px; }
-    .note {
+    .mono {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
+      font-size: 12px;
+    }
+    .note, .status {
       margin-top: 12px;
       color: var(--muted);
       font: 12px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     }
-    .status {
-      margin-top: 8px;
+    .url-row {
+      cursor: pointer;
+      transition: background 0.15s ease;
+    }
+    .url-row:hover { background: #fff4ea; }
+    .url-row.active {
+      background: var(--accent-soft);
+      outline: 1px solid #e6b6a3;
+    }
+    .detail-head {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 8px;
+      align-items: end;
+      margin-bottom: 8px;
+    }
+    .selected-url {
+      margin: 0;
+      color: var(--ink);
+      font: 600 13px/1.35 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      word-break: break-all;
+    }
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border: 1px solid var(--line);
+      font: 700 11px/1.2 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      text-transform: uppercase;
       color: var(--muted);
-      font: 12px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      letter-spacing: 0.8px;
+      background: #fff;
+    }
+    .detail-kpis {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px;
+      margin: 10px 0 14px;
+    }
+    .detail-kpi {
+      border: 1px solid var(--line);
+      background: #fff;
+      padding: 10px;
+    }
+    .detail-kpi h5 {
+      margin: 0 0 4px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      font: 700 10px/1.2 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    .detail-kpi .v {
+      margin: 0;
+      font: 700 24px/1.1 Georgia, serif;
+      color: var(--accent);
+    }
+    .subgrid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    .user-list {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      max-height: 220px;
+      overflow: auto;
+      border: 1px solid var(--line);
+      background: #fff;
+    }
+    .user-list li {
+      padding: 7px 8px;
+      border-bottom: 1px dashed var(--line);
+      font: 12px/1.25 ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
+    }
+    .pager {
+      margin-top: 8px;
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      font: 12px/1.25 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--muted);
+    }
+    .pager button {
+      padding: 6px 10px;
+      font-size: 12px;
+    }
+    .muted {
+      color: var(--muted);
+      font: 12px/1.35 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     }
     @media (max-width: 980px) {
       .toolbar { grid-template-columns: 1fr 1fr; }
       .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .grid { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 720px) {
+      .subgrid { grid-template-columns: 1fr; }
+      .detail-kpis { grid-template-columns: 1fr; }
     }
     @media (max-width: 620px) {
       .toolbar { grid-template-columns: 1fr; }
@@ -180,7 +279,7 @@
 
     <section class="grid">
       <article class="panel">
-        <h3>按 URL 曝光</h3>
+        <h3>按 URL 曝光（点击查看详情）</h3>
         <table>
           <thead><tr><th style="width:72%">URL</th><th style="width:28%">曝光</th></tr></thead>
           <tbody id="urlBody"></tbody>
@@ -188,13 +287,55 @@
       </article>
 
       <article class="panel">
-        <h3>设备分布</h3>
+        <h3>设备分布（全局）</h3>
         <table>
           <thead><tr><th>设备</th><th>曝光</th></tr></thead>
           <tbody id="deviceBody"></tbody>
         </table>
-        <div class="note">后续新增网站会自动出现在左侧 URL 表，不需要改前端代码。</div>
+        <div class="note">新增网站会自动出现在左侧 URL 表，不需要改前端代码。</div>
       </article>
+    </section>
+
+    <section class="panel" style="margin-top:14px;">
+      <div class="detail-head">
+        <h3 style="margin:0; border-bottom:none; padding-bottom:0;">URL 详情</h3>
+        <span class="badge" id="detailBadge">未选择 URL</span>
+      </div>
+      <p class="selected-url mono" id="selectedUrlText">请先点击左侧 URL 行。</p>
+
+      <div class="detail-kpis">
+        <div class="detail-kpi"><h5>该 URL 曝光</h5><p class="v" id="dExposures">0</p></div>
+        <div class="detail-kpi"><h5>该 URL 独立 IP</h5><p class="v" id="dUniqueIp">0</p></div>
+        <div class="detail-kpi"><h5>每日重复 IP</h5><p class="v" id="dRepeatIp">0</p></div>
+      </div>
+
+      <div class="subgrid">
+        <div>
+          <h3 style="font-size:17px;">每日重复 IP 明细</h3>
+          <table>
+            <thead><tr><th>日期</th><th>重复IP</th><th>重复曝光</th></tr></thead>
+            <tbody id="repeatDayBody"></tbody>
+          </table>
+        </div>
+        <div>
+          <h3 style="font-size:17px;">该 URL 设备分布</h3>
+          <table>
+            <thead><tr><th>设备</th><th>曝光</th></tr></thead>
+            <tbody id="detailDeviceBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div style="margin-top:12px;">
+        <h3 style="font-size:17px;">用户唯一 ID（文本）</h3>
+        <ul id="userList" class="user-list"></ul>
+        <div class="pager">
+          <button id="prevPageBtn" type="button">上一页</button>
+          <button id="nextPageBtn" type="button">下一页</button>
+          <span id="pageInfo">第 1 页</span>
+        </div>
+        <div id="detailHint" class="muted" style="margin-top:8px;">等待详情数据。</div>
+      </div>
     </section>
 
     <div class="status" id="status">初始化中...</div>
@@ -203,10 +344,28 @@
   <script>
     var API_BASE = 'https://exposure-analytics.li2335100593.workers.dev';
     var POLL_MS = 30000;
+    var USER_PAGE_SIZE = 50;
     var timer = null;
+
+    var state = {
+      selectedUrl: null,
+      userPage: 1,
+      detailTotalUsers: null,
+      cache: {
+        byUrl: []
+      }
+    };
 
     function nowMs() { return Date.now(); }
     function toTs(v) { return v ? new Date(v).getTime() : null; }
+    function escapeHtml(s) {
+      return String(s == null ? '' : s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
 
     function setDefaultRange() {
       var now = new Date();
@@ -230,6 +389,10 @@
       document.getElementById('status').textContent = msg;
     }
 
+    function setDetailBadge(msg) {
+      document.getElementById('detailBadge').textContent = msg;
+    }
+
     function renderTableRows(tbodyId, rows, cols) {
       var body = document.getElementById(tbodyId);
       if (!rows || rows.length === 0) {
@@ -239,9 +402,50 @@
       body.innerHTML = rows.map(function (r) {
         return '<tr>' + cols.map(function (c) {
           var cls = c === 'url' ? ' class="url mono"' : '';
-          return '<td' + cls + '>' + String(r[c] == null ? '' : r[c]) + '</td>';
+          return '<td' + cls + '>' + escapeHtml(r[c]) + '</td>';
         }).join('') + '</tr>';
       }).join('');
+    }
+
+    function renderUrlRows(rows) {
+      var body = document.getElementById('urlBody');
+      if (!rows || rows.length === 0) {
+        body.innerHTML = '<tr><td colspan="2">暂无数据</td></tr>';
+        return;
+      }
+      body.innerHTML = rows.map(function (r) {
+        var active = state.selectedUrl === r.url ? ' active' : '';
+        return '<tr class="url-row' + active + '" data-url="' + encodeURIComponent(r.url) + '">' +
+          '<td class="url mono">' + escapeHtml(r.url) + '</td>' +
+          '<td>' + escapeHtml(r.exposures) + '</td>' +
+        '</tr>';
+      }).join('');
+      body.querySelectorAll('.url-row').forEach(function (row) {
+        row.addEventListener('click', function () {
+          var decoded = decodeURIComponent(row.getAttribute('data-url') || '');
+          if (!decoded) return;
+          state.selectedUrl = decoded;
+          state.userPage = 1;
+          syncSelectedUrlToHash();
+          renderUrlRows(state.cache.byUrl);
+          loadDetail();
+        });
+      });
+    }
+
+    function syncSelectedUrlToHash() {
+      var p = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+      if (state.selectedUrl) p.set('url', state.selectedUrl);
+      else p.delete('url');
+      p.set('page', String(state.userPage));
+      window.location.hash = p.toString();
+    }
+
+    function loadSelectedFromHash() {
+      var p = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+      state.selectedUrl = p.get('url') || null;
+      var pageNum = parseInt(p.get('page') || '1', 10);
+      state.userPage = isNaN(pageNum) || pageNum < 1 ? 1 : pageNum;
     }
 
     async function loadReport() {
@@ -258,23 +462,130 @@
         var byUrl = data.by_url || [];
         var byDevice = data.by_device || [];
 
+        state.cache.byUrl = byUrl;
+
         document.getElementById('kTotal').textContent = sum.total_exposures || 0;
         document.getElementById('kSid').textContent = sum.unique_sessions || 0;
         document.getElementById('kIp').textContent = sum.unique_ips || 0;
         document.getElementById('kDevice').textContent = byDevice.length || 0;
 
-        renderTableRows('urlBody', byUrl, ['url', 'exposures']);
+        if (!state.selectedUrl && byUrl.length > 0) {
+          state.selectedUrl = byUrl[0].url;
+        }
+
+        renderUrlRows(byUrl);
         renderTableRows('deviceBody', byDevice, ['device_type', 'exposures']);
 
         setStatus('更新于 ' + new Date().toLocaleString());
+        if (state.selectedUrl) {
+          syncSelectedUrlToHash();
+          await loadDetail();
+        } else {
+          resetDetail('没有可展示的 URL。');
+        }
       } catch (e) {
         setStatus('加载失败：' + e.message);
+      }
+    }
+
+    function normalizeDetailPayload(data) {
+      var detail = data && (data.per_url_details || data.url_detail || data.detail || null);
+      if (!detail) {
+        return {
+          exposures: 0,
+          unique_ips: 0,
+          repeated_ip_days_total: 0,
+          daily_repeat_ip: [],
+          by_device: [],
+          user_ids: [],
+          total_user_ids: null,
+          source: 'fallback'
+        };
+      }
+      return {
+        exposures: detail.exposures || detail.total_exposures || 0,
+        unique_ips: detail.unique_ips || 0,
+        repeated_ip_days_total: detail.repeated_ip_days_total || detail.repeat_ip_total || 0,
+        daily_repeat_ip: detail.daily_repeat_ip || [],
+        by_device: detail.by_device || detail.devices || [],
+        user_ids: detail.user_ids || [],
+        total_user_ids: detail.total_user_ids == null ? null : detail.total_user_ids,
+        source: 'api'
+      };
+    }
+
+    function resetDetail(hint) {
+      document.getElementById('selectedUrlText').textContent = state.selectedUrl || '未选择 URL';
+      document.getElementById('dExposures').textContent = '0';
+      document.getElementById('dUniqueIp').textContent = '0';
+      document.getElementById('dRepeatIp').textContent = '0';
+      renderTableRows('repeatDayBody', [], ['day', 'repeat_ips', 'repeat_exposures']);
+      renderTableRows('detailDeviceBody', [], ['device_type', 'exposures']);
+      document.getElementById('userList').innerHTML = '<li>暂无用户 ID</li>';
+      document.getElementById('detailHint').textContent = hint || '等待详情数据。';
+      document.getElementById('pageInfo').textContent = '第 ' + state.userPage + ' 页';
+      setDetailBadge('详情不可用');
+    }
+
+    async function loadDetail() {
+      if (!state.selectedUrl) {
+        resetDetail('请选择 URL。');
+        return;
+      }
+      var range = getRange();
+      var detailUrl = API_BASE + '/api/report?from=' + range.from + '&to=' + range.to +
+        '&url=' + encodeURIComponent(state.selectedUrl) +
+        '&page=' + state.userPage + '&page_size=' + USER_PAGE_SIZE;
+
+      document.getElementById('selectedUrlText').textContent = state.selectedUrl;
+
+      try {
+        var res = await fetch(detailUrl, { cache: 'no-store' });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        var data = await res.json();
+        var detail = normalizeDetailPayload(data);
+
+        document.getElementById('dExposures').textContent = detail.exposures;
+        document.getElementById('dUniqueIp').textContent = detail.unique_ips;
+        document.getElementById('dRepeatIp').textContent = detail.repeated_ip_days_total;
+
+        renderTableRows('repeatDayBody', detail.daily_repeat_ip, ['day', 'repeat_ips', 'repeat_exposures']);
+        renderTableRows('detailDeviceBody', detail.by_device, ['device_type', 'exposures']);
+
+        var userList = document.getElementById('userList');
+        if (!detail.user_ids || detail.user_ids.length === 0) {
+          userList.innerHTML = '<li>暂无用户 ID</li>';
+        } else {
+          userList.innerHTML = detail.user_ids.map(function (id) {
+            return '<li>' + escapeHtml(id) + '</li>';
+          }).join('');
+        }
+
+        state.detailTotalUsers = detail.total_user_ids;
+        var info = '第 ' + state.userPage + ' 页';
+        if (state.detailTotalUsers != null) {
+          info += ' / 总用户ID ' + state.detailTotalUsers;
+        }
+        document.getElementById('pageInfo').textContent = info;
+
+        if (detail.source === 'fallback') {
+          setDetailBadge('待后端详情接口');
+          document.getElementById('detailHint').textContent = '后端 detail 数据尚未返回，已显示占位。';
+        } else {
+          setDetailBadge('已加载 URL 详情');
+          document.getElementById('detailHint').textContent = '指标按所选 URL 细分展示。';
+        }
+      } catch (e) {
+        resetDetail('详情加载失败：' + e.message);
       }
     }
 
     function downloadCsv() {
       var range = getRange();
       var url = API_BASE + '/api/report.csv?from=' + range.from + '&to=' + range.to;
+      if (state.selectedUrl) {
+        url += '&url=' + encodeURIComponent(state.selectedUrl);
+      }
       window.open(url, '_blank');
     }
 
@@ -283,9 +594,23 @@
       timer = setInterval(loadReport, POLL_MS);
     }
 
-    document.getElementById('refreshBtn').addEventListener('click', loadReport);
+    document.getElementById('refreshBtn').addEventListener('click', function () {
+      loadReport();
+    });
     document.getElementById('csvBtn').addEventListener('click', downloadCsv);
+    document.getElementById('prevPageBtn').addEventListener('click', function () {
+      if (state.userPage <= 1) return;
+      state.userPage -= 1;
+      syncSelectedUrlToHash();
+      loadDetail();
+    });
+    document.getElementById('nextPageBtn').addEventListener('click', function () {
+      state.userPage += 1;
+      syncSelectedUrlToHash();
+      loadDetail();
+    });
 
+    loadSelectedFromHash();
     setDefaultRange();
     loadReport();
     startAutoRefresh();
