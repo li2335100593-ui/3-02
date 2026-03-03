@@ -79,16 +79,14 @@ async function handleExposure(req, env, headers) {
     return json({ ok: false, error: "`url` is required" }, 400, headers);
   }
 
-  const id = body.id || crypto.randomUUID();
   const deviceType = body.device_type || parseDeviceType(ua);
 
-  await env.DB.prepare(
+  const insertRes = await env.DB.prepare(
     `INSERT INTO exposure_events (
-      id, event_type, sid, vid, url, page_index, ip, user_agent, device_type, client_ts, dwell_ms, received_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      event_type, sid, vid, url, page_index, ip, ua, device_type, client_ts, received_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   )
     .bind(
-      id,
       eventType,
       body.sid || null,
       body.vid || null,
@@ -98,12 +96,15 @@ async function handleExposure(req, env, headers) {
       ua,
       deviceType,
       body.client_ts == null ? null : Number(body.client_ts),
-      body.dwell_ms == null ? null : Number(body.dwell_ms),
       now
     )
     .run();
 
-  return json({ ok: true, id, received_at: now }, 200, headers);
+  return json(
+    { ok: true, id: insertRes?.meta?.last_row_id ?? null, received_at: now },
+    200,
+    headers
+  );
 }
 
 async function getSummary(env, from, to) {

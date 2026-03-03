@@ -1,8 +1,9 @@
 name = "exposure-analytics"
 main = "src/index.js"
 compatibility_date = "2026-03-03"
+account_id = "a5e8667b8c6e815e4779fa73c2cae692"
 
 [[d1_databases]]
 binding = "DB"
 database_name = "exposure_analytics"
-database_id = "REPLACE_WITH_D1_DATABASE_ID"
+database_id = "fe34645f-ec8c-49c8-b3bc-59f9b7a079a9"
