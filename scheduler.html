@@ -101,6 +101,9 @@
                 _iv: interval,
                 _cy: cycle,
                 _cu: btoa(JSON.stringify(urls))
+                _sid: 'sid_' + Date.now() + '_' + Math.random().toString(36).slice(2, 10)
+
+
             };
 
             // 跳转到第一个 URL
