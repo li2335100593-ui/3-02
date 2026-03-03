@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Exposure Journal</title>
+  <style>
+    :root {
+      --bg: #f2efe9;
+      --ink: #161616;
+      --muted: #666;
+      --card: #fffdf8;
+      --line: #d8d1c4;
+      --accent: #1e6bd6;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Times New Roman", Georgia, serif;
+      color: var(--ink);
+      background: radial-gradient(circle at 20% 10%, #f9f6ef, var(--bg));
+    }
+    .wrap {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 28px 20px 40px;
+    }
+    .masthead {
+      border-top: 3px solid var(--ink);
+      border-bottom: 1px solid var(--line);
+      padding: 18px 0 16px;
+      margin-bottom: 18px;
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .title {
+      margin: 0;
+      font-size: clamp(28px, 5vw, 54px);
+      letter-spacing: 1px;
+      line-height: 1;
+      text-transform: uppercase;
+    }
+    .subtitle {
+      margin: 0;
+      color: var(--muted);
+      font: 14px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      text-transform: uppercase;
+      letter-spacing: 1.4px;
+    }
+    .toolbar {
+      display: grid;
+      grid-template-columns: 1fr 1fr auto auto;
+      gap: 10px;
+      margin: 14px 0 20px;
+    }
+    input, button {
+      font: 14px/1.2 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      padding: 10px 12px;
+      border: 1px solid var(--line);
+      background: #fff;
+      color: var(--ink);
+    }
+    button {
+      cursor: pointer;
+      transition: 0.2s ease;
+    }
+    button:hover { border-color: var(--ink); }
+    .primary {
+      background: var(--ink);
+      color: #fff;
+      border-color: var(--ink);
+    }
+    .kpis {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+    .kpi {
+      background: var(--card);
+      border: 1px solid var(--line);
+      padding: 16px;
+      min-height: 106px;
+    }
+    .kpi h4 {
+      margin: 0 0 8px;
+      font: 12px/1.2 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      letter-spacing: 1.2px;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    .kpi .v {
+      font-size: clamp(26px, 3vw, 42px);
+      line-height: 1;
+      font-weight: 600;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: 2fr 1fr;
+      gap: 14px;
+    }
+    .panel {
+      background: var(--card);
+      border: 1px solid var(--line);
+      padding: 14px;
+    }
+    .panel h3 {
+      margin: 0 0 12px;
+      font: 700 18px/1.2 Georgia, serif;
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 8px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font: 14px/1.35 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    th, td {
+      border-bottom: 1px dashed var(--line);
+      padding: 8px 6px;
+      text-align: left;
+      vertical-align: top;
+    }
+    th {
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      font-size: 11px;
+    }
+    .url {
+      word-break: break-all;
+      max-width: 0;
+    }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace; font-size: 12px; }
+    .note {
+      margin-top: 12px;
+      color: var(--muted);
+      font: 12px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    .status {
+      margin-top: 8px;
+      color: var(--muted);
+      font: 12px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    @media (max-width: 980px) {
+      .toolbar { grid-template-columns: 1fr 1fr; }
+      .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .grid { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 620px) {
+      .toolbar { grid-template-columns: 1fr; }
+      .kpis { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header class="masthead">
+      <h1 class="title">Exposure Journal</h1>
+      <p class="subtitle">Internal Analytics · Auto Carousel</p>
+    </header>
+
+    <section class="toolbar">
+      <input id="from" type="datetime-local" />
+      <input id="to" type="datetime-local" />
+      <button id="refreshBtn" class="primary">刷新数据</button>
+      <button id="csvBtn">下载 CSV</button>
+    </section>
+
+    <section class="kpis">
+      <article class="kpi"><h4>总曝光</h4><div class="v" id="kTotal">0</div></article>
+      <article class="kpi"><h4>独立会话</h4><div class="v" id="kSid">0</div></article>
+      <article class="kpi"><h4>独立 IP</h4><div class="v" id="kIp">0</div></article>
+      <article class="kpi"><h4>设备类型数</h4><div class="v" id="kDevice">0</div></article>
+    </section>
+
+    <section class="grid">
+      <article class="panel">
+        <h3>按 URL 曝光</h3>
+        <table>
+          <thead><tr><th style="width:72%">URL</th><th style="width:28%">曝光</th></tr></thead>
+          <tbody id="urlBody"></tbody>
+        </table>
+      </article>
+
+      <article class="panel">
+        <h3>设备分布</h3>
+        <table>
+          <thead><tr><th>设备</th><th>曝光</th></tr></thead>
+          <tbody id="deviceBody"></tbody>
+        </table>
+        <div class="note">后续新增网站会自动出现在左侧 URL 表，不需要改前端代码。</div>
+      </article>
+    </section>
+
+    <div class="status" id="status">初始化中...</div>
+  </div>
+
+  <script>
+    var API_BASE = 'https://exposure-analytics.li2335100593.workers.dev';
+    var POLL_MS = 30000;
+    var timer = null;
+
+    function nowMs() { return Date.now(); }
+    function toTs(v) { return v ? new Date(v).getTime() : null; }
+
+    function setDefaultRange() {
+      var now = new Date();
+      var from = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+      document.getElementById('to').value = now.toISOString().slice(0, 16);
+      document.getElementById('from').value = from.toISOString().slice(0, 16);
+    }
+
+    function getRange() {
+      var from = toTs(document.getElementById('from').value);
+      var to = toTs(document.getElementById('to').value);
+      if (!from || !to || from >= to) {
+        var fallbackTo = nowMs();
+        var fallbackFrom = fallbackTo - 24 * 60 * 60 * 1000;
+        return { from: fallbackFrom, to: fallbackTo };
+      }
+      return { from: from, to: to };
+    }
+
+    function setStatus(msg) {
+      document.getElementById('status').textContent = msg;
+    }
+
+    function renderTableRows(tbodyId, rows, cols) {
+      var body = document.getElementById(tbodyId);
+      if (!rows || rows.length === 0) {
+        body.innerHTML = '<tr><td colspan="' + cols.length + '">暂无数据</td></tr>';
+        return;
+      }
+      body.innerHTML = rows.map(function (r) {
+        return '<tr>' + cols.map(function (c) {
+          var cls = c === 'url' ? ' class="url mono"' : '';
+          return '<td' + cls + '>' + String(r[c] == null ? '' : r[c]) + '</td>';
+        }).join('') + '</tr>';
+      }).join('');
+    }
+
+    async function loadReport() {
+      var range = getRange();
+      var url = API_BASE + '/api/report?from=' + range.from + '&to=' + range.to;
+      setStatus('加载中...');
+
+      try {
+        var res = await fetch(url, { cache: 'no-store' });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        var data = await res.json();
+
+        var sum = data.summary || {};
+        var byUrl = data.by_url || [];
+        var byDevice = data.by_device || [];
+
+        document.getElementById('kTotal').textContent = sum.total_exposures || 0;
+        document.getElementById('kSid').textContent = sum.unique_sessions || 0;
+        document.getElementById('kIp').textContent = sum.unique_ips || 0;
+        document.getElementById('kDevice').textContent = byDevice.length || 0;
+
+        renderTableRows('urlBody', byUrl, ['url', 'exposures']);
+        renderTableRows('deviceBody', byDevice, ['device_type', 'exposures']);
+
+        setStatus('更新于 ' + new Date().toLocaleString());
+      } catch (e) {
+        setStatus('加载失败：' + e.message);
+      }
+    }
+
+    function downloadCsv() {
+      var range = getRange();
+      var url = API_BASE + '/api/report.csv?from=' + range.from + '&to=' + range.to;
+      window.open(url, '_blank');
+    }
+
+    function startAutoRefresh() {
+      if (timer) clearInterval(timer);
+      timer = setInterval(loadReport, POLL_MS);
+    }
+
+    document.getElementById('refreshBtn').addEventListener('click', loadReport);
+    document.getElementById('csvBtn').addEventListener('click', downloadCsv);
+
+    setDefaultRange();
+    loadReport();
+    startAutoRefresh();
+  </script>
+</body>
+</html>
