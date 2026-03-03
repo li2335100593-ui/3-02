@@ -253,44 +253,52 @@
 <body>
   <div class="wrap">
     <header class="masthead">
-      <h1 class="title">EXPOSURE JOURNAL</h1>
-      <p class="subtitle">Internal Analytics · Auto Carousel</p>
+      <h1 class="title">曝光儀表板</h1>
+      <p class="subtitle">內部分析 · 自動輪播</p>
     </header>
 
     <section class="toolbar">
       <input id="from" type="datetime-local" />
       <input id="to" type="datetime-local" />
-      <button id="refreshBtn" class="primary">刷新数据</button>
-      <button id="csvBtn">下载 CSV</button>
+      <button id="refreshBtn" class="primary">重新整理</button>
+      <button id="csvBtn">下載 CSV</button>
     </section>
 
     <section class="filters">
       <select id="urlFilter" multiple></select>
-      <input id="urlSearch" type="text" placeholder="搜索 URL 关键字" />
-      <button id="applyFilterBtn" class="primary">应用筛选</button>
-      <button id="clearFilterBtn">清空筛选</button>
-      <button id="selectAllBtn">全选可见</button>
+      <input id="urlSearch" type="text" placeholder="搜尋 URL 關鍵字" />
+      <button id="applyFilterBtn" class="primary">套用篩選</button>
+      <button id="clearFilterBtn">清除篩選</button>
+      <button id="selectAllBtn">全選可見</button>
+    </section>
+
+    <section class="filters">
+      <input id="newUrlInput" type="text" placeholder="新增輪播 URL（https://...）" />
+      <button id="addUrlBtn" class="primary">新增 URL</button>
+      <button id="removeSelectedBtn">刪除已選 URL</button>
+      <button id="saveUrlsBtn">儲存輪播 URL</button>
+      <div class="muted" id="urlManageHint">提示：在上方多選框選取後可刪除，儲存後輪播入口會同步使用新清單。</div>
     </section>
 
     <section class="kpis">
-      <article class="kpi"><h4>总曝光</h4><div class="v" id="kTotal">0</div></article>
-      <article class="kpi"><h4>独立会话</h4><div class="v" id="kSid">0</div></article>
-      <article class="kpi"><h4>独立 IP</h4><div class="v" id="kIp">0</div></article>
-      <article class="kpi"><h4>设备类型数</h4><div class="v" id="kDevice">0</div></article>
+      <article class="kpi"><h4>總曝光</h4><div class="v" id="kTotal">0</div></article>
+      <article class="kpi"><h4>獨立會話</h4><div class="v" id="kSid">0</div></article>
+      <article class="kpi"><h4>獨立 IP</h4><div class="v" id="kIp">0</div></article>
+      <article class="kpi"><h4>裝置類型數</h4><div class="v" id="kDevice">0</div></article>
     </section>
 
     <section class="main-panel">
-      <h3>全部 URL 数据（表格优先）</h3>
+      <h3>全部 URL 資料（表格優先）</h3>
       <table>
         <thead>
           <tr>
             <th style="width: 30%;">URL</th>
             <th>曝光</th>
-            <th>独立IP</th>
-            <th>每日重复IP</th>
-            <th>主设备类型</th>
-            <th>CTR代理</th>
-            <th>最后曝光时间</th>
+            <th>獨立IP</th>
+            <th>每日重複IP</th>
+            <th>主要裝置類型</th>
+            <th>互動率代理</th>
+            <th>最後曝光時間</th>
             <th>操作</th>
           </tr>
         </thead>
@@ -360,6 +368,23 @@
       var el = document.getElementById("status");
       el.textContent = msg;
       el.classList.toggle("danger", !!isError);
+    }
+
+    function setManageHint(msg) {
+      var el = document.getElementById("urlManageHint");
+      if (el) el.textContent = msg;
+    }
+
+    function normalizeUrlInput(v) {
+      if (!v) return null;
+      var t = String(v).trim();
+      if (!t) return null;
+      try {
+        var u = new URL(t);
+        return u.toString();
+      } catch (e) {
+        return null;
+      }
     }
 
     function setDefaultRange() {
@@ -452,7 +477,7 @@
       var body = document.getElementById("mainBody");
       var rows = state.allRows;
       if (!rows || rows.length === 0) {
-        body.innerHTML = "<tr><td colspan='8'>暂无数据</td></tr>";
+        body.innerHTML = "<tr><td colspan='8'>暫無資料</td></tr>";
         return;
       }
 
@@ -468,7 +493,7 @@
             "<td>" + escapeHtml(r.primary_device_type || "unknown") + "</td>" +
             "<td>" + formatRatio(r.engagement_ratio) + "</td>" +
             "<td>" + escapeHtml(formatTs(r.last_exposure_time, r.last_exposure_iso)) + "</td>" +
-            "<td class='actions'><button class='tiny detail-btn' data-url='" + encodeURIComponent(r.url) + "'>详情</button></td>" +
+            "<td class='actions'><button class='tiny detail-btn' data-url='" + encodeURIComponent(r.url) + "'>詳情</button></td>" +
           "</tr>"
         );
 
@@ -498,7 +523,7 @@
 
     function renderDetailTable(rows, cols) {
       if (!rows || rows.length === 0) {
-        return "<tr><td colspan='" + cols.length + "'>暂无数据</td></tr>";
+        return "<tr><td colspan='" + cols.length + "'>暫無資料</td></tr>";
       }
       return rows.map(function (r) {
         return "<tr>" + cols.map(function (c) {
@@ -510,34 +535,34 @@
     function renderDetailBox(url) {
       var d = state.detailCache[url];
       if (!d) {
-        return "<div class='detail-box muted'>详情加载中...</div>";
+        return "<div class='detail-box muted'>詳情載入中...</div>";
       }
 
       var users = d.user_ids || [];
       var userHtml = users.length > 0
         ? users.map(function (u) { return "<div>" + escapeHtml(u) + "</div>"; }).join("")
-        : "<div class='muted'>暂无用户 ID</div>";
+        : "<div class='muted'>暫無使用者 ID</div>";
 
       return (
         "<div class='detail-box'>" +
           "<div class='detail-grid'>" +
-            "<div class='detail-metric'><div class='k'>该URL曝光</div><div class='v'>" + formatNum(d.exposures) + "</div></div>" +
-            "<div class='detail-metric'><div class='k'>该URL独立IP</div><div class='v'>" + formatNum(d.unique_ips) + "</div></div>" +
-            "<div class='detail-metric'><div class='k'>每日重复IP</div><div class='v'>" + formatNum(d.repeated_ip_days_total) + "</div></div>" +
+            "<div class='detail-metric'><div class='k'>該 URL 曝光</div><div class='v'>" + formatNum(d.exposures) + "</div></div>" +
+            "<div class='detail-metric'><div class='k'>該 URL 獨立IP</div><div class='v'>" + formatNum(d.unique_ips) + "</div></div>" +
+            "<div class='detail-metric'><div class='k'>每日重複IP</div><div class='v'>" + formatNum(d.repeated_ip_days_total) + "</div></div>" +
           "</div>" +
           "<div class='subtables'>" +
             "<div>" +
-              "<table><thead><tr><th>日期</th><th>重复IP</th><th>重复曝光</th></tr></thead><tbody>" +
+              "<table><thead><tr><th>日期</th><th>重複IP</th><th>重複曝光</th></tr></thead><tbody>" +
               renderDetailTable(d.daily_repeat_ip || [], ["day", "repeat_ips", "repeat_exposures"]) +
               "</tbody></table>" +
             "</div>" +
             "<div>" +
-              "<table><thead><tr><th>设备</th><th>曝光</th></tr></thead><tbody>" +
+              "<table><thead><tr><th>裝置</th><th>曝光</th></tr></thead><tbody>" +
               renderDetailTable(d.by_device || [], ["device_type", "exposures"]) +
               "</tbody></table>" +
             "</div>" +
           "</div>" +
-          "<div class='user-ids'><strong>用户唯一ID（文本）</strong><div style='margin-top:6px;'>" + userHtml + "</div></div>" +
+          "<div class='user-ids'><strong>使用者唯一 ID（文字）</strong><div style='margin-top:6px;'>" + userHtml + "</div></div>" +
         "</div>"
       );
     }
@@ -578,7 +603,7 @@
           by_device: [],
           user_ids: []
         };
-        setStatus("详情加载失败：" + e.message, true);
+        setStatus("詳情載入失敗：" + e.message, true);
       }
       renderMainTable();
     }
@@ -590,7 +615,7 @@
         endpoint += "&urls=" + state.selectedUrls.map(function (u) { return encodeURIComponent(u); }).join(",");
       }
 
-      setStatus("加载中...", false);
+      setStatus("載入中...", false);
       try {
         var res = await fetch(endpoint, { cache: "no-store" });
         if (!res.ok) throw new Error("HTTP " + res.status);
@@ -601,9 +626,30 @@
         updateKpis(data);
         refreshFilterOptions();
         renderMainTable();
-        setStatus("更新于 " + taipeiFormatter.format(new Date()), false);
+        setStatus("更新於 " + taipeiFormatter.format(new Date()), false);
       } catch (e) {
-        setStatus("加载失败：" + e.message, true);
+        setStatus("載入失敗：" + e.message, true);
+      }
+    }
+
+    async function saveConfiguredUrls() {
+      var urls = Array.from(new Set(state.configuredUrls.map(function (u) { return String(u).trim(); }).filter(Boolean))).sort();
+      if (urls.length === 0) {
+        setManageHint("至少需要保留 1 個輪播 URL");
+        return;
+      }
+      try {
+        var res = await fetch(API_BASE + "/api/config/urls", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ source: "scheduler", urls: urls })
+        });
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        setManageHint("已儲存輪播 URL 清單，輪播入口將自動同步。共 " + urls.length + " 筆");
+        state.selectedUrls = state.selectedUrls.filter(function (u) { return urls.indexOf(u) >= 0; });
+        await loadReport();
+      } catch (e) {
+        setManageHint("儲存失敗：" + e.message);
       }
     }
 
@@ -654,6 +700,40 @@
       state.expandedUrl = null;
       state.detailCache = Object.create(null);
       loadReport();
+    });
+
+    document.getElementById("addUrlBtn").addEventListener("click", function () {
+      var input = document.getElementById("newUrlInput");
+      var normalized = normalizeUrlInput(input.value);
+      if (!normalized) {
+        setManageHint("URL 格式錯誤，請輸入完整網址（例如 https://example.com/）");
+        return;
+      }
+      if (state.configuredUrls.indexOf(normalized) >= 0) {
+        setManageHint("此 URL 已存在於輪播清單");
+        return;
+      }
+      state.configuredUrls.push(normalized);
+      state.configuredUrls.sort();
+      input.value = "";
+      refreshFilterOptions();
+      setManageHint("已加入待儲存清單，請點「儲存輪播 URL」生效");
+    });
+
+    document.getElementById("removeSelectedBtn").addEventListener("click", function () {
+      var picked = selectedFromUi();
+      if (picked.length === 0) {
+        setManageHint("請先在上方多選框選取要刪除的 URL");
+        return;
+      }
+      state.configuredUrls = state.configuredUrls.filter(function (u) { return picked.indexOf(u) === -1; });
+      state.selectedUrls = state.selectedUrls.filter(function (u) { return state.configuredUrls.indexOf(u) >= 0; });
+      refreshFilterOptions();
+      setManageHint("已從待儲存清單移除 " + picked.length + " 筆，請點「儲存輪播 URL」生效");
+    });
+
+    document.getElementById("saveUrlsBtn").addEventListener("click", function () {
+      saveConfiguredUrls();
     });
 
     setDefaultRange();

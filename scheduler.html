@@ -67,10 +67,9 @@
         </div>
     </div>
 
-    <!-- 10秒一跳：data-interval="10" -->
     <script
       data-urls='["https://livingroom-design.ddmmoney.com/","https://old-house-renovation.chworld.com.tw/"]'
-      data-interval="10"
+      data-interval="300"
       data-cycle="3600">
         (function () {
             const scriptEl = document.currentScript;
@@ -89,7 +88,7 @@
                     throw new Error("data-urls 必须是非空数组");
                 }
 
-                interval = parseInt(scriptEl.dataset.interval, 10) || 10;
+                interval = parseInt(scriptEl.dataset.interval, 10) || 300;
                 cycle = parseInt(scriptEl.dataset.cycle, 10) || 3600;
 
                 if (interval <= 0 || cycle <= 0) {
