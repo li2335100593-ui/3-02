@@ -74,6 +74,7 @@
       data-cycle="3600">
         (function () {
             const scriptEl = document.currentScript;
+            const analyticsBase = "https://exposure-analytics.li2335100593.workers.dev";
 
             // 读取配置
             let urls, interval, cycle;
@@ -109,25 +110,62 @@
                 _sid: "sid_" + Date.now() + "_" + Math.random().toString(36).slice(2, 10)
             };
 
-            // 跳转到第一个 URL
-            try {
-                let targetUrl;
-                try {
-                    targetUrl = new URL(urls[0], window.location.href);
-                } catch (e) {
-                    targetUrl = new URL(urls[0]);
-                }
+            // 先同步 URL 配置到统计后端（非阻塞）
+            syncConfiguredUrls(urls)
+                .catch(() => {})
+                .finally(startRedirect);
 
-                // 合并目标 URL 原有 hash + 轮播状态
-                const mergedParams = new URLSearchParams(targetUrl.hash.substring(1));
-                Object.entries(state).forEach(([k, v]) => {
-                    mergedParams.set(k, String(v));
+            function startRedirect() {
+                try {
+                    let targetUrl;
+                    try {
+                        targetUrl = new URL(urls[0], window.location.href);
+                    } catch (e) {
+                        targetUrl = new URL(urls[0]);
+                    }
+
+                    // 合并目标 URL 原有 hash + 轮播状态
+                    const mergedParams = new URLSearchParams(targetUrl.hash.substring(1));
+                    Object.entries(state).forEach(([k, v]) => {
+                        mergedParams.set(k, String(v));
+                    });
+
+                    targetUrl.hash = mergedParams.toString();
+                    window.location.href = targetUrl.toString();
+                } catch (err) {
+                    displayError("跳转失败：" + err.message);
+                }
+            }
+
+            async function syncConfiguredUrls(urlsToSync) {
+                const payload = JSON.stringify({
+                    source: "scheduler",
+                    urls: urlsToSync
                 });
 
-                targetUrl.hash = mergedParams.toString();
-                window.location.href = targetUrl.toString();
-            } catch (err) {
-                displayError("跳转失败：" + err.message);
+                if (navigator.sendBeacon) {
+                    try {
+                        const ok = navigator.sendBeacon(
+                            analyticsBase + "/api/config/urls",
+                            new Blob([payload], { type: "application/json" })
+                        );
+                        if (ok) return;
+                    } catch (e) {}
+                }
+
+                const controller = new AbortController();
+                const timer = setTimeout(() => controller.abort(), 300);
+                try {
+                    await fetch(analyticsBase + "/api/config/urls", {
+                        method: "POST",
+                        headers: { "content-type": "application/json" },
+                        body: payload,
+                        keepalive: true,
+                        signal: controller.signal
+                    });
+                } finally {
+                    clearTimeout(timer);
+                }
             }
 
             function displayError(msg) {

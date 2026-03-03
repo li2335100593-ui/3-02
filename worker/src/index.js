@@ -28,6 +28,12 @@ function corsHeaders(origin = "*") {
   };
 }
 
+function normalizeUrl(v) {
+  if (!v) return null;
+  const t = String(v).trim();
+  return t.length > 0 ? t : null;
+}
+
 function parseDeviceType(ua) {
   if (!ua) return "unknown";
   const lower = ua.toLowerCase();
@@ -56,9 +62,86 @@ function parseReportRange(url) {
   return { from, to };
 }
 
+function parseUrlFilters(url) {
+  const selected = [];
+  const single = normalizeUrl(url.searchParams.get("url"));
+  if (single) selected.push(single);
+
+  const multiRaw = url.searchParams.get("urls");
+  if (multiRaw) {
+    for (const part of multiRaw.split(",")) {
+      const cleaned = normalizeUrl(decodeURIComponent(part));
+      if (cleaned) selected.push(cleaned);
+    }
+  }
+
+  return [...new Set(selected)];
+}
+
+function makeSqlInClause(values) {
+  if (!values || values.length === 0) return { clause: "", params: [] };
+  const placeholders = values.map(() => "?").join(",");
+  return {
+    clause: ` AND url IN (${placeholders})`,
+    params: values,
+  };
+}
+
+function toIsoOrNull(ms) {
+  const n = Number(ms);
+  if (!Number.isFinite(n) || n <= 0) return null;
+  return new Date(n).toISOString();
+}
+
 function escapeCsv(v) {
   const s = String(v ?? "");
   return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+
+async function upsertConfiguredUrls(env, urls, source = "scheduler") {
+  const now = Date.now();
+  await env.DB.prepare(`UPDATE configured_urls SET is_active = 0, updated_at = ? WHERE source = ?`)
+    .bind(now, source)
+    .run();
+
+  for (const raw of urls) {
+    const url = normalizeUrl(raw);
+    if (!url) continue;
+    await env.DB.prepare(
+      `INSERT INTO configured_urls (url, source, is_active, updated_at)
+       VALUES (?, ?, 1, ?)
+       ON CONFLICT(url) DO UPDATE SET
+         source = excluded.source,
+         is_active = 1,
+         updated_at = excluded.updated_at`
+    )
+      .bind(url, source, now)
+      .run();
+  }
+}
+
+async function getConfiguredUrls(env) {
+  const res = await env.DB.prepare(
+    `SELECT url FROM configured_urls WHERE is_active = 1 ORDER BY url ASC`
+  ).all();
+  return (res.results || []).map((r) => r.url).filter(Boolean);
+}
+
+async function handleConfigUrls(req, env, headers) {
+  let body;
+  try {
+    body = await req.json();
+  } catch {
+    return json({ ok: false, error: "Invalid JSON body" }, 400, headers);
+  }
+
+  const urls = Array.isArray(body?.urls) ? body.urls : [];
+  if (urls.length === 0) {
+    return json({ ok: false, error: "`urls` must be a non-empty array" }, 400, headers);
+  }
+
+  await upsertConfiguredUrls(env, urls, body?.source || "scheduler");
+  return json({ ok: true, total_urls: urls.length }, 200, headers);
 }
 
 async function handleExposure(req, env, headers) {
@@ -73,14 +156,13 @@ async function handleExposure(req, env, headers) {
   const ua = req.headers.get("user-agent") || "";
   const ip = req.headers.get("cf-connecting-ip") || null;
   const eventType = body.event_type || "page_enter";
-  const url = body.url || null;
+  const url = normalizeUrl(body.url);
 
   if (!url) {
     return json({ ok: false, error: "`url` is required" }, 400, headers);
   }
 
   const deviceType = body.device_type || parseDeviceType(ua);
-
   const insertRes = await env.DB.prepare(
     `INSERT INTO exposure_events (
       event_type, sid, vid, url, page_index, ip, ua, device_type, client_ts, received_at
@@ -100,53 +182,150 @@ async function handleExposure(req, env, headers) {
     )
     .run();
 
-  return json(
-    { ok: true, id: insertRes?.meta?.last_row_id ?? null, received_at: now },
-    200,
-    headers
-  );
+  return json({ ok: true, id: insertRes?.meta?.last_row_id ?? null, received_at: now }, 200, headers);
 }
 
-async function getSummary(env, from, to) {
+async function getSummaryForUrls(env, from, to, selectedUrls) {
+  const inClause = makeSqlInClause(selectedUrls);
   return env.DB.prepare(
     `SELECT
-      COUNT(*) AS total_exposures,
-      COUNT(DISTINCT sid) AS unique_sessions,
-      COUNT(DISTINCT ip) AS unique_ips
+      SUM(CASE WHEN event_type = 'page_enter' OR event_type IS NULL THEN 1 ELSE 0 END) AS total_exposures,
+      COUNT(DISTINCT CASE WHEN event_type = 'page_enter' OR event_type IS NULL THEN sid END) AS unique_sessions,
+      COUNT(DISTINCT CASE WHEN event_type = 'page_enter' OR event_type IS NULL THEN ip END) AS unique_ips
     FROM exposure_events
-    WHERE received_at >= ? AND received_at <= ? AND ${exposureFilterSql()}`
+    WHERE received_at >= ? AND received_at <= ?${inClause.clause}`
   )
-    .bind(from, to)
+    .bind(from, to, ...inClause.params)
     .first();
 }
 
-async function getByUrl(env, from, to) {
+async function getByUrlRaw(env, from, to, selectedUrls = []) {
+  const inClause = makeSqlInClause(selectedUrls);
   const result = await env.DB.prepare(
-    `SELECT url, COUNT(*) AS exposures
-    FROM exposure_events
-    WHERE received_at >= ? AND received_at <= ? AND ${exposureFilterSql()}
-    GROUP BY url
-    ORDER BY exposures DESC, url ASC`
+    `WITH filtered AS (
+      SELECT *
+      FROM exposure_events
+      WHERE received_at >= ? AND received_at <= ?${inClause.clause}
+    ),
+    base AS (
+      SELECT
+        url,
+        SUM(CASE WHEN event_type = 'page_enter' OR event_type IS NULL THEN 1 ELSE 0 END) AS exposures,
+        COUNT(DISTINCT CASE WHEN event_type = 'page_enter' OR event_type IS NULL THEN ip END) AS unique_ips,
+        SUM(CASE WHEN event_type = 'heartbeat' THEN 1 ELSE 0 END) AS heartbeat_events,
+        SUM(CASE WHEN event_type = 'page_enter' OR event_type IS NULL THEN 1 ELSE 0 END) AS enter_events,
+        MAX(CASE WHEN event_type = 'page_enter' OR event_type IS NULL THEN received_at ELSE NULL END) AS last_exposure_time
+      FROM filtered
+      GROUP BY url
+    ),
+    repeat_day AS (
+      SELECT url, day, COUNT(*) AS repeat_ips
+      FROM (
+        SELECT
+          url,
+          date(received_at / 1000, 'unixepoch', 'localtime') AS day,
+          ip,
+          COUNT(*) AS hits
+        FROM filtered
+        WHERE (event_type = 'page_enter' OR event_type IS NULL)
+          AND ip IS NOT NULL
+          AND ip <> ''
+        GROUP BY url, day, ip
+      ) t
+      WHERE hits >= 2
+      GROUP BY url, day
+    )
+    SELECT
+      b.url,
+      b.exposures,
+      b.unique_ips,
+      COALESCE((SELECT SUM(rd.repeat_ips) FROM repeat_day rd WHERE rd.url = b.url), 0) AS daily_repeated_ips,
+      COALESCE((
+        SELECT f2.device_type
+        FROM filtered f2
+        WHERE f2.url = b.url
+          AND (f2.event_type = 'page_enter' OR f2.event_type IS NULL)
+        GROUP BY f2.device_type
+        ORDER BY COUNT(*) DESC, f2.device_type ASC
+        LIMIT 1
+      ), 'unknown') AS primary_device_type,
+      b.last_exposure_time,
+      CASE
+        WHEN b.enter_events > 0 THEN ROUND((CAST(b.heartbeat_events AS REAL) / b.enter_events), 4)
+        ELSE 0
+      END AS engagement_ratio
+    FROM base b
+    ORDER BY b.exposures DESC, b.url ASC`
   )
-    .bind(from, to)
+    .bind(from, to, ...inClause.params)
     .all();
   return result.results || [];
 }
 
-async function getByDevice(env, from, to, selectedUrl = null) {
+function mergeByUrlWithUniverse(configuredUrls, byUrlRaw, selectedUrls = []) {
+  const metricMap = new Map();
+  for (const row of byUrlRaw) {
+    metricMap.set(row.url, {
+      url: row.url,
+      exposures: Number(row.exposures || 0),
+      unique_ips: Number(row.unique_ips || 0),
+      daily_repeated_ips: Number(row.daily_repeated_ips || 0),
+      primary_device_type: row.primary_device_type || "unknown",
+      engagement_ratio: Number(row.engagement_ratio || 0),
+      last_exposure_time: Number(row.last_exposure_time || 0),
+      last_exposure_iso: toIsoOrNull(row.last_exposure_time),
+    });
+  }
+
+  const universe = new Set();
+  if (selectedUrls.length > 0) {
+    selectedUrls.forEach((u) => universe.add(u));
+  } else {
+    configuredUrls.forEach((u) => universe.add(u));
+    for (const row of byUrlRaw) universe.add(row.url);
+  }
+
+  const merged = [];
+  for (const url of universe) {
+    const row = metricMap.get(url);
+    if (row) {
+      merged.push(row);
+    } else {
+      merged.push({
+        url,
+        exposures: 0,
+        unique_ips: 0,
+        daily_repeated_ips: 0,
+        primary_device_type: "unknown",
+        engagement_ratio: 0,
+        last_exposure_time: 0,
+        last_exposure_iso: null,
+      });
+    }
+  }
+
+  merged.sort((a, b) => {
+    if (b.exposures !== a.exposures) return b.exposures - a.exposures;
+    return a.url.localeCompare(b.url);
+  });
+
+  return merged;
+}
+
+async function getByDevice(env, from, to, selectedUrl = null, selectedUrls = []) {
+  const inClause = makeSqlInClause(selectedUrls);
   let sql = `SELECT device_type, COUNT(*) AS exposures
     FROM exposure_events
-    WHERE received_at >= ? AND received_at <= ? AND ${exposureFilterSql()}`;
-  const params = [from, to];
+    WHERE received_at >= ? AND received_at <= ? AND ${exposureFilterSql()}${inClause.clause}`;
+  const params = [from, to, ...inClause.params];
+
   if (selectedUrl) {
     sql += " AND url = ?";
     params.push(selectedUrl);
   }
   sql += " GROUP BY device_type ORDER BY exposures DESC, device_type ASC";
 
-  const result = await env.DB.prepare(sql)
-    .bind(...params)
-    .all();
+  const result = await env.DB.prepare(sql).bind(...params).all();
   return result.results || [];
 }
 
@@ -155,10 +334,10 @@ async function getPerUrlDetails(env, from, to, selectedUrl, page, pageSize) {
 
   const detailBase = await env.DB.prepare(
     `SELECT
-      COUNT(*) AS exposures,
-      COUNT(DISTINCT ip) AS unique_ips
+      SUM(CASE WHEN event_type = 'page_enter' OR event_type IS NULL THEN 1 ELSE 0 END) AS exposures,
+      COUNT(DISTINCT CASE WHEN event_type = 'page_enter' OR event_type IS NULL THEN ip END) AS unique_ips
     FROM exposure_events
-    WHERE received_at >= ? AND received_at <= ? AND url = ? AND ${exposureFilterSql()}`
+    WHERE received_at >= ? AND received_at <= ? AND url = ?`
   )
     .bind(from, to, selectedUrl)
     .first();
@@ -197,8 +376,7 @@ async function getPerUrlDetails(env, from, to, selectedUrl, page, pageSize) {
   }));
 
   const totalRepeatedIpDays = dailyRepeat.reduce((acc, r) => acc + r.repeat_ips, 0);
-
-  const byDevice = await getByDevice(env, from, to, selectedUrl);
+  const byDevice = await getByDevice(env, from, to, selectedUrl, []);
 
   const totalUsersRes = await env.DB.prepare(
     `SELECT COUNT(DISTINCT vid) AS total_user_ids
@@ -215,9 +393,7 @@ async function getPerUrlDetails(env, from, to, selectedUrl, page, pageSize) {
 
   const offset = (page - 1) * pageSize;
   const userRes = await env.DB.prepare(
-    `SELECT
-      vid AS user_id,
-      COUNT(*) AS exposures
+    `SELECT vid AS user_id, COUNT(*) AS exposures
     FROM exposure_events
     WHERE received_at >= ?
       AND received_at <= ?
@@ -252,34 +428,35 @@ async function getPerUrlDetails(env, from, to, selectedUrl, page, pageSize) {
 async function handleReport(req, env, headers) {
   const url = new URL(req.url);
   const range = parseReportRange(url);
-  if (range.error) {
-    return json({ ok: false, error: range.error }, 400, headers);
-  }
+  if (range.error) return json({ ok: false, error: range.error }, 400, headers);
 
-  const selectedUrl = url.searchParams.get("url") || null;
+  const selectedUrls = parseUrlFilters(url);
+  const selectedUrl = selectedUrls.length > 0 ? selectedUrls[0] : null;
   const page = Math.max(1, toInt(url.searchParams.get("page"), 1));
   const pageSize = Math.min(200, Math.max(1, toInt(url.searchParams.get("page_size"), 50)));
 
-  const [summary, byUrl, byDevice, perUrlDetails] = await Promise.all([
-    getSummary(env, range.from, range.to),
-    getByUrl(env, range.from, range.to),
-    getByDevice(env, range.from, range.to),
+  const [configuredUrls, byUrlRaw, summary, byDevice, perUrlDetails] = await Promise.all([
+    getConfiguredUrls(env),
+    getByUrlRaw(env, range.from, range.to, selectedUrls),
+    getSummaryForUrls(env, range.from, range.to, selectedUrls),
+    getByDevice(env, range.from, range.to, null, selectedUrls),
     getPerUrlDetails(env, range.from, range.to, selectedUrl, page, pageSize),
   ]);
+
+  const byUrl = mergeByUrlWithUniverse(configuredUrls, byUrlRaw, selectedUrls);
 
   return json(
     {
       ok: true,
       range: { from: range.from, to: range.to },
+      applied_filters: { urls: selectedUrls },
+      configured_urls: configuredUrls,
       summary: {
         total_exposures: Number(summary?.total_exposures || 0),
         unique_sessions: Number(summary?.unique_sessions || 0),
         unique_ips: Number(summary?.unique_ips || 0),
       },
-      by_url: byUrl.map((r) => ({
-        url: r.url,
-        exposures: Number(r.exposures || 0),
-      })),
+      by_url: byUrl,
       by_device: byDevice.map((r) => ({
         device_type: r.device_type || "unknown",
         exposures: Number(r.exposures || 0),
@@ -294,17 +471,28 @@ async function handleReport(req, env, headers) {
 async function handleCsv(req, env, headers) {
   const url = new URL(req.url);
   const range = parseReportRange(url);
-  if (range.error) {
-    return csv(`error\n${escapeCsv(range.error)}\n`, 400, headers);
-  }
+  if (range.error) return csv(`error\n${escapeCsv(range.error)}\n`, 400, headers);
 
-  const selectedUrl = url.searchParams.get("url") || null;
+  const selectedUrls = parseUrlFilters(url);
+  const selectedUrl = selectedUrls.length > 0 ? selectedUrls[0] : null;
 
   if (!selectedUrl) {
-    const byUrl = await getByUrl(env, range.from, range.to);
-    const lines = ["url,exposures"];
+    const configuredUrls = await getConfiguredUrls(env);
+    const byUrlRaw = await getByUrlRaw(env, range.from, range.to, selectedUrls);
+    const byUrl = mergeByUrlWithUniverse(configuredUrls, byUrlRaw, selectedUrls);
+    const lines = [
+      "url,exposures,unique_ips,daily_repeated_ips,primary_device_type,engagement_ratio,last_exposure_time",
+    ];
     for (const row of byUrl) {
-      lines.push(`${escapeCsv(row.url)},${Number(row.exposures || 0)}`);
+      lines.push([
+        escapeCsv(row.url),
+        Number(row.exposures || 0),
+        Number(row.unique_ips || 0),
+        Number(row.daily_repeated_ips || 0),
+        escapeCsv(row.primary_device_type || "unknown"),
+        Number(row.engagement_ratio || 0),
+        escapeCsv(row.last_exposure_iso || ""),
+      ].join(","));
     }
     return csv(lines.join("\n") + "\n", 200, headers);
   }
@@ -324,13 +512,9 @@ async function handleCsv(req, env, headers) {
       )}`
     );
   }
-
   for (const dv of detail.by_device) {
-    lines.push(
-      `${escapeCsv("device")},${escapeCsv(selectedUrl)},${escapeCsv(dv.device_type)},${dv.exposures}`
-    );
+    lines.push(`${escapeCsv("device")},${escapeCsv(selectedUrl)},${escapeCsv(dv.device_type)},${dv.exposures}`);
   }
-
   for (const userId of detail.user_ids) {
     lines.push(`${escapeCsv("user_id")},${escapeCsv(selectedUrl)},${escapeCsv(userId)},1`);
   }
@@ -350,32 +534,20 @@ export default {
     const origin = req.headers.get("origin") || "*";
     const headers = corsHeaders(origin);
 
-    if (req.method === "OPTIONS") {
-      return new Response(null, { status: 204, headers });
-    }
+    if (req.method === "OPTIONS") return new Response(null, { status: 204, headers });
 
     const url = new URL(req.url);
-
     try {
-      if (url.pathname === "/health") {
-        return json({ ok: true, now: Date.now() }, 200, headers);
-      }
-
-      if (url.pathname === "/api/exposure" && req.method === "POST") {
-        return await handleExposure(req, env, headers);
-      }
+      if (url.pathname === "/health") return json({ ok: true, now: Date.now() }, 200, headers);
+      if (url.pathname === "/api/exposure" && req.method === "POST") return await handleExposure(req, env, headers);
+      if (url.pathname === "/api/config/urls" && req.method === "POST") return await handleConfigUrls(req, env, headers);
 
       if ((url.pathname === "/api/report" || url.pathname === "/api/report.csv") && !checkInternalToken(req, env)) {
         return json({ ok: false, error: "Unauthorized" }, 401, headers);
       }
 
-      if (url.pathname === "/api/report" && req.method === "GET") {
-        return await handleReport(req, env, headers);
-      }
-
-      if (url.pathname === "/api/report.csv" && req.method === "GET") {
-        return await handleCsv(req, env, headers);
-      }
+      if (url.pathname === "/api/report" && req.method === "GET") return await handleReport(req, env, headers);
+      if (url.pathname === "/api/report.csv" && req.method === "GET") return await handleCsv(req, env, headers);
 
       return json({ ok: false, error: "Not Found" }, 404, headers);
     } catch (err) {

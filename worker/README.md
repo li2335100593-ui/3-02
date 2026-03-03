@@ -30,8 +30,9 @@ npx wrangler deploy
 ## Endpoints
 
 - `POST /api/exposure`
-- `GET /api/report?from=<ms>&to=<ms>&url=<optional>&page=1&page_size=50`
-- `GET /api/report.csv?from=<ms>&to=<ms>&url=<optional>`
+- `POST /api/config/urls` (sync scheduler URL list)
+- `GET /api/report?from=<ms>&to=<ms>&url=<optional>&urls=<u1,u2,...>&page=1&page_size=50`
+- `GET /api/report.csv?from=<ms>&to=<ms>&url=<optional>&urls=<u1,u2,...>`
 - `GET /health`
 
 ## Repeated IP Metric

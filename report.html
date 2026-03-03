@@ -3,263 +3,257 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Exposure Journal</title>
+  <title>Exposure Journal V2</title>
   <style>
     :root {
-      --bg: #f6f1e8;
-      --ink: #191714;
-      --muted: #6f675c;
-      --card: #fffaf1;
-      --line: #d9cdbb;
-      --accent: #b54c2e;
-      --accent-soft: #f3d7cb;
-      --shadow: 0 8px 24px rgba(25, 23, 20, 0.07);
+      --bg: #ffffff;
+      --ink: #1b1b1b;
+      --muted: #686868;
+      --line: #e5e7eb;
+      --line-strong: #d5d8de;
+      --card: #ffffff;
+      --soft: #f8fafc;
+      --accent: #0f5bd8;
+      --accent-soft: #e8f0ff;
+      --danger: #b42318;
+      --radius: 10px;
+      --shadow: 0 6px 18px rgba(20, 24, 32, 0.06);
     }
+
     * { box-sizing: border-box; }
     body {
       margin: 0;
       color: var(--ink);
-      font-family: "Times New Roman", Georgia, serif;
-      background:
-        radial-gradient(900px 500px at 5% 0%, #fff5e8 0%, transparent 62%),
-        radial-gradient(700px 380px at 98% 6%, #f8eadd 0%, transparent 66%),
-        var(--bg);
+      background: var(--bg);
+      font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
     }
     .wrap {
-      max-width: 1240px;
+      max-width: 1360px;
       margin: 0 auto;
-      padding: 28px 20px 44px;
+      padding: 20px 20px 36px;
     }
+
     .masthead {
-      border-top: 3px solid var(--ink);
-      border-bottom: 1px solid var(--line);
-      padding: 18px 0 16px;
-      margin-bottom: 18px;
       display: flex;
       justify-content: space-between;
       align-items: baseline;
-      gap: 12px;
-      flex-wrap: wrap;
+      gap: 10px;
+      padding-bottom: 12px;
+      border-bottom: 2px solid #141414;
+      margin-bottom: 16px;
     }
     .title {
       margin: 0;
-      font-size: clamp(30px, 5vw, 56px);
-      letter-spacing: 1px;
-      line-height: 1;
-      text-transform: uppercase;
+      font-size: clamp(28px, 3.6vw, 44px);
+      letter-spacing: 0.6px;
+      font-weight: 800;
     }
     .subtitle {
       margin: 0;
       color: var(--muted);
-      font: 700 13px/1.35 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-size: 12px;
+      letter-spacing: 1.1px;
       text-transform: uppercase;
-      letter-spacing: 1.5px;
+      font-weight: 700;
     }
+
+    .toolbar,
+    .filters,
+    .kpis,
+    .main-panel {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 12px;
+      margin-bottom: 12px;
+    }
+
     .toolbar {
       display: grid;
       grid-template-columns: 1fr 1fr auto auto;
-      gap: 10px;
-      margin: 14px 0 20px;
+      gap: 8px;
     }
-    input, button {
-      font: 14px/1.2 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      padding: 10px 12px;
-      border: 1px solid var(--line);
-      background: #fffdf8;
+
+    .filters {
+      display: grid;
+      grid-template-columns: 1.3fr 1fr auto auto auto;
+      gap: 8px;
+      align-items: start;
+    }
+
+    input, button, select {
+      width: 100%;
+      border: 1px solid var(--line-strong);
+      background: #fff;
       color: var(--ink);
+      border-radius: 8px;
+      padding: 9px 10px;
+      font: 14px/1.2 "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    }
+    select[multiple] {
+      min-height: 124px;
+      padding: 6px;
     }
     button {
       cursor: pointer;
-      transition: 0.2s ease;
+      font-weight: 600;
     }
-    button:hover { border-color: var(--ink); }
-    .primary {
-      background: var(--ink);
+    button.primary {
+      background: #161616;
       color: #fff;
-      border-color: var(--ink);
+      border-color: #161616;
     }
+
     .kpis {
       display: grid;
       grid-template-columns: repeat(4, minmax(0, 1fr));
-      gap: 12px;
-      margin-bottom: 20px;
+      gap: 10px;
     }
     .kpi {
-      background: var(--card);
       border: 1px solid var(--line);
-      padding: 16px;
-      min-height: 106px;
-      box-shadow: var(--shadow);
+      border-radius: 8px;
+      padding: 10px;
+      background: var(--soft);
     }
     .kpi h4 {
-      margin: 0 0 8px;
-      font: 700 12px/1.2 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      letter-spacing: 1.2px;
-      text-transform: uppercase;
+      margin: 0;
       color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.6px;
+      text-transform: uppercase;
     }
     .kpi .v {
-      font-size: clamp(26px, 3vw, 42px);
+      margin-top: 6px;
+      font-size: 34px;
       line-height: 1;
-      font-weight: 600;
+      font-weight: 800;
     }
-    .grid {
-      display: grid;
-      grid-template-columns: 1.45fr 1fr;
-      gap: 14px;
+
+    .main-panel h3 {
+      margin: 0 0 10px;
+      font-size: 24px;
+      font-weight: 800;
+      letter-spacing: 0.3px;
     }
-    .panel {
-      background: var(--card);
-      border: 1px solid var(--line);
-      padding: 14px;
-      box-shadow: var(--shadow);
-    }
-    .panel h3 {
-      margin: 0 0 12px;
-      font: 700 20px/1.2 Georgia, serif;
-      border-bottom: 1px solid var(--line);
-      padding-bottom: 8px;
-    }
+
     table {
       width: 100%;
       border-collapse: collapse;
-      font: 14px/1.35 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-size: 13px;
     }
     th, td {
-      border-bottom: 1px dashed var(--line);
-      padding: 8px 6px;
+      border-bottom: 1px solid var(--line);
+      padding: 9px 8px;
       text-align: left;
       vertical-align: top;
     }
     th {
-      font-weight: 700;
       color: var(--muted);
-      text-transform: uppercase;
-      letter-spacing: 0.6px;
       font-size: 11px;
+      letter-spacing: 0.4px;
+      text-transform: uppercase;
+      white-space: nowrap;
     }
-    .url {
+    td.url {
+      max-width: 320px;
       word-break: break-all;
-      max-width: 0;
-    }
-    .mono {
       font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
       font-size: 12px;
     }
-    .note, .status {
-      margin-top: 12px;
-      color: var(--muted);
-      font: 12px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    tr.url-row:hover {
+      background: #f7faff;
     }
-    .url-row {
-      cursor: pointer;
-      transition: background 0.15s ease;
-    }
-    .url-row:hover { background: #fff4ea; }
-    .url-row.active {
+    tr.url-row.active {
       background: var(--accent-soft);
-      outline: 1px solid #e6b6a3;
     }
-    .detail-head {
-      display: grid;
-      grid-template-columns: 1fr auto;
-      gap: 8px;
-      align-items: end;
-      margin-bottom: 8px;
+
+    .actions {
+      white-space: nowrap;
     }
-    .selected-url {
-      margin: 0;
-      color: var(--ink);
-      font: 600 13px/1.35 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      word-break: break-all;
+    .tiny {
+      width: auto;
+      padding: 5px 8px;
+      font-size: 12px;
     }
-    .badge {
-      display: inline-block;
-      padding: 2px 8px;
+
+    .detail-box {
       border: 1px solid var(--line);
-      font: 700 11px/1.2 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      text-transform: uppercase;
-      color: var(--muted);
-      letter-spacing: 0.8px;
+      border-radius: 8px;
       background: #fff;
+      padding: 10px;
+      margin: 8px 0;
     }
-    .detail-kpis {
+    .detail-grid {
       display: grid;
       grid-template-columns: repeat(3, minmax(0, 1fr));
       gap: 8px;
-      margin: 10px 0 14px;
+      margin-bottom: 8px;
     }
-    .detail-kpi {
+    .detail-metric {
       border: 1px solid var(--line);
-      background: #fff;
-      padding: 10px;
+      border-radius: 6px;
+      padding: 8px;
+      background: var(--soft);
     }
-    .detail-kpi h5 {
-      margin: 0 0 4px;
+    .detail-metric .k {
       color: var(--muted);
+      font-size: 11px;
       text-transform: uppercase;
-      letter-spacing: 0.6px;
-      font: 700 10px/1.2 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      letter-spacing: 0.4px;
+      font-weight: 700;
     }
-    .detail-kpi .v {
-      margin: 0;
-      font: 700 24px/1.1 Georgia, serif;
+    .detail-metric .v {
+      margin-top: 4px;
+      font-size: 24px;
+      font-weight: 800;
       color: var(--accent);
     }
-    .subgrid {
+
+    .subtables {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 10px;
+      gap: 8px;
     }
-    .user-list {
-      list-style: none;
-      margin: 0;
-      padding: 0;
-      max-height: 220px;
-      overflow: auto;
+    .user-ids {
       border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 8px;
+      margin-top: 8px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
+      font-size: 12px;
+      max-height: 160px;
+      overflow: auto;
       background: #fff;
     }
-    .user-list li {
-      padding: 7px 8px;
-      border-bottom: 1px dashed var(--line);
-      font: 12px/1.25 ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
-    }
-    .pager {
+    .muted { color: var(--muted); }
+    .status {
       margin-top: 8px;
-      display: flex;
-      gap: 8px;
-      align-items: center;
-      font: 12px/1.25 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      color: var(--muted);
-    }
-    .pager button {
-      padding: 6px 10px;
       font-size: 12px;
-    }
-    .muted {
       color: var(--muted);
-      font: 12px/1.35 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     }
-    @media (max-width: 980px) {
+    .danger { color: var(--danger); }
+
+    @media (max-width: 1080px) {
       .toolbar { grid-template-columns: 1fr 1fr; }
+      .filters { grid-template-columns: 1fr 1fr; }
       .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-      .grid { grid-template-columns: 1fr; }
+      .detail-grid { grid-template-columns: 1fr; }
+      .subtables { grid-template-columns: 1fr; }
     }
-    @media (max-width: 720px) {
-      .subgrid { grid-template-columns: 1fr; }
-      .detail-kpis { grid-template-columns: 1fr; }
-    }
-    @media (max-width: 620px) {
-      .toolbar { grid-template-columns: 1fr; }
+    @media (max-width: 680px) {
+      .toolbar,
+      .filters,
       .kpis { grid-template-columns: 1fr; }
+      .title { font-size: 30px; }
     }
   </style>
 </head>
 <body>
   <div class="wrap">
     <header class="masthead">
-      <h1 class="title">Exposure Journal</h1>
+      <h1 class="title">EXPOSURE JOURNAL</h1>
       <p class="subtitle">Internal Analytics · Auto Carousel</p>
     </header>
 
@@ -270,6 +264,14 @@
       <button id="csvBtn">下载 CSV</button>
     </section>
 
+    <section class="filters">
+      <select id="urlFilter" multiple></select>
+      <input id="urlSearch" type="text" placeholder="搜索 URL 关键字" />
+      <button id="applyFilterBtn" class="primary">应用筛选</button>
+      <button id="clearFilterBtn">清空筛选</button>
+      <button id="selectAllBtn">全选可见</button>
+    </section>
+
     <section class="kpis">
       <article class="kpi"><h4>总曝光</h4><div class="v" id="kTotal">0</div></article>
       <article class="kpi"><h4>独立会话</h4><div class="v" id="kSid">0</div></article>
@@ -277,106 +279,58 @@
       <article class="kpi"><h4>设备类型数</h4><div class="v" id="kDevice">0</div></article>
     </section>
 
-    <section class="grid">
-      <article class="panel">
-        <h3>按 URL 曝光（点击查看详情）</h3>
-        <table>
-          <thead><tr><th style="width:72%">URL</th><th style="width:28%">曝光</th></tr></thead>
-          <tbody id="urlBody"></tbody>
-        </table>
-      </article>
-
-      <article class="panel">
-        <h3>设备分布（全局）</h3>
-        <table>
-          <thead><tr><th>设备</th><th>曝光</th></tr></thead>
-          <tbody id="deviceBody"></tbody>
-        </table>
-        <div class="note">新增网站会自动出现在左侧 URL 表，不需要改前端代码。</div>
-      </article>
+    <section class="main-panel">
+      <h3>全部 URL 数据（表格优先）</h3>
+      <table>
+        <thead>
+          <tr>
+            <th style="width: 30%;">URL</th>
+            <th>曝光</th>
+            <th>独立IP</th>
+            <th>每日重复IP</th>
+            <th>主设备类型</th>
+            <th>CTR代理</th>
+            <th>最后曝光时间</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody id="mainBody"></tbody>
+      </table>
+      <div class="status" id="status">初始化中...</div>
     </section>
-
-    <section class="panel" style="margin-top:14px;">
-      <div class="detail-head">
-        <h3 style="margin:0; border-bottom:none; padding-bottom:0;">URL 详情</h3>
-        <span class="badge" id="detailBadge">未选择 URL</span>
-      </div>
-      <p class="selected-url mono" id="selectedUrlText">请先点击左侧 URL 行。</p>
-
-      <div class="detail-kpis">
-        <div class="detail-kpi"><h5>该 URL 曝光</h5><p class="v" id="dExposures">0</p></div>
-        <div class="detail-kpi"><h5>该 URL 独立 IP</h5><p class="v" id="dUniqueIp">0</p></div>
-        <div class="detail-kpi"><h5>每日重复 IP</h5><p class="v" id="dRepeatIp">0</p></div>
-      </div>
-
-      <div class="subgrid">
-        <div>
-          <h3 style="font-size:17px;">每日重复 IP 明细</h3>
-          <table>
-            <thead><tr><th>日期</th><th>重复IP</th><th>重复曝光</th></tr></thead>
-            <tbody id="repeatDayBody"></tbody>
-          </table>
-        </div>
-        <div>
-          <h3 style="font-size:17px;">该 URL 设备分布</h3>
-          <table>
-            <thead><tr><th>设备</th><th>曝光</th></tr></thead>
-            <tbody id="detailDeviceBody"></tbody>
-          </table>
-        </div>
-      </div>
-
-      <div style="margin-top:12px;">
-        <h3 style="font-size:17px;">用户唯一 ID（文本）</h3>
-        <ul id="userList" class="user-list"></ul>
-        <div class="pager">
-          <button id="prevPageBtn" type="button">上一页</button>
-          <button id="nextPageBtn" type="button">下一页</button>
-          <span id="pageInfo">第 1 页</span>
-        </div>
-        <div id="detailHint" class="muted" style="margin-top:8px;">等待详情数据。</div>
-      </div>
-    </section>
-
-    <div class="status" id="status">初始化中...</div>
   </div>
 
   <script>
-    var API_BASE = 'https://exposure-analytics.li2335100593.workers.dev';
+    var API_BASE = "https://exposure-analytics.li2335100593.workers.dev";
     var POLL_MS = 30000;
-    var USER_PAGE_SIZE = 50;
-    var timer = null;
 
     var state = {
-      selectedUrl: null,
-      userPage: 1,
-      detailTotalUsers: null,
-      cache: {
-        byUrl: []
-      }
+      allRows: [],
+      configuredUrls: [],
+      selectedUrls: [],
+      expandedUrl: null,
+      detailCache: Object.create(null),
+      urlSearch: ""
     };
 
     function nowMs() { return Date.now(); }
     function toTs(v) { return v ? new Date(v).getTime() : null; }
-    function escapeHtml(s) {
-      return String(s == null ? '' : s)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#39;');
+    function setStatus(msg, isError) {
+      var el = document.getElementById("status");
+      el.textContent = msg;
+      el.classList.toggle("danger", !!isError);
     }
 
     function setDefaultRange() {
       var now = new Date();
       var from = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-      document.getElementById('to').value = now.toISOString().slice(0, 16);
-      document.getElementById('from').value = from.toISOString().slice(0, 16);
+      document.getElementById("to").value = now.toISOString().slice(0, 16);
+      document.getElementById("from").value = from.toISOString().slice(0, 16);
     }
 
     function getRange() {
-      var from = toTs(document.getElementById('from').value);
-      var to = toTs(document.getElementById('to').value);
+      var from = toTs(document.getElementById("from").value);
+      var to = toTs(document.getElementById("to").value);
       if (!from || !to || from >= to) {
         var fallbackTo = nowMs();
         var fallbackFrom = fallbackTo - 24 * 60 * 60 * 1000;
@@ -385,232 +339,281 @@
       return { from: from, to: to };
     }
 
-    function setStatus(msg) {
-      document.getElementById('status').textContent = msg;
+    function formatNum(v) {
+      var n = Number(v || 0);
+      if (!Number.isFinite(n)) return "0";
+      return n.toLocaleString();
     }
 
-    function setDetailBadge(msg) {
-      document.getElementById('detailBadge').textContent = msg;
+    function formatRatio(v) {
+      var n = Number(v || 0);
+      if (!Number.isFinite(n)) return "0.0000";
+      return n.toFixed(4);
     }
 
-    function renderTableRows(tbodyId, rows, cols) {
-      var body = document.getElementById(tbodyId);
+    function formatTs(v, iso) {
+      if (iso) {
+        var dIso = new Date(iso);
+        return isNaN(dIso.getTime()) ? "-" : dIso.toLocaleString();
+      }
+      var n = Number(v || 0);
+      if (!Number.isFinite(n) || n <= 0) return "-";
+      var d = new Date(n);
+      return isNaN(d.getTime()) ? "-" : d.toLocaleString();
+    }
+
+    function escapeHtml(str) {
+      return String(str == null ? "" : str)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/\"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+    }
+
+    function selectedFromUi() {
+      var options = Array.from(document.getElementById("urlFilter").options);
+      return options.filter(function (o) { return o.selected; }).map(function (o) { return o.value; });
+    }
+
+    function refreshFilterOptions() {
+      var select = document.getElementById("urlFilter");
+      var pool = state.configuredUrls.length > 0
+        ? state.configuredUrls
+        : state.allRows.map(function (r) { return r.url; });
+
+      var filteredPool = pool.filter(function (u) {
+        if (!state.urlSearch) return true;
+        return u.toLowerCase().indexOf(state.urlSearch.toLowerCase()) >= 0;
+      });
+
+      select.innerHTML = filteredPool.map(function (u) {
+        var isSelected = state.selectedUrls.indexOf(u) >= 0 ? " selected" : "";
+        return "<option value=\"" + encodeURIComponent(u) + "\"" + isSelected + ">" + escapeHtml(u) + "</option>";
+      }).join("");
+
+      Array.from(select.options).forEach(function (opt) {
+        opt.value = decodeURIComponent(opt.value);
+      });
+    }
+
+    function updateKpis(data) {
+      var s = data.summary || {};
+      var byDevice = data.by_device || [];
+      document.getElementById("kTotal").textContent = formatNum(s.total_exposures);
+      document.getElementById("kSid").textContent = formatNum(s.unique_sessions);
+      document.getElementById("kIp").textContent = formatNum(s.unique_ips);
+      document.getElementById("kDevice").textContent = formatNum(byDevice.length);
+    }
+
+    function renderMainTable() {
+      var body = document.getElementById("mainBody");
+      var rows = state.allRows;
       if (!rows || rows.length === 0) {
-        body.innerHTML = '<tr><td colspan="' + cols.length + '">暂无数据</td></tr>';
+        body.innerHTML = "<tr><td colspan='8'>暂无数据</td></tr>";
         return;
       }
-      body.innerHTML = rows.map(function (r) {
-        return '<tr>' + cols.map(function (c) {
-          var cls = c === 'url' ? ' class="url mono"' : '';
-          return '<td' + cls + '>' + escapeHtml(r[c]) + '</td>';
-        }).join('') + '</tr>';
-      }).join('');
-    }
 
-    function renderUrlRows(rows) {
-      var body = document.getElementById('urlBody');
-      if (!rows || rows.length === 0) {
-        body.innerHTML = '<tr><td colspan="2">暂无数据</td></tr>';
-        return;
-      }
-      body.innerHTML = rows.map(function (r) {
-        var active = state.selectedUrl === r.url ? ' active' : '';
-        return '<tr class="url-row' + active + '" data-url="' + encodeURIComponent(r.url) + '">' +
-          '<td class="url mono">' + escapeHtml(r.url) + '</td>' +
-          '<td>' + escapeHtml(r.exposures) + '</td>' +
-        '</tr>';
-      }).join('');
-      body.querySelectorAll('.url-row').forEach(function (row) {
-        row.addEventListener('click', function () {
-          var decoded = decodeURIComponent(row.getAttribute('data-url') || '');
-          if (!decoded) return;
-          state.selectedUrl = decoded;
-          state.userPage = 1;
-          syncSelectedUrlToHash();
-          renderUrlRows(state.cache.byUrl);
-          loadDetail();
+      var html = [];
+      rows.forEach(function (r) {
+        var active = state.expandedUrl === r.url ? " active" : "";
+        html.push(
+          "<tr class='url-row" + active + "' data-url='" + encodeURIComponent(r.url) + "'>" +
+            "<td class='url'>" + escapeHtml(r.url) + "</td>" +
+            "<td>" + formatNum(r.exposures) + "</td>" +
+            "<td>" + formatNum(r.unique_ips) + "</td>" +
+            "<td>" + formatNum(r.daily_repeated_ips) + "</td>" +
+            "<td>" + escapeHtml(r.primary_device_type || "unknown") + "</td>" +
+            "<td>" + formatRatio(r.engagement_ratio) + "</td>" +
+            "<td>" + escapeHtml(formatTs(r.last_exposure_time, r.last_exposure_iso)) + "</td>" +
+            "<td class='actions'><button class='tiny detail-btn' data-url='" + encodeURIComponent(r.url) + "'>详情</button></td>" +
+          "</tr>"
+        );
+
+        if (state.expandedUrl === r.url) {
+          html.push(
+            "<tr><td colspan='8'>" + renderDetailBox(r.url) + "</td></tr>"
+          );
+        }
+      });
+      body.innerHTML = html.join("");
+
+      body.querySelectorAll(".detail-btn").forEach(function (btn) {
+        btn.addEventListener("click", function (e) {
+          e.stopPropagation();
+          var url = decodeURIComponent(btn.getAttribute("data-url"));
+          toggleDetail(url);
+        });
+      });
+
+      body.querySelectorAll("tr.url-row").forEach(function (tr) {
+        tr.addEventListener("click", function () {
+          var url = decodeURIComponent(tr.getAttribute("data-url"));
+          toggleDetail(url);
         });
       });
     }
 
-    function syncSelectedUrlToHash() {
-      var p = new URLSearchParams(window.location.hash.replace(/^#/, ''));
-      if (state.selectedUrl) p.set('url', state.selectedUrl);
-      else p.delete('url');
-      p.set('page', String(state.userPage));
-      window.location.hash = p.toString();
-    }
-
-    function loadSelectedFromHash() {
-      var p = new URLSearchParams(window.location.hash.replace(/^#/, ''));
-      state.selectedUrl = p.get('url') || null;
-      var pageNum = parseInt(p.get('page') || '1', 10);
-      state.userPage = isNaN(pageNum) || pageNum < 1 ? 1 : pageNum;
-    }
-
-    async function loadReport() {
-      var range = getRange();
-      var url = API_BASE + '/api/report?from=' + range.from + '&to=' + range.to;
-      setStatus('加载中...');
-
-      try {
-        var res = await fetch(url, { cache: 'no-store' });
-        if (!res.ok) throw new Error('HTTP ' + res.status);
-        var data = await res.json();
-
-        var sum = data.summary || {};
-        var byUrl = data.by_url || [];
-        var byDevice = data.by_device || [];
-
-        state.cache.byUrl = byUrl;
-
-        document.getElementById('kTotal').textContent = sum.total_exposures || 0;
-        document.getElementById('kSid').textContent = sum.unique_sessions || 0;
-        document.getElementById('kIp').textContent = sum.unique_ips || 0;
-        document.getElementById('kDevice').textContent = byDevice.length || 0;
-
-        if (!state.selectedUrl && byUrl.length > 0) {
-          state.selectedUrl = byUrl[0].url;
-        }
-
-        renderUrlRows(byUrl);
-        renderTableRows('deviceBody', byDevice, ['device_type', 'exposures']);
-
-        setStatus('更新于 ' + new Date().toLocaleString());
-        if (state.selectedUrl) {
-          syncSelectedUrlToHash();
-          await loadDetail();
-        } else {
-          resetDetail('没有可展示的 URL。');
-        }
-      } catch (e) {
-        setStatus('加载失败：' + e.message);
+    function renderDetailTable(rows, cols) {
+      if (!rows || rows.length === 0) {
+        return "<tr><td colspan='" + cols.length + "'>暂无数据</td></tr>";
       }
+      return rows.map(function (r) {
+        return "<tr>" + cols.map(function (c) {
+          return "<td>" + escapeHtml(r[c]) + "</td>";
+        }).join("") + "</tr>";
+      }).join("");
     }
 
-    function normalizeDetailPayload(data) {
-      var detail = data && (data.per_url_details || data.url_detail || data.detail || null);
-      if (!detail) {
-        return {
+    function renderDetailBox(url) {
+      var d = state.detailCache[url];
+      if (!d) {
+        return "<div class='detail-box muted'>详情加载中...</div>";
+      }
+
+      var users = d.user_ids || [];
+      var userHtml = users.length > 0
+        ? users.map(function (u) { return "<div>" + escapeHtml(u) + "</div>"; }).join("")
+        : "<div class='muted'>暂无用户 ID</div>";
+
+      return (
+        "<div class='detail-box'>" +
+          "<div class='detail-grid'>" +
+            "<div class='detail-metric'><div class='k'>该URL曝光</div><div class='v'>" + formatNum(d.exposures) + "</div></div>" +
+            "<div class='detail-metric'><div class='k'>该URL独立IP</div><div class='v'>" + formatNum(d.unique_ips) + "</div></div>" +
+            "<div class='detail-metric'><div class='k'>每日重复IP</div><div class='v'>" + formatNum(d.repeated_ip_days_total) + "</div></div>" +
+          "</div>" +
+          "<div class='subtables'>" +
+            "<div>" +
+              "<table><thead><tr><th>日期</th><th>重复IP</th><th>重复曝光</th></tr></thead><tbody>" +
+              renderDetailTable(d.daily_repeat_ip || [], ["day", "repeat_ips", "repeat_exposures"]) +
+              "</tbody></table>" +
+            "</div>" +
+            "<div>" +
+              "<table><thead><tr><th>设备</th><th>曝光</th></tr></thead><tbody>" +
+              renderDetailTable(d.by_device || [], ["device_type", "exposures"]) +
+              "</tbody></table>" +
+            "</div>" +
+          "</div>" +
+          "<div class='user-ids'><strong>用户唯一ID（文本）</strong><div style='margin-top:6px;'>" + userHtml + "</div></div>" +
+        "</div>"
+      );
+    }
+
+    async function loadDetail(url) {
+      var range = getRange();
+      var endpoint = API_BASE + "/api/report?from=" + range.from + "&to=" + range.to + "&url=" + encodeURIComponent(url) + "&page=1&page_size=100";
+      var res = await fetch(endpoint, { cache: "no-store" });
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      var data = await res.json();
+      state.detailCache[url] = data.per_url_details || {
+        url: url,
+        exposures: 0,
+        unique_ips: 0,
+        repeated_ip_days_total: 0,
+        daily_repeat_ip: [],
+        by_device: [],
+        user_ids: []
+      };
+    }
+
+    async function toggleDetail(url) {
+      if (state.expandedUrl === url) {
+        state.expandedUrl = null;
+        renderMainTable();
+        return;
+      }
+      state.expandedUrl = url;
+      renderMainTable();
+      try {
+        await loadDetail(url);
+      } catch (e) {
+        state.detailCache[url] = {
           exposures: 0,
           unique_ips: 0,
           repeated_ip_days_total: 0,
           daily_repeat_ip: [],
           by_device: [],
-          user_ids: [],
-          total_user_ids: null,
-          source: 'fallback'
+          user_ids: []
         };
+        setStatus("详情加载失败：" + e.message, true);
       }
-      return {
-        exposures: detail.exposures || detail.total_exposures || 0,
-        unique_ips: detail.unique_ips || 0,
-        repeated_ip_days_total: detail.repeated_ip_days_total || detail.repeat_ip_total || 0,
-        daily_repeat_ip: detail.daily_repeat_ip || [],
-        by_device: detail.by_device || detail.devices || [],
-        user_ids: detail.user_ids || [],
-        total_user_ids: detail.total_user_ids == null ? null : detail.total_user_ids,
-        source: 'api'
-      };
+      renderMainTable();
     }
 
-    function resetDetail(hint) {
-      document.getElementById('selectedUrlText').textContent = state.selectedUrl || '未选择 URL';
-      document.getElementById('dExposures').textContent = '0';
-      document.getElementById('dUniqueIp').textContent = '0';
-      document.getElementById('dRepeatIp').textContent = '0';
-      renderTableRows('repeatDayBody', [], ['day', 'repeat_ips', 'repeat_exposures']);
-      renderTableRows('detailDeviceBody', [], ['device_type', 'exposures']);
-      document.getElementById('userList').innerHTML = '<li>暂无用户 ID</li>';
-      document.getElementById('detailHint').textContent = hint || '等待详情数据。';
-      document.getElementById('pageInfo').textContent = '第 ' + state.userPage + ' 页';
-      setDetailBadge('详情不可用');
-    }
-
-    async function loadDetail() {
-      if (!state.selectedUrl) {
-        resetDetail('请选择 URL。');
-        return;
-      }
+    async function loadReport() {
       var range = getRange();
-      var detailUrl = API_BASE + '/api/report?from=' + range.from + '&to=' + range.to +
-        '&url=' + encodeURIComponent(state.selectedUrl) +
-        '&page=' + state.userPage + '&page_size=' + USER_PAGE_SIZE;
+      var endpoint = API_BASE + "/api/report?from=" + range.from + "&to=" + range.to;
+      if (state.selectedUrls.length > 0) {
+        endpoint += "&urls=" + state.selectedUrls.map(function (u) { return encodeURIComponent(u); }).join(",");
+      }
 
-      document.getElementById('selectedUrlText').textContent = state.selectedUrl;
-
+      setStatus("加载中...", false);
       try {
-        var res = await fetch(detailUrl, { cache: 'no-store' });
-        if (!res.ok) throw new Error('HTTP ' + res.status);
+        var res = await fetch(endpoint, { cache: "no-store" });
+        if (!res.ok) throw new Error("HTTP " + res.status);
         var data = await res.json();
-        var detail = normalizeDetailPayload(data);
 
-        document.getElementById('dExposures').textContent = detail.exposures;
-        document.getElementById('dUniqueIp').textContent = detail.unique_ips;
-        document.getElementById('dRepeatIp').textContent = detail.repeated_ip_days_total;
-
-        renderTableRows('repeatDayBody', detail.daily_repeat_ip, ['day', 'repeat_ips', 'repeat_exposures']);
-        renderTableRows('detailDeviceBody', detail.by_device, ['device_type', 'exposures']);
-
-        var userList = document.getElementById('userList');
-        if (!detail.user_ids || detail.user_ids.length === 0) {
-          userList.innerHTML = '<li>暂无用户 ID</li>';
-        } else {
-          userList.innerHTML = detail.user_ids.map(function (id) {
-            return '<li>' + escapeHtml(id) + '</li>';
-          }).join('');
-        }
-
-        state.detailTotalUsers = detail.total_user_ids;
-        var info = '第 ' + state.userPage + ' 页';
-        if (state.detailTotalUsers != null) {
-          info += ' / 总用户ID ' + state.detailTotalUsers;
-        }
-        document.getElementById('pageInfo').textContent = info;
-
-        if (detail.source === 'fallback') {
-          setDetailBadge('待后端详情接口');
-          document.getElementById('detailHint').textContent = '后端 detail 数据尚未返回，已显示占位。';
-        } else {
-          setDetailBadge('已加载 URL 详情');
-          document.getElementById('detailHint').textContent = '指标按所选 URL 细分展示。';
-        }
+        state.allRows = data.by_url || [];
+        state.configuredUrls = data.configured_urls || [];
+        updateKpis(data);
+        refreshFilterOptions();
+        renderMainTable();
+        setStatus("更新于 " + new Date().toLocaleString(), false);
       } catch (e) {
-        resetDetail('详情加载失败：' + e.message);
+        setStatus("加载失败：" + e.message, true);
       }
     }
 
     function downloadCsv() {
       var range = getRange();
-      var url = API_BASE + '/api/report.csv?from=' + range.from + '&to=' + range.to;
-      if (state.selectedUrl) {
-        url += '&url=' + encodeURIComponent(state.selectedUrl);
+      var endpoint = API_BASE + "/api/report.csv?from=" + range.from + "&to=" + range.to;
+      if (state.selectedUrls.length > 0) {
+        endpoint += "&urls=" + state.selectedUrls.map(function (u) { return encodeURIComponent(u); }).join(",");
       }
-      window.open(url, '_blank');
+      window.open(endpoint, "_blank");
     }
 
     function startAutoRefresh() {
-      if (timer) clearInterval(timer);
-      timer = setInterval(loadReport, POLL_MS);
+      setInterval(function () {
+        loadReport();
+      }, POLL_MS);
     }
 
-    document.getElementById('refreshBtn').addEventListener('click', function () {
+    document.getElementById("refreshBtn").addEventListener("click", function () {
       loadReport();
     });
-    document.getElementById('csvBtn').addEventListener('click', downloadCsv);
-    document.getElementById('prevPageBtn').addEventListener('click', function () {
-      if (state.userPage <= 1) return;
-      state.userPage -= 1;
-      syncSelectedUrlToHash();
-      loadDetail();
-    });
-    document.getElementById('nextPageBtn').addEventListener('click', function () {
-      state.userPage += 1;
-      syncSelectedUrlToHash();
-      loadDetail();
+    document.getElementById("csvBtn").addEventListener("click", downloadCsv);
+
+    document.getElementById("urlSearch").addEventListener("input", function (e) {
+      state.urlSearch = e.target.value || "";
+      refreshFilterOptions();
     });
 
-    loadSelectedFromHash();
+    document.getElementById("applyFilterBtn").addEventListener("click", function () {
+      state.selectedUrls = selectedFromUi();
+      state.expandedUrl = null;
+      state.detailCache = Object.create(null);
+      loadReport();
+    });
+
+    document.getElementById("clearFilterBtn").addEventListener("click", function () {
+      state.selectedUrls = [];
+      state.expandedUrl = null;
+      state.detailCache = Object.create(null);
+      refreshFilterOptions();
+      loadReport();
+    });
+
+    document.getElementById("selectAllBtn").addEventListener("click", function () {
+      var opts = Array.from(document.getElementById("urlFilter").options);
+      opts.forEach(function (o) { o.selected = true; });
+      state.selectedUrls = selectedFromUi();
+      state.expandedUrl = null;
+      state.detailCache = Object.create(null);
+      loadReport();
+    });
+
     setDefaultRange();
     loadReport();
     startAutoRefresh();
