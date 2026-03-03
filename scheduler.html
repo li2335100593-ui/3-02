@@ -67,48 +67,50 @@
         </div>
     </div>
 
-    <script data-urls='["https://livingroom-design.ddmmoney.com/", "https://old-house-renovation.chworld.com.tw/"]' data-interval="300" data-cycle="3600">
-        (function() {
+    <!-- 10秒一跳：data-interval="10" -->
+    <script
+      data-urls='["https://livingroom-design.ddmmoney.com/","https://old-house-renovation.chworld.com.tw/"]'
+      data-interval="10"
+      data-cycle="3600">
+        (function () {
             const scriptEl = document.currentScript;
-            
+
             // 读取配置
             let urls, interval, cycle;
             try {
                 const urlsStr = scriptEl.dataset.urls;
                 if (!urlsStr) {
-                    throw new Error('缺少必需的配置：data-urls 属性未定义');
+                    throw new Error("缺少必需的配置：data-urls 属性未定义");
                 }
+
                 urls = JSON.parse(urlsStr);
                 if (!Array.isArray(urls) || urls.length === 0) {
-                    throw new Error('data-urls 必须是非空数组');
+                    throw new Error("data-urls 必须是非空数组");
                 }
-                interval = parseInt(scriptEl.dataset.interval) || 300;
-                cycle = parseInt(scriptEl.dataset.cycle) || 3600;
-                
-                // 验证间隔参数
+
+                interval = parseInt(scriptEl.dataset.interval, 10) || 10;
+                cycle = parseInt(scriptEl.dataset.cycle, 10) || 3600;
+
                 if (interval <= 0 || cycle <= 0) {
-                    throw new Error('interval 和 cycle 必须大于 0');
+                    throw new Error("interval 和 cycle 必须大于 0");
                 }
             } catch (err) {
                 displayError(err.message);
                 return;
             }
 
-            // 构建状态 hash
+            // 构建状态 hash（包含 _sid）
             const state = {
                 _ci: 0,
                 _ct: Date.now(),
                 _iv: interval,
                 _cy: cycle,
-                _cu: btoa(JSON.stringify(urls))
-                _sid: 'sid_' + Date.now() + '_' + Math.random().toString(36).slice(2, 10)
-
-
+                _cu: btoa(JSON.stringify(urls)),
+                _sid: "sid_" + Date.now() + "_" + Math.random().toString(36).slice(2, 10)
             };
 
             // 跳转到第一个 URL
             try {
-                // 解析目标 URL，合并已有 hash
                 let targetUrl;
                 try {
                     targetUrl = new URL(urls[0], window.location.href);
@@ -116,20 +118,20 @@
                     targetUrl = new URL(urls[0]);
                 }
 
-                // 合并原有 hash 和 carousel 状态参数
+                // 合并目标 URL 原有 hash + 轮播状态
                 const mergedParams = new URLSearchParams(targetUrl.hash.substring(1));
                 Object.entries(state).forEach(([k, v]) => {
-                    mergedParams.set(k, v);
+                    mergedParams.set(k, String(v));
                 });
 
                 targetUrl.hash = mergedParams.toString();
                 window.location.href = targetUrl.toString();
             } catch (err) {
-                displayError('跳转失败：' + err.message);
+                displayError("跳转失败：" + err.message);
             }
 
             function displayError(msg) {
-                const app = document.getElementById('app');
+                const app = document.getElementById("app");
                 app.innerHTML = `
                     <div class="container">
                         <div class="error">
