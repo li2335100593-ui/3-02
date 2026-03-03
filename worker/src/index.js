@@ -223,7 +223,7 @@ async function getByUrlRaw(env, from, to, selectedUrls = []) {
       FROM (
         SELECT
           url,
-          date(received_at / 1000, 'unixepoch', 'localtime') AS day,
+          date(received_at / 1000, 'unixepoch', '+8 hours') AS day,
           ip,
           COUNT(*) AS hits
         FROM filtered
@@ -345,7 +345,7 @@ async function getPerUrlDetails(env, from, to, selectedUrl, page, pageSize) {
   const dailyRepeatRes = await env.DB.prepare(
     `WITH per_ip_day AS (
       SELECT
-        date(received_at / 1000, 'unixepoch', 'localtime') AS day,
+        date(received_at / 1000, 'unixepoch', '+8 hours') AS day,
         ip,
         COUNT(*) AS hits
       FROM exposure_events

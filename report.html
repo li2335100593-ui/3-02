@@ -313,11 +313,48 @@
       urlSearch: ""
     };
 
+    var TAIPEI_OFFSET_MS = 8 * 60 * 60 * 1000;
+    var taipeiFormatter = new Intl.DateTimeFormat("zh-TW", {
+      timeZone: "Asia/Taipei",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: false
+    });
+
     function nowMs() { return Date.now(); }
-    function toTs(v) { return v ? new Date(v).getTime() : null; }
-    function toLocalInputValue(dateObj) {
-      var d = new Date(dateObj.getTime() - dateObj.getTimezoneOffset() * 60000);
-      return d.toISOString().slice(0, 16);
+
+    function getTaipeiParts(ms) {
+      var parts = taipeiFormatter.formatToParts(new Date(ms));
+      var out = {};
+      for (var i = 0; i < parts.length; i++) {
+        var p = parts[i];
+        if (p.type !== "literal") out[p.type] = p.value;
+      }
+      return out;
+    }
+
+    function toTaipeiInputValue(ms) {
+      var p = getTaipeiParts(ms);
+      return p.year + "-" + p.month + "-" + p.day + "T" + p.hour + ":" + p.minute;
+    }
+
+    function parseTaipeiInputToTs(v) {
+      if (!v) return null;
+      var m = String(v).match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/);
+      if (!m) return null;
+      var y = Number(m[1]);
+      var mo = Number(m[2]);
+      var d = Number(m[3]);
+      var h = Number(m[4]);
+      var mi = Number(m[5]);
+      if (!Number.isFinite(y) || !Number.isFinite(mo) || !Number.isFinite(d) || !Number.isFinite(h) || !Number.isFinite(mi)) {
+        return null;
+      }
+      return Date.UTC(y, mo - 1, d, h, mi) - TAIPEI_OFFSET_MS;
     }
     function setStatus(msg, isError) {
       var el = document.getElementById("status");
@@ -326,15 +363,15 @@
     }
 
     function setDefaultRange() {
-      var now = new Date();
-      var from = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-      document.getElementById("to").value = toLocalInputValue(now);
-      document.getElementById("from").value = toLocalInputValue(from);
+      var now = nowMs();
+      var from = now - 24 * 60 * 60 * 1000;
+      document.getElementById("to").value = toTaipeiInputValue(now);
+      document.getElementById("from").value = toTaipeiInputValue(from);
     }
 
     function getRange() {
-      var from = toTs(document.getElementById("from").value);
-      var to = toTs(document.getElementById("to").value);
+      var from = parseTaipeiInputToTs(document.getElementById("from").value);
+      var to = parseTaipeiInputToTs(document.getElementById("to").value);
       if (!from || !to || from >= to) {
         var fallbackTo = nowMs();
         var fallbackFrom = fallbackTo - 24 * 60 * 60 * 1000;
@@ -356,14 +393,15 @@
     }
 
     function formatTs(v, iso) {
+      var ms = 0;
       if (iso) {
         var dIso = new Date(iso);
-        return isNaN(dIso.getTime()) ? "-" : dIso.toLocaleString();
+        ms = dIso.getTime();
+      } else {
+        ms = Number(v || 0);
       }
-      var n = Number(v || 0);
-      if (!Number.isFinite(n) || n <= 0) return "-";
-      var d = new Date(n);
-      return isNaN(d.getTime()) ? "-" : d.toLocaleString();
+      if (!Number.isFinite(ms) || ms <= 0) return "-";
+      return taipeiFormatter.format(new Date(ms));
     }
 
     function escapeHtml(str) {
@@ -563,7 +601,7 @@
         updateKpis(data);
         refreshFilterOptions();
         renderMainTable();
-        setStatus("更新于 " + new Date().toLocaleString(), false);
+        setStatus("更新于 " + taipeiFormatter.format(new Date()), false);
       } catch (e) {
         setStatus("加载失败：" + e.message, true);
       }
