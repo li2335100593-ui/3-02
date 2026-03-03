@@ -1,0 +1,8 @@
+name = "exposure-analytics"
+main = "src/index.js"
+compatibility_date = "2026-03-03"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "exposure_analytics"
+database_id = "REPLACE_WITH_D1_DATABASE_ID"
