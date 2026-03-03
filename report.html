@@ -315,6 +315,10 @@
 
     function nowMs() { return Date.now(); }
     function toTs(v) { return v ? new Date(v).getTime() : null; }
+    function toLocalInputValue(dateObj) {
+      var d = new Date(dateObj.getTime() - dateObj.getTimezoneOffset() * 60000);
+      return d.toISOString().slice(0, 16);
+    }
     function setStatus(msg, isError) {
       var el = document.getElementById("status");
       el.textContent = msg;
@@ -324,8 +328,8 @@
     function setDefaultRange() {
       var now = new Date();
       var from = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-      document.getElementById("to").value = now.toISOString().slice(0, 16);
-      document.getElementById("from").value = from.toISOString().slice(0, 16);
+      document.getElementById("to").value = toLocalInputValue(now);
+      document.getElementById("from").value = toLocalInputValue(from);
     }
 
     function getRange() {
