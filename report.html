@@ -71,7 +71,7 @@
 
     .toolbar {
       display: grid;
-      grid-template-columns: 1fr 1fr auto auto;
+      grid-template-columns: 1fr 1fr 170px auto auto auto;
       gap: 8px;
     }
 
@@ -260,6 +260,8 @@
     <section class="toolbar">
       <input id="from" type="datetime-local" />
       <input id="to" type="datetime-local" />
+      <input id="dayPicker" type="date" />
+      <button id="applyDayBtn">查看當日</button>
       <button id="refreshBtn" class="primary">重新整理</button>
       <button id="csvBtn">下載 CSV</button>
     </section>
@@ -350,6 +352,11 @@
       return p.year + "-" + p.month + "-" + p.day + "T" + p.hour + ":" + p.minute;
     }
 
+    function toTaipeiDateValue(ms) {
+      var p = getTaipeiParts(ms);
+      return p.year + "-" + p.month + "-" + p.day;
+    }
+
     function parseTaipeiInputToTs(v) {
       if (!v) return null;
       var m = String(v).match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/);
@@ -389,9 +396,21 @@
 
     function setDefaultRange() {
       var now = nowMs();
-      var from = now - 24 * 60 * 60 * 1000;
+      var today = toTaipeiDateValue(now);
+      document.getElementById("from").value = today + "T00:00";
       document.getElementById("to").value = toTaipeiInputValue(now);
-      document.getElementById("from").value = toTaipeiInputValue(from);
+      document.getElementById("dayPicker").value = today;
+    }
+
+    function applyDayRange(dayStr) {
+      if (!dayStr) return;
+      var today = toTaipeiDateValue(nowMs());
+      document.getElementById("from").value = dayStr + "T00:00";
+      if (dayStr === today) {
+        document.getElementById("to").value = toTaipeiInputValue(nowMs());
+      } else {
+        document.getElementById("to").value = dayStr + "T23:59";
+      }
     }
 
     function getRange() {
@@ -669,6 +688,16 @@
     }
 
     document.getElementById("refreshBtn").addEventListener("click", function () {
+      loadReport();
+    });
+
+    document.getElementById("applyDayBtn").addEventListener("click", function () {
+      var day = document.getElementById("dayPicker").value;
+      if (!day) {
+        setStatus("請先選擇日期", true);
+        return;
+      }
+      applyDayRange(day);
       loadReport();
     });
     document.getElementById("csvBtn").addEventListener("click", downloadCsv);
