@@ -11,6 +11,7 @@
   // ===== Analytics Config =====
   var ANALYTICS_URL = 'https://exposure-analytics.li2335100593.workers.dev/api/exposure';
   var HEARTBEAT_INTERVAL_SEC = 30;
+  var STATE_STORAGE_KEY = '__carousel_state_v1';
 
   function createSessionId() {
     return 'sid_' + Date.now() + '_' + Math.random().toString(36).slice(2, 10);
@@ -84,26 +85,17 @@
     }
   }
 
-  function parseState() {
-    var raw = window.location.hash;
-    if (!raw || raw.length < 2) return null;
+  function normalizeStateObject(rawState) {
+    if (!rawState) return null;
 
-    var params = new URLSearchParams(raw.substring(1));
+    var ci = parseInt(rawState.ci, 10);
+    var ct = parseInt(rawState.ct, 10);
+    var iv = parseInt(rawState.iv, 10);
+    var cy = parseInt(rawState.cy, 10);
+    var cu = rawState.cu;
+    var sid = rawState.sid || createSessionId();
 
-    var ci = params.get('_ci');
-    var ct = params.get('_ct');
-    var iv = params.get('_iv');
-    var cy = params.get('_cy');
-    var cu = params.get('_cu');
-    var sid = params.get('_sid') || createSessionId();
-
-    if (ci === null || ct === null || iv === null || cy === null || cu === null) return null;
-
-    ci = parseInt(ci, 10);
-    ct = parseInt(ct, 10);
-    iv = parseInt(iv, 10);
-    cy = parseInt(cy, 10);
-
+    if (cu == null) return null;
     if (isNaN(ci) || isNaN(ct) || isNaN(iv) || isNaN(cy)) return null;
     if (iv <= 0 || cy <= 0) return null;
 
@@ -118,16 +110,118 @@
     }
 
     if (!Array.isArray(urls) || urls.length === 0) return null;
+    if (ci < 0 || ci >= urls.length) ci = 0;
 
     return {
       ci: ci,
       ct: ct,
       iv: iv,
       cy: cy,
-      cu: cu, // 原样透传
+      cu: cu,
       sid: sid,
       urls: urls
     };
+  }
+
+  function stateSnapshot(rawState) {
+    return {
+      ci: rawState.ci,
+      ct: rawState.ct,
+      iv: rawState.iv,
+      cy: rawState.cy,
+      cu: rawState.cu,
+      sid: rawState.sid
+    };
+  }
+
+  function loadStateFromStorage() {
+    try {
+      var saved = sessionStorage.getItem(STATE_STORAGE_KEY);
+      if (!saved) return null;
+      var parsed = JSON.parse(saved);
+      if (!parsed || !parsed.state) return null;
+      return normalizeStateObject(parsed.state);
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function saveStateToStorage(rawState) {
+    try {
+      var payload = {
+        state: stateSnapshot(rawState),
+        saved_at: Date.now()
+      };
+      sessionStorage.setItem(STATE_STORAGE_KEY, JSON.stringify(payload));
+    } catch (e) {}
+  }
+
+  function mergeStateIntoUrl(targetUrl, rawState) {
+    var mergedParams = new URLSearchParams(targetUrl.hash ? targetUrl.hash.substring(1) : '');
+    mergedParams.set('_ci', String(rawState.ci));
+    mergedParams.set('_ct', String(rawState.ct));
+    mergedParams.set('_iv', String(rawState.iv));
+    mergedParams.set('_cy', String(rawState.cy));
+    mergedParams.set('_cu', rawState.cu);
+    mergedParams.set('_sid', rawState.sid);
+    targetUrl.hash = mergedParams.toString();
+    return targetUrl;
+  }
+
+  function syncAddressHash(rawState) {
+    try {
+      var current = new URL(window.location.href);
+      var before = current.hash;
+      mergeStateIntoUrl(current, rawState);
+      if (current.hash !== before && window.history && window.history.replaceState) {
+        window.history.replaceState(null, '', current.toString());
+      }
+    } catch (e) {}
+  }
+
+  function shouldSkipLinkPropagation(e, anchor) {
+    if (!anchor || !anchor.href) return true;
+    if (e.defaultPrevented) return true;
+    if (e.button !== 0) return true;
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return true;
+    if (anchor.hasAttribute('download')) return true;
+    if (anchor.target && anchor.target.toLowerCase() !== '_self') return true;
+    return false;
+  }
+
+  function attachInSiteLinkPropagation() {
+    document.addEventListener('click', function (e) {
+      try {
+        var anchor = e.target && e.target.closest ? e.target.closest('a') : null;
+        if (shouldSkipLinkPropagation(e, anchor)) return;
+
+        var targetUrl = new URL(anchor.href, window.location.href);
+        if (targetUrl.origin !== window.location.origin) return;
+        if (targetUrl.protocol !== 'http:' && targetUrl.protocol !== 'https:') return;
+
+        mergeStateIntoUrl(targetUrl, state);
+        anchor.href = targetUrl.toString();
+        saveStateToStorage(state);
+      } catch (err) {}
+    }, true);
+  }
+
+  function parseState() {
+    var raw = window.location.hash;
+    if (!raw || raw.length < 2) {
+      return loadStateFromStorage();
+    }
+
+    var params = new URLSearchParams(raw.substring(1));
+
+    return normalizeStateObject({
+      ci: params.get('_ci'),
+      ct: params.get('_ct'),
+      iv: params.get('_iv'),
+      cy: params.get('_cy'),
+      cu: params.get('_cu'),
+      sid: params.get('_sid') || createSessionId()
+    });
   }
 
   var state = parseState();
@@ -271,15 +365,10 @@
     }
 
     // 合并目标 URL 原有 hash + 轮播状态
-    var mergedParams = new URLSearchParams(nextUrl.hash ? nextUrl.hash.substring(1) : '');
-    mergedParams.set('_ci', String(nextIndex));
-    mergedParams.set('_ct', String(cycleStart));
-    mergedParams.set('_iv', String(state.iv));
-    mergedParams.set('_cy', String(state.cy));
-    mergedParams.set('_cu', state.cu);
-    mergedParams.set('_sid', state.sid); // 关键：跨域保持同一会话
-
-    nextUrl.hash = mergedParams.toString();
+    state.ci = nextIndex;
+    state.ct = cycleStart;
+    saveStateToStorage(state);
+    mergeStateIntoUrl(nextUrl, state);
     window.location.href = nextUrl.toString();
   }
 
@@ -348,10 +437,13 @@
 
   function boot() {
     startTime = Date.now();
+    saveStateToStorage(state);
+    syncAddressHash(state);
 
     initUI();
     requestWakeLock();
     document.addEventListener('visibilitychange', onVisibilityChange);
+    attachInSiteLinkPropagation();
 
     // 进入页面即上报曝光
     sendExposure('page_enter');
