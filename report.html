@@ -82,6 +82,49 @@
       align-items: start;
     }
 
+    .chip-list {
+      border: 1px solid var(--line-strong);
+      border-radius: 8px;
+      background: #fff;
+      min-height: 124px;
+      max-height: 180px;
+      overflow: auto;
+      padding: 8px;
+      display: flex;
+      flex-wrap: wrap;
+      align-content: flex-start;
+      gap: 8px;
+    }
+
+    .chip {
+      border: 1px solid var(--line-strong);
+      background: #fff;
+      color: var(--ink);
+      border-radius: 999px;
+      padding: 7px 12px;
+      font-size: 13px;
+      line-height: 1.2;
+      cursor: pointer;
+      max-width: 100%;
+      word-break: break-all;
+      min-height: 40px;
+      display: inline-flex;
+      align-items: center;
+    }
+
+    .chip.selected {
+      border-color: var(--accent);
+      background: var(--accent-soft);
+      color: #0b3f9a;
+      font-weight: 700;
+    }
+
+    .selected-count {
+      margin-top: 4px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
     input, button, select {
       width: 100%;
       border: 1px solid var(--line-strong);
@@ -267,7 +310,10 @@
     </section>
 
     <section class="filters">
-      <select id="urlFilter" multiple></select>
+      <div>
+        <div id="urlFilterChips" class="chip-list"></div>
+        <div id="urlSelectedCount" class="selected-count">已選 0 個主站</div>
+      </div>
       <input id="urlSearch" type="text" placeholder="搜尋 URL 關鍵字" />
       <button id="applyFilterBtn" class="primary">套用篩選</button>
       <button id="clearFilterBtn">清除篩選</button>
@@ -458,12 +504,13 @@
     }
 
     function selectedFromUi() {
-      var options = Array.from(document.getElementById("urlFilter").options);
-      return options.filter(function (o) { return o.selected; }).map(function (o) { return o.value; });
+      var chips = Array.from(document.querySelectorAll("#urlFilterChips .chip.selected"));
+      return chips.map(function (c) { return c.getAttribute("data-url") || ""; }).filter(Boolean);
     }
 
     function refreshFilterOptions() {
-      var select = document.getElementById("urlFilter");
+      var host = document.getElementById("urlFilterChips");
+      var countEl = document.getElementById("urlSelectedCount");
       var pool = state.configuredUrls.length > 0
         ? state.configuredUrls
         : state.allRows.map(function (r) { return r.url; });
@@ -473,14 +520,20 @@
         return u.toLowerCase().indexOf(state.urlSearch.toLowerCase()) >= 0;
       });
 
-      select.innerHTML = filteredPool.map(function (u) {
-        var isSelected = state.selectedUrls.indexOf(u) >= 0 ? " selected" : "";
-        return "<option value=\"" + encodeURIComponent(u) + "\"" + isSelected + ">" + escapeHtml(u) + "</option>";
+      host.innerHTML = filteredPool.map(function (u) {
+        var selectedClass = state.selectedUrls.indexOf(u) >= 0 ? " selected" : "";
+        return "<button type='button' class='chip" + selectedClass + "' data-url='" + escapeHtml(u) + "'>" + escapeHtml(u) + "</button>";
       }).join("");
 
-      Array.from(select.options).forEach(function (opt) {
-        opt.value = decodeURIComponent(opt.value);
+      host.querySelectorAll(".chip").forEach(function (chip) {
+        chip.addEventListener("click", function () {
+          chip.classList.toggle("selected");
+          state.selectedUrls = selectedFromUi();
+          countEl.textContent = "已選 " + state.selectedUrls.length + " 個主站";
+        });
       });
+
+      countEl.textContent = "已選 " + state.selectedUrls.length + " 個主站";
     }
 
     function updateKpis(data) {
@@ -581,6 +634,14 @@
               "</tbody></table>" +
             "</div>" +
           "</div>" +
+          "<div style='margin-top:8px;'><table><thead><tr><th>站內連結</th><th>曝光</th><th>獨立IP</th><th>最後曝光</th></tr></thead><tbody>" +
+          renderDetailTable((d.sub_pages || []).map(function (x) { return {
+            url: x.url,
+            exposures: x.exposures,
+            unique_ips: x.unique_ips,
+            last_exposure: formatTs(x.last_exposure_time, x.last_exposure_iso)
+          }; }), ["url", "exposures", "unique_ips", "last_exposure"]) +
+          "</tbody></table></div>" +
           "<div class='user-ids'><strong>使用者唯一 ID（文字）</strong><div style='margin-top:6px;'>" + userHtml + "</div></div>" +
         "</div>"
       );
@@ -599,6 +660,7 @@
         repeated_ip_days_total: 0,
         daily_repeat_ip: [],
         by_device: [],
+        sub_pages: [],
         user_ids: []
       };
     }
@@ -620,6 +682,7 @@
           repeated_ip_days_total: 0,
           daily_repeat_ip: [],
           by_device: [],
+          sub_pages: [],
           user_ids: []
         };
         setStatus("詳情載入失敗：" + e.message, true);
@@ -723,11 +786,13 @@
     });
 
     document.getElementById("selectAllBtn").addEventListener("click", function () {
-      var opts = Array.from(document.getElementById("urlFilter").options);
-      opts.forEach(function (o) { o.selected = true; });
-      state.selectedUrls = selectedFromUi();
+      var visible = Array.from(document.querySelectorAll("#urlFilterChips .chip"))
+        .map(function (c) { return c.getAttribute("data-url") || ""; })
+        .filter(Boolean);
+      state.selectedUrls = Array.from(new Set(visible));
       state.expandedUrl = null;
       state.detailCache = Object.create(null);
+      refreshFilterOptions();
       loadReport();
     });
 

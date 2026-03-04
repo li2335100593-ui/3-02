@@ -93,6 +93,36 @@ function toIsoOrNull(ms) {
   return new Date(n).toISOString();
 }
 
+function rootLikePattern(rootUrl) {
+  if (!rootUrl) return "%";
+  return rootUrl.endsWith("/") ? `${rootUrl}%` : `${rootUrl}/%`;
+}
+
+function buildUrlScopeClause(selectedUrls, configuredUrls) {
+  if (!selectedUrls || selectedUrls.length === 0) {
+    return { clause: "", params: [] };
+  }
+
+  const roots = new Set(configuredUrls || []);
+  const parts = [];
+  const params = [];
+
+  for (const u of selectedUrls) {
+    if (roots.has(u)) {
+      parts.push("(url = ? OR url LIKE ?)");
+      params.push(u, rootLikePattern(u));
+    } else {
+      parts.push("url = ?");
+      params.push(u);
+    }
+  }
+
+  return {
+    clause: ` AND (${parts.join(" OR ")})`,
+    params,
+  };
+}
+
 function escapeCsv(v) {
   const s = String(v ?? "");
   return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
@@ -186,7 +216,8 @@ async function handleExposure(req, env, headers) {
 }
 
 async function getSummaryForUrls(env, from, to, selectedUrls) {
-  const inClause = makeSqlInClause(selectedUrls);
+  const configuredUrls = await getConfiguredUrls(env);
+  const inClause = buildUrlScopeClause(selectedUrls, configuredUrls);
   return env.DB.prepare(
     `SELECT
       SUM(CASE WHEN event_type = 'page_enter' OR event_type IS NULL THEN 1 ELSE 0 END) AS total_exposures,
@@ -200,7 +231,8 @@ async function getSummaryForUrls(env, from, to, selectedUrls) {
 }
 
 async function getByUrlRaw(env, from, to, selectedUrls = []) {
-  const inClause = makeSqlInClause(selectedUrls);
+  const configuredUrls = await getConfiguredUrls(env);
+  const inClause = buildUrlScopeClause(selectedUrls, configuredUrls);
   const result = await env.DB.prepare(
     `WITH filtered AS (
       SELECT *
@@ -262,6 +294,87 @@ async function getByUrlRaw(env, from, to, selectedUrls = []) {
   return result.results || [];
 }
 
+async function getRowsByConfiguredRoot(env, from, to, configuredUrls, selectedUrls = []) {
+  const targetRoots = selectedUrls.length > 0
+    ? selectedUrls.filter((u) => configuredUrls.includes(u))
+    : configuredUrls;
+
+  if (!targetRoots || targetRoots.length === 0) return [];
+
+  const out = [];
+  for (const rootUrl of targetRoots) {
+    const like = rootLikePattern(rootUrl);
+    const row = await env.DB.prepare(
+      `WITH scoped AS (
+        SELECT *
+        FROM exposure_events
+        WHERE received_at >= ?
+          AND received_at <= ?
+          AND (url = ? OR url LIKE ?)
+      ),
+      repeat_day AS (
+        SELECT day, COUNT(*) AS repeat_ips
+        FROM (
+          SELECT
+            date(received_at / 1000, 'unixepoch', '+8 hours') AS day,
+            ip,
+            COUNT(*) AS hits
+          FROM scoped
+          WHERE ${exposureFilterSql()}
+            AND ip IS NOT NULL
+            AND ip <> ''
+          GROUP BY day, ip
+        ) t
+        WHERE hits >= 2
+        GROUP BY day
+      )
+      SELECT
+        ? AS url,
+        SUM(CASE WHEN event_type = 'page_enter' OR event_type IS NULL THEN 1 ELSE 0 END) AS exposures,
+        COUNT(DISTINCT CASE WHEN event_type = 'page_enter' OR event_type IS NULL THEN ip END) AS unique_ips,
+        COALESCE((SELECT SUM(repeat_ips) FROM repeat_day), 0) AS daily_repeated_ips,
+        COALESCE((
+          SELECT device_type
+          FROM scoped
+          WHERE event_type = 'page_enter' OR event_type IS NULL
+          GROUP BY device_type
+          ORDER BY COUNT(*) DESC, device_type ASC
+          LIMIT 1
+        ), 'unknown') AS primary_device_type,
+        CASE
+          WHEN SUM(CASE WHEN event_type = 'page_enter' OR event_type IS NULL THEN 1 ELSE 0 END) > 0
+          THEN ROUND(
+            CAST(SUM(CASE WHEN event_type = 'heartbeat' THEN 1 ELSE 0 END) AS REAL) /
+            SUM(CASE WHEN event_type = 'page_enter' OR event_type IS NULL THEN 1 ELSE 0 END),
+            4
+          )
+          ELSE 0
+        END AS engagement_ratio,
+        MAX(CASE WHEN event_type = 'page_enter' OR event_type IS NULL THEN received_at ELSE NULL END) AS last_exposure_time
+      FROM scoped`
+    )
+      .bind(from, to, rootUrl, like, rootUrl)
+      .first();
+
+    out.push({
+      url: rootUrl,
+      exposures: Number(row?.exposures || 0),
+      unique_ips: Number(row?.unique_ips || 0),
+      daily_repeated_ips: Number(row?.daily_repeated_ips || 0),
+      primary_device_type: row?.primary_device_type || "unknown",
+      engagement_ratio: Number(row?.engagement_ratio || 0),
+      last_exposure_time: Number(row?.last_exposure_time || 0),
+      last_exposure_iso: toIsoOrNull(row?.last_exposure_time),
+    });
+  }
+
+  out.sort((a, b) => {
+    if (b.exposures !== a.exposures) return b.exposures - a.exposures;
+    return a.url.localeCompare(b.url);
+  });
+  return out;
+}
+
 function mergeByUrlWithUniverse(configuredUrls, byUrlRaw, selectedUrls = []) {
   const metricMap = new Map();
   for (const row of byUrlRaw) {
@@ -313,7 +426,8 @@ function mergeByUrlWithUniverse(configuredUrls, byUrlRaw, selectedUrls = []) {
 }
 
 async function getByDevice(env, from, to, selectedUrl = null, selectedUrls = []) {
-  const inClause = makeSqlInClause(selectedUrls);
+  const configuredUrls = await getConfiguredUrls(env);
+  const inClause = buildUrlScopeClause(selectedUrls, configuredUrls);
   let sql = `SELECT device_type, COUNT(*) AS exposures
     FROM exposure_events
     WHERE received_at >= ? AND received_at <= ? AND ${exposureFilterSql()}${inClause.clause}`;
@@ -332,14 +446,20 @@ async function getByDevice(env, from, to, selectedUrl = null, selectedUrls = [])
 async function getPerUrlDetails(env, from, to, selectedUrl, page, pageSize) {
   if (!selectedUrl) return null;
 
+  const configuredUrls = await getConfiguredUrls(env);
+  const isRoot = configuredUrls.includes(selectedUrl);
+  const rootLike = rootLikePattern(selectedUrl);
+  const detailScopeClause = isRoot ? "(url = ? OR url LIKE ?)" : "url = ?";
+  const detailScopeParams = isRoot ? [selectedUrl, rootLike] : [selectedUrl];
+
   const detailBase = await env.DB.prepare(
     `SELECT
       SUM(CASE WHEN event_type = 'page_enter' OR event_type IS NULL THEN 1 ELSE 0 END) AS exposures,
       COUNT(DISTINCT CASE WHEN event_type = 'page_enter' OR event_type IS NULL THEN ip END) AS unique_ips
     FROM exposure_events
-    WHERE received_at >= ? AND received_at <= ? AND url = ?`
+    WHERE received_at >= ? AND received_at <= ? AND ${detailScopeClause}`
   )
-    .bind(from, to, selectedUrl)
+    .bind(from, to, ...detailScopeParams)
     .first();
 
   const dailyRepeatRes = await env.DB.prepare(
@@ -351,7 +471,7 @@ async function getPerUrlDetails(env, from, to, selectedUrl, page, pageSize) {
       FROM exposure_events
       WHERE received_at >= ?
         AND received_at <= ?
-        AND url = ?
+        AND ${detailScopeClause}
         AND ${exposureFilterSql()}
         AND ip IS NOT NULL
         AND ip <> ''
@@ -366,7 +486,7 @@ async function getPerUrlDetails(env, from, to, selectedUrl, page, pageSize) {
     GROUP BY day
     ORDER BY day DESC`
   )
-    .bind(from, to, selectedUrl)
+    .bind(from, to, ...detailScopeParams)
     .all();
 
   const dailyRepeat = (dailyRepeatRes.results || []).map((r) => ({
@@ -376,19 +496,19 @@ async function getPerUrlDetails(env, from, to, selectedUrl, page, pageSize) {
   }));
 
   const totalRepeatedIpDays = dailyRepeat.reduce((acc, r) => acc + r.repeat_ips, 0);
-  const byDevice = await getByDevice(env, from, to, selectedUrl, []);
+  const byDevice = await getByDevice(env, from, to, null, [selectedUrl]);
 
   const totalUsersRes = await env.DB.prepare(
     `SELECT COUNT(DISTINCT vid) AS total_user_ids
     FROM exposure_events
     WHERE received_at >= ?
       AND received_at <= ?
-      AND url = ?
+      AND ${detailScopeClause}
       AND ${exposureFilterSql()}
       AND vid IS NOT NULL
       AND vid <> ''`
   )
-    .bind(from, to, selectedUrl)
+    .bind(from, to, ...detailScopeParams)
     .first();
 
   const offset = (page - 1) * pageSize;
@@ -397,7 +517,7 @@ async function getPerUrlDetails(env, from, to, selectedUrl, page, pageSize) {
     FROM exposure_events
     WHERE received_at >= ?
       AND received_at <= ?
-      AND url = ?
+      AND ${detailScopeClause}
       AND ${exposureFilterSql()}
       AND vid IS NOT NULL
       AND vid <> ''
@@ -405,7 +525,24 @@ async function getPerUrlDetails(env, from, to, selectedUrl, page, pageSize) {
     ORDER BY exposures DESC, user_id ASC
     LIMIT ? OFFSET ?`
   )
-    .bind(from, to, selectedUrl, pageSize, offset)
+    .bind(from, to, ...detailScopeParams, pageSize, offset)
+    .all();
+
+  const subPageRes = await env.DB.prepare(
+    `SELECT
+      url,
+      SUM(CASE WHEN event_type = 'page_enter' OR event_type IS NULL THEN 1 ELSE 0 END) AS exposures,
+      COUNT(DISTINCT CASE WHEN event_type = 'page_enter' OR event_type IS NULL THEN ip END) AS unique_ips,
+      MAX(CASE WHEN event_type = 'page_enter' OR event_type IS NULL THEN received_at ELSE NULL END) AS last_exposure_time
+    FROM exposure_events
+    WHERE received_at >= ?
+      AND received_at <= ?
+      AND ${detailScopeClause}
+    GROUP BY url
+    ORDER BY exposures DESC, url ASC
+    LIMIT 50`
+  )
+    .bind(from, to, ...detailScopeParams)
     .all();
 
   return {
@@ -417,6 +554,13 @@ async function getPerUrlDetails(env, from, to, selectedUrl, page, pageSize) {
     by_device: byDevice.map((r) => ({
       device_type: r.device_type || "unknown",
       exposures: Number(r.exposures || 0),
+    })),
+    sub_pages: (subPageRes.results || []).map((r) => ({
+      url: r.url,
+      exposures: Number(r.exposures || 0),
+      unique_ips: Number(r.unique_ips || 0),
+      last_exposure_time: Number(r.last_exposure_time || 0),
+      last_exposure_iso: toIsoOrNull(r.last_exposure_time),
     })),
     user_ids: (userRes.results || []).map((r) => r.user_id),
     total_user_ids: Number(totalUsersRes?.total_user_ids || 0),
@@ -435,15 +579,14 @@ async function handleReport(req, env, headers) {
   const page = Math.max(1, toInt(url.searchParams.get("page"), 1));
   const pageSize = Math.min(200, Math.max(1, toInt(url.searchParams.get("page_size"), 50)));
 
-  const [configuredUrls, byUrlRaw, summary, byDevice, perUrlDetails] = await Promise.all([
+  const [configuredUrls, summary, byDevice, perUrlDetails] = await Promise.all([
     getConfiguredUrls(env),
-    getByUrlRaw(env, range.from, range.to, selectedUrls),
     getSummaryForUrls(env, range.from, range.to, selectedUrls),
     getByDevice(env, range.from, range.to, null, selectedUrls),
     getPerUrlDetails(env, range.from, range.to, selectedUrl, page, pageSize),
   ]);
 
-  const byUrl = mergeByUrlWithUniverse(configuredUrls, byUrlRaw, selectedUrls);
+  const byUrl = await getRowsByConfiguredRoot(env, range.from, range.to, configuredUrls, selectedUrls);
 
   return json(
     {
@@ -478,8 +621,7 @@ async function handleCsv(req, env, headers) {
 
   if (!selectedUrl) {
     const configuredUrls = await getConfiguredUrls(env);
-    const byUrlRaw = await getByUrlRaw(env, range.from, range.to, selectedUrls);
-    const byUrl = mergeByUrlWithUniverse(configuredUrls, byUrlRaw, selectedUrls);
+    const byUrl = await getRowsByConfiguredRoot(env, range.from, range.to, configuredUrls, selectedUrls);
     const lines = [
       "url,exposures,unique_ips,daily_repeated_ips,primary_device_type,engagement_ratio,last_exposure_time",
     ];
