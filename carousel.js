@@ -48,18 +48,16 @@
 
       var body = JSON.stringify(payload);
 
-      // 优先 sendBeacon（跳转前更稳）
-      if (navigator.sendBeacon) {
+      if (eventType === 'page_leave' && navigator.sendBeacon) {
         try {
-          var ok = navigator.sendBeacon(
+          var beaconOk = navigator.sendBeacon(
             ANALYTICS_URL,
             new Blob([body], { type: 'application/json' })
           );
-          if (ok) return;
+          if (beaconOk) return;
         } catch (e) {}
       }
 
-      // 降级 fetch keepalive
       fetch(ANALYTICS_URL, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
