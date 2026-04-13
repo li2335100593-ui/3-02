@@ -1,184 +1,215 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>轮播调度器</title>
-    <style>
-        body {
-            margin: 0;
-            padding: 0;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            height: 100vh;
-            background: #f5f5f5;
-        }
-        .container {
-            text-align: center;
-            background: white;
-            padding: 40px;
-            border-radius: 8px;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-            max-width: 400px;
-        }
-        .loading {
-            font-size: 16px;
-            color: #333;
-            margin-bottom: 16px;
-        }
-        .spinner {
-            display: inline-block;
-            width: 24px;
-            height: 24px;
-            border: 3px solid #e0e0e0;
-            border-top-color: #1976d2;
-            border-radius: 50%;
-            animation: spin 0.8s linear infinite;
-        }
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-        .error {
-            color: #d32f2f;
-            text-align: left;
-            background: #ffebee;
-            padding: 16px;
-            border-radius: 4px;
-            border-left: 4px solid #d32f2f;
-            white-space: pre-wrap;
-            word-break: break-word;
-            font-family: monospace;
-            font-size: 12px;
-        }
-        .error-title {
-            font-weight: bold;
-            margin-bottom: 8px;
-            color: #b71c1c;
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>轮播调度器</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      background: #f5f5f5;
+    }
+    .container {
+      text-align: center;
+      background: white;
+      padding: 40px;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      max-width: 400px;
+    }
+    .loading {
+      font-size: 16px;
+      color: #333;
+      margin-bottom: 16px;
+    }
+    .spinner {
+      display: inline-block;
+      width: 24px;
+      height: 24px;
+      border: 3px solid #e0e0e0;
+      border-top-color: #1976d2;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    .error {
+      color: #d32f2f;
+      text-align: left;
+      background: #ffebee;
+      padding: 16px;
+      border-radius: 4px;
+      border-left: 4px solid #d32f2f;
+      white-space: pre-wrap;
+      word-break: break-word;
+      font-family: monospace;
+      font-size: 12px;
+    }
+    .error-title {
+      font-weight: bold;
+      margin-bottom: 8px;
+      color: #b71c1c;
+    }
+    .uid-badge {
+      display: inline-block;
+      margin-top: 12px;
+      padding: 4px 12px;
+      background: #e3f2fd;
+      color: #1565c0;
+      border-radius: 12px;
+      font-size: 13px;
+    }
+  </style>
 </head>
 <body>
-    <div class="container" id="app">
-        <div class="loading">
-            <div class="spinner"></div>
-            <p>启动轮播中...</p>
-        </div>
-    </div>
 
-    <script
-      data-urls='["https://livingroom-design.ddmmoney.com/","https://old-house-renovation.chworld.com.tw/"]'
-      data-interval="300"
-      data-cycle="3600">
-        (function () {
-            const scriptEl = document.currentScript;
-            const analyticsBase = "https://exposure-analytics.li2335100593.workers.dev";
+<div id="app" class="container">
+  <div class="spinner"></div>
+  <div class="loading">启动轮播中...</div>
+  <div id="uid-display"></div>
+</div>
 
-            // 读取配置
-            let urls, interval, cycle;
-            try {
-                const urlsStr = scriptEl.dataset.urls;
-                if (!urlsStr) {
-                    throw new Error("缺少必需的配置：data-urls 属性未定义");
-                }
+<script
+  data-urls='[
+    "https://domain-a.com/page1",
+    "https://domain-b.com/page2"
+  ]'
+  data-interval="300"
+  data-cycle="3600"
+>
+(function () {
+  var scriptEl = document.currentScript;
+  var analyticsBase = "https://exposure-analytics.li2335100593.workers.dev";
 
-                urls = JSON.parse(urlsStr);
-                if (!Array.isArray(urls) || urls.length === 0) {
-                    throw new Error("data-urls 必须是非空数组");
-                }
+  // ===== 1. 读取播放人员身份 _u =====
+  // 优先级: ?u=xxx > #u=xxx > 空
+  function getUserId() {
+    // 从 query string 读
+    try {
+      var qp = new URLSearchParams(window.location.search);
+      if (qp.get('u')) return qp.get('u');
+    } catch (e) {}
+    // 从 hash 读
+    try {
+      var hp = new URLSearchParams(window.location.hash.substring(1));
+      if (hp.get('u')) return hp.get('u');
+      if (hp.get('_u')) return hp.get('_u');
+    } catch (e) {}
+    return null;
+  }
 
-                interval = parseInt(scriptEl.dataset.interval, 10) || 300;
-                cycle = parseInt(scriptEl.dataset.cycle, 10) || 3600;
+  var uid = getUserId();
 
-                if (interval <= 0 || cycle <= 0) {
-                    throw new Error("interval 和 cycle 必须大于 0");
-                }
-            } catch (err) {
-                displayError(err.message);
-                return;
-            }
+  // 显示身份标识
+  if (uid) {
+    var badge = document.getElementById('uid-display');
+    if (badge) badge.innerHTML = '<div class="uid-badge">\uD83D\uDC64 ' + uid + '</div>';
+  }
 
-            // 构建状态 hash（包含 _sid）
-            const state = {
-                _ci: 0,
-                _ct: Date.now(),
-                _iv: interval,
-                _cy: cycle,
-                _cu: btoa(JSON.stringify(urls)),
-                _sid: "sid_" + Date.now() + "_" + Math.random().toString(36).slice(2, 10)
-            };
+  // ===== 2. 读取轮播配置 =====
+  var urls, interval, cycle;
+  try {
+    var urlsStr = scriptEl.dataset.urls;
+    if (!urlsStr) {
+      throw new Error("缺少必需的配置：data-urls 属性未定义");
+    }
+    urls = JSON.parse(urlsStr);
+    if (!Array.isArray(urls) || urls.length === 0) {
+      throw new Error("data-urls 必须是非空数组");
+    }
+    interval = parseInt(scriptEl.dataset.interval, 10) || 300;
+    cycle = parseInt(scriptEl.dataset.cycle, 10) || 3600;
+    if (interval <= 0 || cycle <= 0) {
+      throw new Error("interval 和 cycle 必须大于 0");
+    }
+  } catch (err) {
+    displayError(err.message);
+    return;
+  }
 
-            // 先同步 URL 配置到统计后端（非阻塞）
-            syncConfiguredUrls(urls)
-                .catch(() => {})
-                .finally(startRedirect);
+  // ===== 3. 构建状态（包含 _u） =====
+  var state = {
+    _ci: 0,
+    _ct: Date.now(),
+    _iv: interval,
+    _cy: cycle,
+    _cu: btoa(JSON.stringify(urls)),
+    _sid: "sid_" + Date.now() + "_" + Math.random().toString(36).slice(2, 10)
+  };
 
-            function startRedirect() {
-                try {
-                    let targetUrl;
-                    try {
-                        targetUrl = new URL(urls[0], window.location.href);
-                    } catch (e) {
-                        targetUrl = new URL(urls[0]);
-                    }
+  // 如果有 uid，加入状态
+  if (uid) {
+    state._u = uid;
+  }
 
-                    // 合并目标 URL 原有 hash + 轮播状态
-                    const mergedParams = new URLSearchParams(targetUrl.hash.substring(1));
-                    Object.entries(state).forEach(([k, v]) => {
-                        mergedParams.set(k, String(v));
-                    });
+  // ===== 4. 同步配置到后端（非阻塞） =====
+  syncConfiguredUrls(urls)
+    .catch(function () {})
+    .finally(startRedirect);
 
-                    targetUrl.hash = mergedParams.toString();
-                    window.location.href = targetUrl.toString();
-                } catch (err) {
-                    displayError("跳转失败：" + err.message);
-                }
-            }
+  function startRedirect() {
+    try {
+      var targetUrl;
+      try {
+        targetUrl = new URL(urls[0], window.location.href);
+      } catch (e) {
+        targetUrl = new URL(urls[0]);
+      }
 
-            async function syncConfiguredUrls(urlsToSync) {
-                const payload = JSON.stringify({
-                    source: "scheduler",
-                    urls: urlsToSync
-                });
+      var mergedParams = new URLSearchParams(targetUrl.hash.substring(1));
+      Object.entries(state).forEach(function (pair) {
+        mergedParams.set(pair[0], String(pair[1]));
+      });
 
-                if (navigator.sendBeacon) {
-                    try {
-                        const ok = navigator.sendBeacon(
-                            analyticsBase + "/api/config/urls",
-                            new Blob([payload], { type: "application/json" })
-                        );
-                        if (ok) return;
-                    } catch (e) {}
-                }
+      targetUrl.hash = mergedParams.toString();
+      window.location.href = targetUrl.toString();
+    } catch (err) {
+      displayError("跳转失败：" + err.message);
+    }
+  }
 
-                const controller = new AbortController();
-                const timer = setTimeout(() => controller.abort(), 300);
-                try {
-                    await fetch(analyticsBase + "/api/config/urls", {
-                        method: "POST",
-                        headers: { "content-type": "application/json" },
-                        body: payload,
-                        keepalive: true,
-                        signal: controller.signal
-                    });
-                } finally {
-                    clearTimeout(timer);
-                }
-            }
+  function syncConfiguredUrls(urlsToSync) {
+    var payload = JSON.stringify({
+      source: "scheduler",
+      urls: urlsToSync,
+      uid: uid || null
+    });
 
-            function displayError(msg) {
-                const app = document.getElementById("app");
-                app.innerHTML = `
-                    <div class="container">
-                        <div class="error">
-                            <div class="error-title">⚠️ 启动失败</div>
-                            ${msg}
-                        </div>
-                    </div>
-                `;
-            }
-        })();
-    </script>
+    if (navigator.sendBeacon) {
+      try {
+        var ok = navigator.sendBeacon(
+          analyticsBase + "/api/config/urls",
+          new Blob([payload], { type: "application/json" })
+        );
+        if (ok) return Promise.resolve();
+      } catch (e) {}
+    }
+
+    var controller = new AbortController();
+    var timer = setTimeout(function () { controller.abort(); }, 300);
+    return fetch(analyticsBase + "/api/config/urls", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: payload,
+      keepalive: true,
+      signal: controller.signal
+    }).finally(function () {
+      clearTimeout(timer);
+    });
+  }
+
+  function displayError(msg) {
+    var app = document.getElementById("app");
+    app.innerHTML = '<div class="error"><div class="error-title">\u26A0\uFE0F 启动失败</div>' + msg + '</div>';
+  }
+})();
+</script>
 </body>
 </html>
