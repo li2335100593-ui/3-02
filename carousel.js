@@ -1,9 +1,9 @@
 /**
- * Carousel SDK v1.1 (with exposure analytics)
- * 客户嵌入脚本 — 从 URL hash 读取轮播状态，自动定时跳转到下一页面
+ * Carousel SDK v2.0 (with user identity + exposure analytics)
+ * 客户嵌入脚本 — 从 URL hash 读取轮播状态 + 播放人员身份，自动定时跳转
  *
  * Hash 格式:
- * #_ci=<index>&_ct=<cycleStartMs>&_iv=<intervalSec>&_cy=<cycleSec>&_cu=<base64URLs>[&_sid=<sessionId>]
+ * #_ci=<index>&_ct=<cycleStart>&_iv=<interval>&_cy=<cycle>&_cu=<base64urls>&_sid=<sessionId>&_u=<userId>
  */
 ;(function () {
   'use strict';
@@ -31,6 +31,7 @@
     }
   }
 
+  // ===== 上报（新增 uid 字段） =====
   function sendExposure(eventType, extra) {
     try {
       if (!state) return;
@@ -38,6 +39,7 @@
         event_type: eventType,
         sid: state.sid || null,
         vid: getVid(),
+        uid: state.uid || null,          // ← 新增：播放人员身份
         url: window.location.origin + window.location.pathname,
         page_index: state.ci,
         client_ts: Date.now()
@@ -69,7 +71,7 @@
   }
 
   /* ====================================================================
-   * Module 1 — 状态管理
+   * Module 1 — 状态管理（新增 _u 字段）
    * ==================================================================== */
 
   function decodeBase64Unicode(b64) {
@@ -94,6 +96,7 @@
     var cy = parseInt(rawState.cy, 10);
     var cu = rawState.cu;
     var sid = rawState.sid || createSessionId();
+    var uid = rawState.uid || null;       // ← 新增
 
     if (cu == null) return null;
     if (isNaN(ci) || isNaN(ct) || isNaN(iv) || isNaN(cy)) return null;
@@ -119,12 +122,13 @@
       cy: cy,
       cu: cu,
       sid: sid,
+      uid: uid,                           // ← 新增
       urls: urls
     };
   }
 
   function stateSnapshot(rawState) {
-    return {
+    var snap = {
       ci: rawState.ci,
       ct: rawState.ct,
       iv: rawState.iv,
@@ -132,6 +136,8 @@
       cu: rawState.cu,
       sid: rawState.sid
     };
+    if (rawState.uid) snap.uid = rawState.uid;  // ← 新增
+    return snap;
   }
 
   function loadStateFromStorage() {
@@ -164,6 +170,9 @@
     mergedParams.set('_cy', String(rawState.cy));
     mergedParams.set('_cu', rawState.cu);
     mergedParams.set('_sid', rawState.sid);
+    if (rawState.uid) {
+      mergedParams.set('_u', rawState.uid);   // ← 新增：传递身份
+    }
     targetUrl.hash = mergedParams.toString();
     return targetUrl;
   }
@@ -220,15 +229,16 @@
       iv: params.get('_iv'),
       cy: params.get('_cy'),
       cu: params.get('_cu'),
-      sid: params.get('_sid') || createSessionId()
+      sid: params.get('_sid') || createSessionId(),
+      uid: params.get('_u') || null          // ← 新增：从 hash 读取 _u
     });
   }
 
   var state = parseState();
-  if (!state) return; // 无有效状态静默退出
+  if (!state) return;
 
   /* ====================================================================
-   * Module 2 — 定时器（timestamp-based）
+   * Module 2 — 定时器（timestamp-based）— 无变化
    * ==================================================================== */
 
   var intervalSec = state.iv;
@@ -247,10 +257,8 @@
 
   function tick() {
     var e = elapsed();
-
     updateUI(e);
 
-    // heartbeat
     if (e >= 0 && e % HEARTBEAT_INTERVAL_SEC === 0 && e !== lastHeartbeatSec) {
       lastHeartbeatSec = e;
       sendExposure('heartbeat', { dwell_ms: e * 1000 });
@@ -262,7 +270,7 @@
   }
 
   /* ====================================================================
-   * Module 3 — Wake Lock + 降级
+   * Module 3 — Wake Lock + 降级 — 无变化
    * ==================================================================== */
 
   var wakeLockSentinel = null;
@@ -288,7 +296,6 @@
   function ensureSilentVideo() {
     try {
       if (silentVideo) return;
-
       var video = document.createElement('video');
       video.setAttribute('playsinline', '');
       video.setAttribute('muted', '');
@@ -301,11 +308,7 @@
       video.style.opacity = '0';
       video.style.pointerEvents = 'none';
       video.style.zIndex = '-1';
-
-      // 1x1 黑色视频（极小）
-      video.src =
-        'data:video/mp4;base64,AAAAIGZ0eXBpc29tAAACAGlzb21pc28yYXZjMQAAAAhmcmVlAAABQG1kYXQhEAUgpAABthYQAAAD6GxhdmM1OC4xMzQ=';
-
+      video.src = 'data:video/mp4;base64,AAAAIGZ0eXBpc29tAAACAGlzb21pc28yYXZjMQAAAAhmcmVlAAABQG1kYXQhEAUgpAABthYQAAAD6GxhdmM1OC4xMzQ=';
       document.body.appendChild(video);
       var p = video.play();
       if (p && p.catch) p.catch(function () {});
@@ -320,7 +323,7 @@
   }
 
   /* ====================================================================
-   * Module 4 — 跳转逻辑
+   * Module 4 — 跳转逻辑 — 无变化（mergeStateIntoUrl 已自动带 _u）
    * ==================================================================== */
 
   var navigated = false;
@@ -329,27 +332,17 @@
     if (navigated) return;
     navigated = true;
 
-    // 跳转前上报离开事件（非阻塞）
-    sendExposure('page_leave', {
-      dwell_ms: Date.now() - startTime
-    });
+    sendExposure('page_leave', { dwell_ms: Date.now() - startTime });
 
     if (tickTimer) clearInterval(tickTimer);
-
-    try {
-      if (wakeLockSentinel) wakeLockSentinel.release();
-    } catch (e) {}
-
-    try {
-      if (silentVideo && silentVideo.parentNode) silentVideo.parentNode.removeChild(silentVideo);
-    } catch (e) {}
+    try { if (wakeLockSentinel) wakeLockSentinel.release(); } catch (e) {}
+    try { if (silentVideo && silentVideo.parentNode) silentVideo.parentNode.removeChild(silentVideo); } catch (e) {}
 
     var urls = state.urls;
     var nextIndex = state.ci + 1;
     var cycleStart = state.ct;
     var now = Date.now();
 
-    // 周期结束：重置
     if (nextIndex >= urls.length || (now - cycleStart) >= state.cy * 1000) {
       nextIndex = 0;
       cycleStart = now;
@@ -359,21 +352,19 @@
     try {
       nextUrl = new URL(urls[nextIndex], window.location.href);
     } catch (e) {
-      // 兜底（一般不会走到）
       window.location.href = urls[nextIndex];
       return;
     }
 
-    // 合并目标 URL 原有 hash + 轮播状态
     state.ci = nextIndex;
     state.ct = cycleStart;
     saveStateToStorage(state);
-    mergeStateIntoUrl(nextUrl, state);
+    mergeStateIntoUrl(nextUrl, state);    // _u 会自动带上
     window.location.href = nextUrl.toString();
   }
 
   /* ====================================================================
-   * Module 5 — UI（4px 底部条 + 倒计时）
+   * Module 5 — UI（新增：显示播放人员身份）
    * ==================================================================== */
 
   var containerEl = null;
@@ -428,11 +419,13 @@
     var timeStr = min + ':' + (sec < 10 ? '0' : '') + sec;
 
     var pageLabel = (state.ci + 1) + '/' + state.urls.length;
-    textEl.textContent = pageLabel + ' — ' + timeStr;
+    // 如果有 uid，显示在角标上
+    var uidLabel = state.uid ? ' [' + state.uid + ']' : '';
+    textEl.textContent = pageLabel + ' — ' + timeStr + uidLabel;
   }
 
   /* ====================================================================
-   * 启动
+   * 启动 — 无变化
    * ==================================================================== */
 
   function boot() {
@@ -445,7 +438,6 @@
     document.addEventListener('visibilitychange', onVisibilityChange);
     attachInSiteLinkPropagation();
 
-    // 进入页面即上报曝光
     sendExposure('page_enter');
 
     tickTimer = setInterval(tick, 1000);
