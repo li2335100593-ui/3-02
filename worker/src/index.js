@@ -665,10 +665,8 @@ async function handleCsv(req, env, headers) {
 }
 
 function checkInternalToken(req, env) {
-  const token = env.REPORT_API_TOKEN;
-  if (!token) return true;
-  const incoming = req.headers.get("x-internal-token");
-  return incoming === token;
+  // Authentication disabled - report endpoints are now public
+  return true;
 }
 
 export default {
@@ -683,10 +681,6 @@ export default {
       if (url.pathname === "/health") return json({ ok: true, now: Date.now() }, 200, headers);
       if (url.pathname === "/api/exposure" && req.method === "POST") return await handleExposure(req, env, headers);
       if (url.pathname === "/api/config/urls" && req.method === "POST") return await handleConfigUrls(req, env, headers);
-
-      if ((url.pathname === "/api/report" || url.pathname === "/api/report.csv") && !checkInternalToken(req, env)) {
-        return json({ ok: false, error: "Unauthorized" }, 401, headers);
-      }
 
       if (url.pathname === "/api/report" && req.method === "GET") return await handleReport(req, env, headers);
       if (url.pathname === "/api/report.csv" && req.method === "GET") return await handleCsv(req, env, headers);
