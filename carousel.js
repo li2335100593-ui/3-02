@@ -27,7 +27,9 @@
       }
       return vid;
     } catch (e) {
-      return null;
+      // MEDIUM-RISK FIX: localStorage unavailable in private mode - generate fallback VID
+      console.warn('[carousel] localStorage unavailable (private mode?), using generated VID');
+      return 'vid_' + Date.now() + '_' + Math.random().toString(36).slice(2, 10);
     }
   }
 
@@ -351,8 +353,14 @@
     var nextUrl;
     try {
       nextUrl = new URL(urls[nextIndex], window.location.href);
+      // HIGH-RISK FIX: Validate protocol to prevent javascript: and data: URLs
+      if (nextUrl.protocol !== 'http:' && nextUrl.protocol !== 'https:') {
+        console.error('[carousel] Invalid protocol:', nextUrl.protocol);
+        return;
+      }
     } catch (e) {
-      window.location.href = urls[nextIndex];
+      // Invalid URL format - do not navigate
+      console.error('[carousel] Invalid URL:', urls[nextIndex]);
       return;
     }
 

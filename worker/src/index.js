@@ -19,9 +19,20 @@ function csv(text, status = 200, extraHeaders = {}) {
   });
 }
 
+const CORS_WHITELIST = [
+  "https://ad.4339.live",
+  "https://www.ad.4339.live",
+  "http://localhost:3000",
+  "http://localhost:8080",
+  "http://127.0.0.1:3000",
+  "http://127.0.0.1:8080",
+];
+
 function corsHeaders(origin = "*") {
+  // Only allow whitelisted origins. Reject spoofed origins.
+  const allowedOrigin = CORS_WHITELIST.includes(origin) ? origin : "https://ad.4339.live";
   return {
-    "access-control-allow-origin": origin,
+    "access-control-allow-origin": allowedOrigin,
     "access-control-allow-methods": "GET,POST,OPTIONS",
     "access-control-allow-headers": "content-type,x-internal-token",
     "access-control-max-age": "86400",

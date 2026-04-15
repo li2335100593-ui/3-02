@@ -160,7 +160,16 @@
       try {
         targetUrl = new URL(urls[0], window.location.href);
       } catch (e) {
-        targetUrl = new URL(urls[0]);
+        console.error('[scheduler] Invalid URL:', urls[0]);
+        displayError("无效的目标 URL");
+        return;
+      }
+
+      // HIGH-RISK FIX: Protocol validation to prevent XSS via javascript:/data: protocols
+      if (targetUrl.protocol !== 'http:' && targetUrl.protocol !== 'https:') {
+        console.error('[scheduler] Invalid protocol:', targetUrl.protocol);
+        displayError("目标 URL 协议必须是 http 或 https");
+        return;
       }
 
       var mergedParams = new URLSearchParams(targetUrl.hash.substring(1));
@@ -193,7 +202,8 @@
     }
 
     var controller = new AbortController();
-    var timer = setTimeout(function () { controller.abort(); }, 300);
+    // MEDIUM-RISK FIX: Increased timeout from 300ms to 500ms for better reliability
+    var timer = setTimeout(function () { controller.abort(); }, 500);
     return fetch(analyticsBase + "/api/config/urls", {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -207,7 +217,13 @@
 
   function displayError(msg) {
     var app = document.getElementById("app");
-    app.innerHTML = '<div class="error"><div class="error-title">\u26A0\uFE0F 启动失败</div>' + msg + '</div>';
+    // LOW-RISK FIX: Use textContent instead of innerHTML to prevent XSS
+    app.innerHTML = '<div class="error"><div class="error-title">⚠️ 启动失败</div></div>';
+    var errorDiv = app.querySelector('.error');
+    var msgDiv = document.createElement('div');
+    msgDiv.textContent = msg;
+    msgDiv.style.marginTop = '8px';
+    errorDiv.appendChild(msgDiv);
   }
 })();
 </script>

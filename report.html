@@ -370,16 +370,36 @@
     };
 
     var TAIPEI_OFFSET_MS = 8 * 60 * 60 * 1000;
-    var taipeiFormatter = new Intl.DateTimeFormat("zh-TW", {
-      timeZone: "Asia/Taipei",
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-      hour12: false
-    });
+    
+    // MEDIUM-RISK FIX: Timezone fallback if Asia/Taipei is not supported by browser
+    var taipeiFormatter;
+    try {
+      taipeiFormatter = new Intl.DateTimeFormat("zh-TW", {
+        timeZone: "Asia/Taipei",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+        hour12: false
+      });
+      // Test if timezone actually works
+      var testParts = taipeiFormatter.formatToParts(new Date());
+      if (!testParts || testParts.length === 0) throw new Error("Timezone formatting failed");
+    } catch (e) {
+      console.warn('[report] Asia/Taipei timezone not supported, falling back to UTC');
+      taipeiFormatter = new Intl.DateTimeFormat("en-US", {
+        timeZone: "UTC",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+        hour12: false
+      });
+    }
 
     function nowMs() { return Date.now(); }
 
@@ -736,18 +756,40 @@
     }
 
     function downloadCsv() {
-      var range = getRange();
-      var endpoint = API_BASE + "/api/report.csv?from=" + range.from + "&to=" + range.to;
-      if (state.selectedUrls.length > 0) {
-        endpoint += "&urls=" + state.selectedUrls.map(function (u) { return encodeURIComponent(u); }).join(",");
+      var range = getDateRange();
+      if (!range) {
+        setStatus("日期範圍無效", true);
+        return;
       }
+      
+      // LOW-RISK FIX: Add error handling for CSV download
+      try {
+        var endpoint = API_BASE + "/api/report.csv?from=" + range.from + "&to=" + range.to;
+        if (state.selectedUrls.length > 0) {
+          endpoint += "&urls=" + state.selectedUrls.map(function (u) { return encodeURIComponent(u); }).join(",");
+        }
+        
+        if (!endpoint || endpoint.length === 0) {
+          throw new Error("Invalid download URL");
+        }
+        
+        window.open(endpoint, "_blank");
+      } catch (err) {
+        setStatus("下載失敗: " + err.message, true);
+      }
+    }
       window.open(endpoint, "_blank");
     }
 
     function startAutoRefresh() {
-      setInterval(function () {
+      var timerId = setInterval(function () {
         loadReport();
       }, POLL_MS);
+      
+      // LOW-RISK FIX: Clean up timer on page unload to prevent memory leaks
+      window.addEventListener('beforeunload', function () {
+        clearInterval(timerId);
+      });
     }
 
     document.getElementById("refreshBtn").addEventListener("click", function () {
