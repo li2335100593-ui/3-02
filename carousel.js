@@ -465,6 +465,24 @@
 
   function boot() {
     // 使用 cycle start time (state.ct) 作为计时起点，确保同周期内跳转时倒计时连续
+    // 但如果 state.ct 非常新（<5秒前），而 localStorage 里有更旧的 ct，说明状态可能被错误重置了
+    var now = Date.now();
+    var ctAge = now - state.ct;
+    if (ctAge < 5000) {
+      try {
+        var localSaved = localStorage.getItem(STATE_STORAGE_KEY_LOCAL);
+        if (localSaved) {
+          var localParsed = JSON.parse(localSaved);
+          if (localParsed && localParsed.state && localParsed.state.ct) {
+            var localCtAge = now - localParsed.state.ct;
+            // 如果 localStorage 里的 ct 更旧（但不超过一个周期），用它
+            if (localCtAge > ctAge && localCtAge < state.cy * 1000) {
+              state.ct = localParsed.state.ct;
+            }
+          }
+        }
+      } catch (e) {}
+    }
     startTime = state.ct;
     saveStateToStorage(state);
     syncAddressHash(state);
