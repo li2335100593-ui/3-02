@@ -437,7 +437,8 @@
    * ==================================================================== */
 
   function boot() {
-    startTime = Date.now();
+    // 使用 cycle start time (state.ct) 作为计时起点，确保同周期内跳转时倒计时连续
+    startTime = state.ct;
     saveStateToStorage(state);
     syncAddressHash(state);
 
