@@ -376,7 +376,9 @@
     var timeStr = min + ':' + (sec < 10 ? '0' : '') + sec;
     var pageLabel = (state.ci + 1) + '/' + state.urls.length;
     var uidLabel = state.uid ? ' [' + state.uid + ']' : '';
-    textEl.textContent = pageLabel + ' — ' + timeStr + uidLabel;
+    // DEBUG: show ctAge in UI to diagnose reset issues
+    var ctAgeSec = Math.floor((now() - state.ct) / 1000);
+    textEl.textContent = pageLabel + ' — ' + timeStr + uidLabel + ' | debug:' + ctAgeSec + 's';
   }
 
   // ===== Boot =====
