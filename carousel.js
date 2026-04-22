@@ -1,42 +1,58 @@
 /**
- * Carousel SDK v2.1 (fixed: persistent cycle timing across navigation)
- * 客户嵌入脚本 — 从 URL hash + localStorage 读取轮播状态，自动定时跳转
- *
- * Hash 格式:
- * #_ci=<index>&_iv=<interval>&_cy=<cycle>&_cu=<base64urls>&_sid=<sessionId>&_u=<userId>
- *
- * 注意: _ct (cycle start time) 不再通过 hash 传递，而是通过 localStorage 全局共享
+ * Carousel SDK v2.2 (robust: cycle timing persistence via localStorage + cookie fallback)
  */
 ;(function () {
   'use strict';
 
-  // ===== Analytics Config =====
   var ANALYTICS_URL = 'https://exposure-analytics.li2335100593.workers.dev/api/exposure';
   var HEARTBEAT_INTERVAL_SEC = 30;
 
-  // localStorage keys
+  // Storage keys
   var LS_VID = '__carousel_vid';
-  var LS_CYCLE_START = '__carousel_cycle_start_v2';
-  var LS_STATE = '__carousel_state_v2';
+  var LS_CYCLE = '__carousel_cycle_v3';
+  var LS_STATE = '__carousel_state_v3';
+  var CK_CYCLE = '__carousel_cycle_v3';
 
-  function createSessionId() {
-    return 'sid_' + Date.now() + '_' + Math.random().toString(36).slice(2, 10);
+  function now() { return Date.now(); }
+
+  function createSid() {
+    return 'sid_' + now() + '_' + Math.random().toString(36).slice(2, 10);
   }
 
+  // ===== Cookie helpers =====
+  function setCookie(name, value, seconds) {
+    try {
+      var expires = '';
+      if (seconds) {
+        var d = new Date(now() + seconds * 1000);
+        expires = '; expires=' + d.toUTCString();
+      }
+      document.cookie = name + '=' + encodeURIComponent(value) + expires + '; path=/; SameSite=Lax';
+    } catch (e) {}
+  }
+
+  function getCookie(name) {
+    try {
+      var match = document.cookie.match(new RegExp('(?:^|; )' + name + '=([^;]*)'));
+      return match ? decodeURIComponent(match[1]) : null;
+    } catch (e) { return null; }
+  }
+
+  // ===== VID =====
   function getVid() {
     try {
       var vid = localStorage.getItem(LS_VID);
       if (!vid) {
-        vid = 'vid_' + Date.now() + '_' + Math.random().toString(36).slice(2, 10);
+        vid = 'vid_' + now() + '_' + Math.random().toString(36).slice(2, 10);
         localStorage.setItem(LS_VID, vid);
       }
       return vid;
     } catch (e) {
-      return 'vid_' + Date.now() + '_' + Math.random().toString(36).slice(2, 10);
+      return 'vid_' + now() + '_' + Math.random().toString(36).slice(2, 10);
     }
   }
 
-  // ===== 上报 =====
+  // ===== Analytics =====
   function sendExposure(eventType, extra) {
     try {
       if (!state) return;
@@ -47,7 +63,7 @@
         uid: state.uid || null,
         url: window.location.origin + window.location.pathname,
         page_index: state.ci,
-        client_ts: Date.now()
+        client_ts: now()
       };
       if (extra && typeof extra === 'object') {
         for (var k in extra) payload[k] = extra[k];
@@ -58,44 +74,37 @@
           if (navigator.sendBeacon(ANALYTICS_URL, new Blob([body], { type: 'application/json' }))) return;
         } catch (e) {}
       }
-      fetch(ANALYTICS_URL, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: body,
-        keepalive: true
-      }).catch(function () {});
+      fetch(ANALYTICS_URL, { method: 'POST', headers: { 'content-type': 'application/json' }, body: body, keepalive: true }).catch(function () {});
     } catch (e) {}
   }
 
-  /* ====================================================================
-   * Module 1 — 状态管理
-   * ==================================================================== */
-
-  function decodeBase64Unicode(b64) {
+  // ===== Base64 decode =====
+  function decodeB64(b64) {
     try {
-      var binary = atob(b64);
+      var bin = atob(b64);
       var bytes = [];
-      for (var i = 0; i < binary.length; i++) {
-        bytes.push('%' + ('00' + binary.charCodeAt(i).toString(16)).slice(-2));
+      for (var i = 0; i < bin.length; i++) {
+        bytes.push('%' + ('00' + bin.charCodeAt(i).toString(16)).slice(-2));
       }
       return decodeURIComponent(bytes.join(''));
     } catch (e) { return null; }
   }
 
-  function normalizeStateObject(rawState) {
-    if (!rawState) return null;
-    var ci = parseInt(rawState.ci, 10);
-    var iv = parseInt(rawState.iv, 10);
-    var cy = parseInt(rawState.cy, 10);
-    var cu = rawState.cu;
-    var sid = rawState.sid || createSessionId();
-    var uid = rawState.uid || null;
+  // ===== Normalize state =====
+  function normalize(raw) {
+    if (!raw) return null;
+    var ci = parseInt(raw.ci, 10);
+    var iv = parseInt(raw.iv, 10);
+    var cy = parseInt(raw.cy, 10);
+    var cu = raw.cu;
+    var sid = raw.sid || createSid();
+    var uid = raw.uid || null;
 
     if (cu == null) return null;
     if (isNaN(ci) || isNaN(iv) || isNaN(cy)) return null;
     if (iv <= 0 || cy <= 0) return null;
 
-    var decoded = decodeBase64Unicode(cu);
+    var decoded = decodeB64(cu);
     if (!decoded) return null;
 
     var urls;
@@ -106,164 +115,153 @@
     return { ci: ci, iv: iv, cy: cy, cu: cu, sid: sid, uid: uid, urls: urls };
   }
 
-  // 从 hash 读取状态（不含 ct）
-  function parseStateFromHash() {
+  // ===== Read state from hash =====
+  function fromHash() {
     var raw = window.location.hash;
     if (!raw || raw.length < 2) return null;
-    var params = new URLSearchParams(raw.substring(1));
-    return normalizeStateObject({
-      ci: params.get('_ci'),
-      iv: params.get('_iv'),
-      cy: params.get('_cy'),
-      cu: params.get('_cu'),
-      sid: params.get('_sid') || createSessionId(),
-      uid: params.get('_u') || null
+    var p = new URLSearchParams(raw.substring(1));
+    return normalize({
+      ci: p.get('_ci'),
+      iv: p.get('_iv'),
+      cy: p.get('_cy'),
+      cu: p.get('_cu'),
+      sid: p.get('_sid') || createSid(),
+      uid: p.get('_u') || null
     });
   }
 
-  // 从 localStorage 读取状态
-  function parseStateFromStorage() {
+  // ===== Read state from localStorage =====
+  function fromLS() {
     try {
-      var saved = localStorage.getItem(LS_STATE);
-      if (!saved) return null;
-      var parsed = JSON.parse(saved);
-      if (!parsed || !parsed.state) return null;
-      return normalizeStateObject(parsed.state);
+      var s = localStorage.getItem(LS_STATE);
+      if (!s) return null;
+      var p = JSON.parse(s);
+      return p && p.state ? normalize(p.state) : null;
     } catch (e) { return null; }
   }
 
-  // 获取全局周期开始时间（所有页面共享）
+  // ===== Get cycle start (global, shared across all pages) =====
   function getCycleStart(cy) {
+    var ct = null;
+    // Try localStorage first
     try {
-      var saved = localStorage.getItem(LS_CYCLE_START);
-      if (saved) {
-        var ct = parseInt(saved, 10);
-        var age = Date.now() - ct;
-        // 如果周期还没结束，继续用旧的
-        if (!isNaN(ct) && age >= 0 && age < cy * 1000) {
-          return ct;
-        }
+      var s = localStorage.getItem(LS_CYCLE);
+      if (s) ct = parseInt(s, 10);
+    } catch (e) {}
+    // Fallback to cookie
+    if (!ct || isNaN(ct)) {
+      var c = getCookie(CK_CYCLE);
+      if (c) ct = parseInt(c, 10);
+    }
+    // Validate
+    if (ct && !isNaN(ct)) {
+      var age = now() - ct;
+      if (age >= 0 && age < cy * 1000) {
+        return ct; // Cycle still running, reuse
       }
-    } catch (e) {}
-    // 周期已结束或没有保存的，创建新的
-    var now = Date.now();
-    try { localStorage.setItem(LS_CYCLE_START, String(now)); } catch (e) {}
-    return now;
+    }
+    // Start new cycle
+    var t = now();
+    try { localStorage.setItem(LS_CYCLE, String(t)); } catch (e) {}
+    setCookie(CK_CYCLE, String(t), cy);
+    return t;
   }
 
-  // 保存状态到 localStorage
-  function saveState(rawState) {
+  // ===== Save state =====
+  function save(st) {
     try {
-      localStorage.setItem(LS_STATE, JSON.stringify({ state: rawState, saved_at: Date.now() }));
+      localStorage.setItem(LS_STATE, JSON.stringify({ state: st, saved_at: now() }));
     } catch (e) {}
   }
 
-  // 把状态写入链接 hash（不含 ct）
-  function mergeStateIntoUrl(targetUrl, rawState) {
-    var mergedParams = new URLSearchParams(targetUrl.hash ? targetUrl.hash.substring(1) : '');
-    mergedParams.set('_ci', String(rawState.ci));
-    mergedParams.set('_iv', String(rawState.iv));
-    mergedParams.set('_cy', String(rawState.cy));
-    mergedParams.set('_cu', rawState.cu);
-    mergedParams.set('_sid', rawState.sid);
-    if (rawState.uid) mergedParams.set('_u', rawState.uid);
-    // 注意: 不再写入 _ct，ct 通过 localStorage 全局共享
-    targetUrl.hash = mergedParams.toString();
+  // ===== Merge state into link hash =====
+  function mergeIntoUrl(targetUrl, st) {
+    var p = new URLSearchParams(targetUrl.hash ? targetUrl.hash.substring(1) : '');
+    p.set('_ci', String(st.ci));
+    p.set('_iv', String(st.iv));
+    p.set('_cy', String(st.cy));
+    p.set('_cu', st.cu);
+    p.set('_sid', st.sid);
+    if (st.uid) p.set('_u', st.uid);
+    targetUrl.hash = p.toString();
     return targetUrl;
   }
 
-  function syncAddressHash(rawState) {
+  // ===== Sync hash to address bar =====
+  function syncHash(st) {
     try {
-      var current = new URL(window.location.href);
-      var before = current.hash;
-      mergeStateIntoUrl(current, rawState);
-      if (current.hash !== before && window.history && window.history.replaceState) {
-        window.history.replaceState(null, '', current.toString());
+      var cur = new URL(window.location.href);
+      var before = cur.hash;
+      mergeIntoUrl(cur, st);
+      if (cur.hash !== before && window.history && window.history.replaceState) {
+        window.history.replaceState(null, '', cur.toString());
       }
     } catch (e) {}
   }
 
-  function shouldSkipLinkPropagation(e, anchor) {
-    if (!anchor || !anchor.href) return true;
-    if (e.defaultPrevented) return true;
-    if (e.button !== 0) return true;
-    if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return true;
-    if (anchor.hasAttribute('download')) return true;
-    if (anchor.target && anchor.target.toLowerCase() !== '_self') return true;
-    return false;
-  }
-
-  function attachInSiteLinkPropagation() {
+  // ===== Intercept clicks on internal links =====
+  function attachLinkInterceptor() {
     document.addEventListener('click', function (e) {
       try {
-        var anchor = e.target && e.target.closest ? e.target.closest('a') : null;
-        if (shouldSkipLinkPropagation(e, anchor)) return;
-        var targetUrl = new URL(anchor.href, window.location.href);
-        if (targetUrl.origin !== window.location.origin) return;
-        if (targetUrl.protocol !== 'http:' && targetUrl.protocol !== 'https:') return;
-        mergeStateIntoUrl(targetUrl, state);
-        anchor.href = targetUrl.toString();
-        saveState(state);
+        var a = e.target && e.target.closest ? e.target.closest('a') : null;
+        if (!a || !a.href) return;
+        if (e.defaultPrevented) return;
+        if (e.button !== 0) return;
+        if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+        if (a.hasAttribute('download')) return;
+        if (a.target && a.target.toLowerCase() !== '_self') return;
+
+        var u = new URL(a.href, window.location.href);
+        if (u.origin !== window.location.origin) return;
+        if (u.protocol !== 'http:' && u.protocol !== 'https:') return;
+
+        mergeIntoUrl(u, state);
+        a.href = u.toString();
+        save(state);
       } catch (err) {}
     }, true);
   }
 
-  // 解析状态：优先用 hash，fallback 到 storage
-  var fromHash = parseStateFromHash();
-  var fromStorage = parseStateFromStorage();
-  var baseState = fromHash || fromStorage;
+  // ===== Parse state =====
+  var hashState = fromHash();
+  var lsState = fromLS();
+  var base = hashState || lsState;
 
-  // DEBUG info for troubleshooting
-  var debugInfo = {
-    hasHash: !!(window.location.hash && window.location.hash.length > 1),
-    hash: window.location.hash,
-    fromHash: fromHash ? 'yes' : 'no',
-    fromStorage: fromStorage ? 'yes' : 'no',
-    baseState: baseState ? 'yes' : 'no'
-  };
-
-  if (!baseState) {
-    // 没有任何状态，carousel.js 退出
-    console.log('[carousel] EXIT: no state. debug:', JSON.stringify(debugInfo));
+  if (!base) {
+    console.log('[carousel] no state, exiting');
     return;
   }
 
-  // 获取全局周期开始时间
-  var cycleStart = getCycleStart(baseState.cy);
+  var cycleStart = getCycleStart(base.cy);
 
-  // 组装最终状态
   var state = {
-    ci: baseState.ci,
+    ci: base.ci,
     ct: cycleStart,
-    iv: baseState.iv,
-    cy: baseState.cy,
-    cu: baseState.cu,
-    sid: baseState.sid,
-    uid: baseState.uid,
-    urls: baseState.urls
+    iv: base.iv,
+    cy: base.cy,
+    cu: base.cu,
+    sid: base.sid,
+    uid: base.uid,
+    urls: base.urls
   };
 
-  // DEBUG: log key info
-  console.log('[carousel] state loaded. ctAge=' + (Date.now() - state.ct) + 'ms, ci=' + state.ci + ', debug=' + JSON.stringify(debugInfo));
+  console.log('[carousel] loaded ci=' + state.ci + ' ctAge=' + (now() - state.ct) + 'ms');
 
-  /* ====================================================================
-   * Module 2 — 定时器
-   * ==================================================================== */
-
+  // ===== Timer =====
   var intervalSec = state.iv;
   var startTime = state.ct;
   var tickTimer = null;
-  var lastHeartbeatSec = -1;
+  var lastHbSec = -1;
 
   function elapsed() {
-    return Math.floor((Date.now() - startTime) / 1000);
+    return Math.floor((now() - startTime) / 1000);
   }
 
   function tick() {
     var e = elapsed();
     updateUI(e);
-    if (e >= 0 && e % HEARTBEAT_INTERVAL_SEC === 0 && e !== lastHeartbeatSec) {
-      lastHeartbeatSec = e;
+    if (e >= 0 && e % HEARTBEAT_INTERVAL_SEC === 0 && e !== lastHbSec) {
+      lastHbSec = e;
       sendExposure('heartbeat', { dwell_ms: e * 1000 });
     }
     if (e >= intervalSec) {
@@ -271,19 +269,16 @@
     }
   }
 
-  /* ====================================================================
-   * Module 3 — Wake Lock
-   * ==================================================================== */
-
+  // ===== Wake lock =====
   var wakeLockSentinel = null;
   var silentVideo = null;
 
   function requestWakeLock() {
     if ('wakeLock' in navigator && navigator.wakeLock && navigator.wakeLock.request) {
       navigator.wakeLock.request('screen')
-        .then(function (sentinel) {
-          wakeLockSentinel = sentinel;
-          sentinel.addEventListener('release', function () { wakeLockSentinel = null; });
+        .then(function (s) {
+          wakeLockSentinel = s;
+          s.addEventListener('release', function () { wakeLockSentinel = null; });
         })
         .catch(function () { ensureSilentVideo(); });
     } else {
@@ -294,18 +289,18 @@
   function ensureSilentVideo() {
     try {
       if (silentVideo) return;
-      var video = document.createElement('video');
-      video.setAttribute('playsinline', '');
-      video.setAttribute('muted', '');
-      video.muted = true;
-      video.loop = true;
-      video.autoplay = true;
-      video.style.cssText = 'position:fixed;width:1px;height:1px;opacity:0;pointerEvents:none;zIndex:-1;';
-      video.src = 'data:video/mp4;base64,AAAAIGZ0eXBpc29tAAACAGlzb21pc28yYXZjMQAAAAhmcmVlAAABQG1kYXQhEAUgpAABthYQAAAD6GxhdmM1OC4xMzQ=';
-      document.body.appendChild(video);
-      var p = video.play();
+      var v = document.createElement('video');
+      v.setAttribute('playsinline', '');
+      v.setAttribute('muted', '');
+      v.muted = true;
+      v.loop = true;
+      v.autoplay = true;
+      v.style.cssText = 'position:fixed;width:1px;height:1px;opacity:0;pointer-events:none;z-index:-1;';
+      v.src = 'data:video/mp4;base64,AAAAIGZ0eXBpc29tAAACAGlzb21pc28yYXZjMQAAAAhmcmVlAAABQG1kYXQhEAUgpAABthYQAAAD6GxhdmM1OC4xMzQ=';
+      document.body.appendChild(v);
+      var p = v.play();
       if (p && p.catch) p.catch(function () {});
-      silentVideo = video;
+      silentVideo = v;
     } catch (e) {}
   }
 
@@ -315,75 +310,58 @@
     }
   }
 
-  /* ====================================================================
-   * Module 4 — 跳转逻辑
-   * ==================================================================== */
-
+  // ===== Navigation =====
   var navigated = false;
 
   function navigate() {
     if (navigated) return;
     navigated = true;
 
-    sendExposure('page_leave', { dwell_ms: Date.now() - startTime });
+    sendExposure('page_leave', { dwell_ms: now() - startTime });
     if (tickTimer) clearInterval(tickTimer);
     try { if (wakeLockSentinel) wakeLockSentinel.release(); } catch (e) {}
     try { if (silentVideo && silentVideo.parentNode) silentVideo.parentNode.removeChild(silentVideo); } catch (e) {}
 
     var urls = state.urls;
     var nextIndex = state.ci + 1;
-    var now = Date.now();
+    var t = now();
 
-    // 检查是否需要开始新周期
-    if (nextIndex >= urls.length || (now - state.ct) >= state.cy * 1000) {
+    if (nextIndex >= urls.length || (t - state.ct) >= state.cy * 1000) {
       nextIndex = 0;
-      // 新周期，重置全局 cycle start
-      state.ct = now;
-      try { localStorage.setItem(LS_CYCLE_START, String(now)); } catch (e) {}
+      state.ct = t;
+      try { localStorage.setItem(LS_CYCLE, String(t)); } catch (e) {}
+      setCookie(CK_CYCLE, String(t), state.cy);
     }
 
     var nextUrl;
     try {
       nextUrl = new URL(urls[nextIndex], window.location.href);
-      if (nextUrl.protocol !== 'http:' && nextUrl.protocol !== 'https:') {
-        console.error('[carousel] Invalid protocol:', nextUrl.protocol);
-        return;
-      }
-    } catch (e) {
-      console.error('[carousel] Invalid URL:', urls[nextIndex]);
-      return;
-    }
+      if (nextUrl.protocol !== 'http:' && nextUrl.protocol !== 'https:') return;
+    } catch (e) { return; }
 
     state.ci = nextIndex;
-    saveState(state);
-    mergeStateIntoUrl(nextUrl, state);
+    save(state);
+    mergeIntoUrl(nextUrl, state);
     window.location.href = nextUrl.toString();
   }
 
-  /* ====================================================================
-   * Module 5 — UI
-   * ==================================================================== */
-
-  var containerEl = null;
+  // ===== UI =====
   var barEl = null;
   var textEl = null;
 
   function initUI() {
-    containerEl = document.createElement('div');
-    containerEl.id = '__carousel_container';
-    containerEl.style.cssText = 'position:fixed;left:0;bottom:0;width:100%;zIndex:2147483647;pointerEvents:none;fontFamily:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;';
+    var container = document.createElement('div');
+    container.style.cssText = 'position:fixed;left:0;bottom:0;width:100%;z-index:2147483647;pointer-events:none;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;';
 
     barEl = document.createElement('div');
-    barEl.id = '__carousel_bar';
     barEl.style.cssText = 'height:4px;width:0%;background:#35a3ff;transition:width 0.25s linear;';
 
     textEl = document.createElement('div');
-    textEl.id = '__carousel_text';
-    textEl.style.cssText = 'position:fixed;right:10px;bottom:8px;padding:2px 8px;fontSize:12px;color:#fff;background:rgba(0,0,0,0.55);borderRadius:10px;';
+    textEl.style.cssText = 'position:fixed;right:10px;bottom:8px;padding:2px 8px;font-size:12px;color:#fff;background:rgba(0,0,0,0.55);border-radius:10px;';
     textEl.textContent = '...';
 
-    containerEl.appendChild(barEl);
-    document.body.appendChild(containerEl);
+    container.appendChild(barEl);
+    document.body.appendChild(container);
     document.body.appendChild(textEl);
   }
 
@@ -401,17 +379,14 @@
     textEl.textContent = pageLabel + ' — ' + timeStr + uidLabel;
   }
 
-  /* ====================================================================
-   * 启动
-   * ==================================================================== */
-
+  // ===== Boot =====
   function boot() {
-    saveState(state);
-    syncAddressHash(state);
+    save(state);
+    syncHash(state);
     initUI();
     requestWakeLock();
     document.addEventListener('visibilitychange', onVisibilityChange);
-    attachInSiteLinkPropagation();
+    attachLinkInterceptor();
     sendExposure('page_enter');
     tickTimer = setInterval(tick, 1000);
     tick();
