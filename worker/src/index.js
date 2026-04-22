@@ -206,13 +206,14 @@ async function handleExposure(req, env, headers) {
   const deviceType = body.device_type || parseDeviceType(ua);
   const insertRes = await env.DB.prepare(
     `INSERT INTO exposure_events (
-      event_type, sid, vid, url, page_index, ip, ua, device_type, client_ts, received_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      event_type, sid, vid, uid, url, page_index, ip, ua, device_type, client_ts, received_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   )
     .bind(
       eventType,
       body.sid || null,
       body.vid || null,
+      body.uid || null,
       url,
       body.page_index == null ? null : Number(body.page_index),
       ip,
@@ -233,7 +234,8 @@ async function getSummaryForUrls(env, from, to, selectedUrls) {
     `SELECT
       SUM(CASE WHEN event_type = 'page_enter' OR event_type IS NULL THEN 1 ELSE 0 END) AS total_exposures,
       COUNT(DISTINCT CASE WHEN event_type = 'page_enter' OR event_type IS NULL THEN sid END) AS unique_sessions,
-      COUNT(DISTINCT CASE WHEN event_type = 'page_enter' OR event_type IS NULL THEN ip END) AS unique_ips
+      COUNT(DISTINCT CASE WHEN event_type = 'page_enter' OR event_type IS NULL THEN ip END) AS unique_ips,
+      COUNT(DISTINCT CASE WHEN event_type = 'page_enter' OR event_type IS NULL THEN uid END) AS unique_users
     FROM exposure_events
     WHERE received_at >= ? AND received_at <= ?${inClause.clause}`
   )
@@ -580,6 +582,29 @@ async function getPerUrlDetails(env, from, to, selectedUrl, page, pageSize) {
   };
 }
 
+async function getByUid(env, from, to, selectedUrls = []) {
+  const configuredUrls = await getConfiguredUrls(env);
+  const inClause = buildUrlScopeClause(selectedUrls, configuredUrls);
+  const result = await env.DB.prepare(
+    `SELECT
+      COALESCE(uid, '(未指定)') AS uid,
+      COUNT(*) AS total_events,
+      SUM(CASE WHEN event_type = 'page_enter' OR event_type IS NULL THEN 1 ELSE 0 END) AS exposures,
+      SUM(CASE WHEN event_type = 'heartbeat' THEN 1 ELSE 0 END) AS heartbeats,
+      COUNT(DISTINCT sid) AS unique_sessions,
+      COUNT(DISTINCT vid) AS unique_vids,
+      MIN(received_at) AS first_seen,
+      MAX(received_at) AS last_seen
+    FROM exposure_events
+    WHERE received_at >= ? AND received_at <= ?${inClause.clause}
+    GROUP BY uid
+    ORDER BY exposures DESC, uid ASC`
+  )
+    .bind(from, to, ...inClause.params)
+    .all();
+  return result.results || [];
+}
+
 async function handleReport(req, env, headers) {
   const url = new URL(req.url);
   const range = parseReportRange(url);
@@ -590,11 +615,12 @@ async function handleReport(req, env, headers) {
   const page = Math.max(1, toInt(url.searchParams.get("page"), 1));
   const pageSize = Math.min(200, Math.max(1, toInt(url.searchParams.get("page_size"), 50)));
 
-  const [configuredUrls, summary, byDevice, perUrlDetails] = await Promise.all([
+  const [configuredUrls, summary, byDevice, perUrlDetails, byUid] = await Promise.all([
     getConfiguredUrls(env),
     getSummaryForUrls(env, range.from, range.to, selectedUrls),
     getByDevice(env, range.from, range.to, null, selectedUrls),
     getPerUrlDetails(env, range.from, range.to, selectedUrl, page, pageSize),
+    getByUid(env, range.from, range.to, selectedUrls),
   ]);
 
   const byUrl = await getRowsByConfiguredRoot(env, range.from, range.to, configuredUrls, selectedUrls);
@@ -609,11 +635,24 @@ async function handleReport(req, env, headers) {
         total_exposures: Number(summary?.total_exposures || 0),
         unique_sessions: Number(summary?.unique_sessions || 0),
         unique_ips: Number(summary?.unique_ips || 0),
+        unique_users: Number(summary?.unique_users || 0),
       },
       by_url: byUrl,
       by_device: byDevice.map((r) => ({
         device_type: r.device_type || "unknown",
         exposures: Number(r.exposures || 0),
+      })),
+      by_uid: byUid.map((r) => ({
+        uid: r.uid || "(未指定)",
+        total_events: Number(r.total_events || 0),
+        exposures: Number(r.exposures || 0),
+        heartbeats: Number(r.heartbeats || 0),
+        unique_sessions: Number(r.unique_sessions || 0),
+        unique_vids: Number(r.unique_vids || 0),
+        first_seen: Number(r.first_seen || 0),
+        last_seen: Number(r.last_seen || 0),
+        first_seen_iso: toIsoOrNull(r.first_seen),
+        last_seen_iso: toIsoOrNull(r.last_seen),
       })),
       per_url_details: perUrlDetails,
     },

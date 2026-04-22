@@ -3,6 +3,7 @@ CREATE TABLE IF NOT EXISTS exposure_events (
   event_type TEXT NOT NULL,
   sid TEXT,
   vid TEXT,
+  uid TEXT,
   url TEXT NOT NULL,
   page_index INTEGER,
   device_type TEXT,
@@ -23,4 +24,6 @@ CREATE INDEX IF NOT EXISTS idx_exposure_received_at ON exposure_events(received_
 CREATE INDEX IF NOT EXISTS idx_exposure_url_received_at ON exposure_events(url, received_at);
 CREATE INDEX IF NOT EXISTS idx_exposure_url_ip_received_at ON exposure_events(url, ip, received_at);
 CREATE INDEX IF NOT EXISTS idx_exposure_url_vid_received_at ON exposure_events(url, vid, received_at);
+CREATE INDEX IF NOT EXISTS idx_exposure_url_uid_received_at ON exposure_events(url, uid, received_at);
+CREATE INDEX IF NOT EXISTS idx_exposure_uid_received_at ON exposure_events(uid, received_at);
 CREATE INDEX IF NOT EXISTS idx_configured_urls_active ON configured_urls(is_active, updated_at);
