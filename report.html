@@ -358,14 +358,45 @@ tailwind.config = {
               <tr>
                 <th>日期</th>
                 <th>Session 數</th>
-                <th>Page Enter</th>
-                <th>Heartbeat</th>
+                <th>事件總數</th>
                 <th>運行時長</th>
+                <th>播放人員</th>
                 <th>狀態</th>
+                <th>操作</th>
               </tr>
             </thead>
             <tbody id="dailyTableBody"></tbody>
           </table>
+        </div>
+
+        <!-- Day Detail Panel -->
+        <div id="dayDetailPanel" class="card-block hidden">
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <h3 class="text-lg font-bold text-fg" id="dayDetailTitle">2026-04-01 詳細記錄</h3>
+              <p class="text-sm text-gray-400 mt-1">該日所有曝光事件明細</p>
+            </div>
+            <button onclick="hideDayDetail()" class="btn-secondary h-10 px-4 text-sm flex items-center gap-2">
+              <span class="material-symbols-outlined">close</span>
+              <span>關閉</span>
+            </button>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full data-table" id="dayDetailTable">
+              <thead>
+                <tr>
+                  <th>時間</th>
+                  <th>播放人員</th>
+                  <th>設備</th>
+                  <th>URL</th>
+                  <th>事件類型</th>
+                  <th>頁面索引</th>
+                  <th>IP</th>
+                </tr>
+              </thead>
+              <tbody id="dayDetailBody"></tbody>
+            </table>
+          </div>
         </div>
       </div>
 
@@ -759,10 +790,11 @@ async function doRegister() {
 }
 
 function enterDashboard() {
+  if (!gUsername) gUsername = 'admin';
   $('loginView').classList.add('hidden');
   $('dashboardView').classList.remove('hidden');
   $('userName').textContent = gUsername;
-  $('userAvatar').textContent = gUsername.charAt(0).toUpperCase();
+  $('userAvatar').textContent = (gUsername || 'A').charAt(0).toUpperCase();
   refreshAll();
 }
 
@@ -987,7 +1019,7 @@ async function renderOperatorRanking() {
 // ========== DAILY TABLE ==========
 function renderDailyTable(data) {
   const tbody = $('dailyTableBody');
-  if (!data.length) { tbody.innerHTML = '<tr><td colspan="6" class="text-center text-gray-400 py-8">暫無數據</td></tr>'; return; }
+  if (!data.length) { tbody.innerHTML = '<tr><td colspan="7" class="text-center text-gray-400 py-8">暫無數據</td></tr>'; return; }
 
   tbody.innerHTML = data.map(d => {
     const status = (d.duration_min || 0) >= 60
@@ -996,13 +1028,19 @@ function renderDailyTable(data) {
         ? '<span class="tag-pill bg-amber-100 text-amber-700">偏短</span>'
         : '<span class="tag-pill bg-red-100 text-red-700">異常</span>');
     return `
-      <tr>
-        <td class="font-semibold">${d.day}</td>
+      <tr class="cursor-pointer hover:bg-blue-50/50 transition-colors" onclick="showDayDetail('${d.day}')">
+        <td class="font-semibold text-primary">${d.day}</td>
         <td>${d.sessions || 0}</td>
-        <td>${d.enters || 0}</td>
-        <td>${d.heartbeats || 0}</td>
+        <td>${d.total_events || 0}</td>
         <td class="font-semibold">${fmtDuration(d.duration_min || 0)}</td>
+        <td>${d.operators || 0} 人</td>
         <td>${status}</td>
+        <td>
+          <button class="text-primary hover:text-blue-700 flex items-center gap-1 text-sm font-medium">
+            <span class="material-symbols-outlined" style="font-size:18px">visibility</span>
+            <span>查看詳情</span>
+          </button>
+        </td>
       </tr>
     `;
   }).join('');
@@ -1019,8 +1057,10 @@ async function queryDaily() {
       WITH ds AS (
         SELECT date(received_at/1000,'unixepoch','+8 hours') as day,
                COUNT(DISTINCT sid) as sessions,
+               COUNT(*) as total_events,
                COUNT(CASE WHEN event_type='page_enter' THEN 1 END) as enters,
                COUNT(CASE WHEN event_type='heartbeat' THEN 1 END) as heartbeats,
+               COUNT(DISTINCT vid) as operators,
                ROUND((MAX(received_at)-MIN(received_at))/1000.0/60.0,1) as duration_min
         FROM exposure_events
         WHERE date(received_at/1000,'unixepoch','+8 hours') >= '${from}' AND date(received_at/1000,'unixepoch','+8 hours') <= '${to}'
@@ -1032,7 +1072,65 @@ async function queryDaily() {
     const res = await d1Query(sql);
     const filtered = res[0].results;
     renderDailyTable(filtered);
+    hideDayDetail();
   } catch(e) { alert('查詢失敗：' + e.message); }
+}
+
+async function showDayDetail(day) {
+  const op = $('dailyOperator').value;
+  $('dayDetailTitle').textContent = day + ' 詳細記錄';
+  $('dayDetailPanel').classList.remove('hidden');
+  $('dayDetailBody').innerHTML = '<tr><td colspan="7" class="text-center text-gray-400 py-8">加載中...</td></tr>';
+
+  try {
+    let sql = `
+      SELECT
+        datetime(received_at/1000,'unixepoch','+8 hours') as time,
+        vid as operator_code,
+        device_type,
+        url,
+        event_type,
+        page_index,
+        ip
+      FROM exposure_events
+      WHERE date(received_at/1000,'unixepoch','+8 hours') = '${day}'
+      ${op ? `AND vid = '${op}'` : ''}
+      ORDER BY received_at ASC
+    `;
+    const res = await d1Query(sql);
+    const rows = res[0].results;
+    renderDayDetail(rows);
+    // Scroll to detail panel
+    $('dayDetailPanel').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  } catch(e) {
+    $('dayDetailBody').innerHTML = '<tr><td colspan="7" class="text-center text-red-400 py-8">加載失敗：' + e.message + '</td></tr>';
+  }
+}
+
+function hideDayDetail() {
+  $('dayDetailPanel').classList.add('hidden');
+}
+
+function renderDayDetail(rows) {
+  const tbody = $('dayDetailBody');
+  if (!rows || !rows.length) {
+    tbody.innerHTML = '<tr><td colspan="7" class="text-center text-gray-400 py-8">該日暫無明細數據</td></tr>';
+    return;
+  }
+  const labels = { desktop:'桌面端', mobile:'移動端', tablet:'平板', unknown:'未知', '':'未知' };
+  const evtLabels = { page_enter:'進入頁面', heartbeat:'心跳', page_leave:'離開頁面' };
+
+  tbody.innerHTML = rows.map(r => `
+    <tr>
+      <td class="font-mono text-xs">${r.time || '--'}</td>
+      <td class="font-semibold text-sm">${r.operator_code || '--'}</td>
+      <td><span class="tag-pill bg-gray-100 text-gray-600">${labels[r.device_type] || r.device_type || '未知'}</span></td>
+      <td class="text-xs truncate max-w-[200px]" title="${r.url}">${r.url?.replace(/^https?:\/\//,'') || '--'}</td>
+      <td><span class="tag-pill ${r.event_type==='page_enter'?'bg-blue-100 text-blue-700':(r.event_type==='heartbeat'?'bg-emerald-100 text-emerald-700':'bg-gray-100 text-gray-600')}">${evtLabels[r.event_type] || r.event_type || '--'}</span></td>
+      <td class="text-center">${r.page_index != null ? r.page_index : '--'}</td>
+      <td class="font-mono text-xs text-gray-400">${r.ip || '--'}</td>
+    </tr>
+  `).join('');
 }
 
 async function loadOperatorsForSelect() {
