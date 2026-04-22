@@ -1,9 +1,11 @@
 /**
- * Carousel SDK v2.0 (with user identity + exposure analytics)
- * 客户嵌入脚本 — 从 URL hash 读取轮播状态 + 播放人员身份，自动定时跳转
+ * Carousel SDK v2.1 (fixed: persistent cycle timing across navigation)
+ * 客户嵌入脚本 — 从 URL hash + localStorage 读取轮播状态，自动定时跳转
  *
  * Hash 格式:
- * #_ci=<index>&_ct=<cycleStart>&_iv=<interval>&_cy=<cycle>&_cu=<base64urls>&_sid=<sessionId>&_u=<userId>
+ * #_ci=<index>&_iv=<interval>&_cy=<cycle>&_cu=<base64urls>&_sid=<sessionId>&_u=<userId>
+ *
+ * 注意: _ct (cycle start time) 不再通过 hash 传递，而是通过 localStorage 全局共享
  */
 ;(function () {
   'use strict';
@@ -11,8 +13,11 @@
   // ===== Analytics Config =====
   var ANALYTICS_URL = 'https://exposure-analytics.li2335100593.workers.dev/api/exposure';
   var HEARTBEAT_INTERVAL_SEC = 30;
-  var STATE_STORAGE_KEY = '__carousel_state_v1';
-  var STATE_STORAGE_KEY_LOCAL = '__carousel_state_v1_local';
+
+  // localStorage keys
+  var LS_VID = '__carousel_vid';
+  var LS_CYCLE_START = '__carousel_cycle_start_v2';
+  var LS_STATE = '__carousel_state_v2';
 
   function createSessionId() {
     return 'sid_' + Date.now() + '_' + Math.random().toString(36).slice(2, 10);
@@ -20,21 +25,18 @@
 
   function getVid() {
     try {
-      var key = '__carousel_vid';
-      var vid = localStorage.getItem(key);
+      var vid = localStorage.getItem(LS_VID);
       if (!vid) {
         vid = 'vid_' + Date.now() + '_' + Math.random().toString(36).slice(2, 10);
-        localStorage.setItem(key, vid);
+        localStorage.setItem(LS_VID, vid);
       }
       return vid;
     } catch (e) {
-      // MEDIUM-RISK FIX: localStorage unavailable in private mode - generate fallback VID
-      console.warn('[carousel] localStorage unavailable (private mode?), using generated VID');
       return 'vid_' + Date.now() + '_' + Math.random().toString(36).slice(2, 10);
     }
   }
 
-  // ===== 上报（新增 uid 字段） =====
+  // ===== 上报 =====
   function sendExposure(eventType, extra) {
     try {
       if (!state) return;
@@ -42,28 +44,20 @@
         event_type: eventType,
         sid: state.sid || null,
         vid: getVid(),
-        uid: state.uid || null,          // ← 新增：播放人员身份
+        uid: state.uid || null,
         url: window.location.origin + window.location.pathname,
         page_index: state.ci,
         client_ts: Date.now()
       };
-
       if (extra && typeof extra === 'object') {
         for (var k in extra) payload[k] = extra[k];
       }
-
       var body = JSON.stringify(payload);
-
       if (eventType === 'page_leave' && navigator.sendBeacon) {
         try {
-          var beaconOk = navigator.sendBeacon(
-            ANALYTICS_URL,
-            new Blob([body], { type: 'application/json' })
-          );
-          if (beaconOk) return;
+          if (navigator.sendBeacon(ANALYTICS_URL, new Blob([body], { type: 'application/json' }))) return;
         } catch (e) {}
       }
-
       fetch(ANALYTICS_URL, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
@@ -74,7 +68,7 @@
   }
 
   /* ====================================================================
-   * Module 1 — 状态管理（新增 _u 字段）
+   * Module 1 — 状态管理
    * ==================================================================== */
 
   function decodeBase64Unicode(b64) {
@@ -85,103 +79,95 @@
         bytes.push('%' + ('00' + binary.charCodeAt(i).toString(16)).slice(-2));
       }
       return decodeURIComponent(bytes.join(''));
-    } catch (e) {
-      return null;
-    }
+    } catch (e) { return null; }
   }
 
   function normalizeStateObject(rawState) {
     if (!rawState) return null;
-
     var ci = parseInt(rawState.ci, 10);
-    var ct = parseInt(rawState.ct, 10);
     var iv = parseInt(rawState.iv, 10);
     var cy = parseInt(rawState.cy, 10);
     var cu = rawState.cu;
     var sid = rawState.sid || createSessionId();
-    var uid = rawState.uid || null;       // ← 新增
+    var uid = rawState.uid || null;
 
     if (cu == null) return null;
-    if (isNaN(ci) || isNaN(ct) || isNaN(iv) || isNaN(cy)) return null;
+    if (isNaN(ci) || isNaN(iv) || isNaN(cy)) return null;
     if (iv <= 0 || cy <= 0) return null;
 
     var decoded = decodeBase64Unicode(cu);
     if (!decoded) return null;
 
     var urls;
-    try {
-      urls = JSON.parse(decoded);
-    } catch (e) {
-      return null;
-    }
-
+    try { urls = JSON.parse(decoded); } catch (e) { return null; }
     if (!Array.isArray(urls) || urls.length === 0) return null;
     if (ci < 0 || ci >= urls.length) ci = 0;
 
-    return {
-      ci: ci,
-      ct: ct,
-      iv: iv,
-      cy: cy,
-      cu: cu,
-      sid: sid,
-      uid: uid,                           // ← 新增
-      urls: urls
-    };
+    return { ci: ci, iv: iv, cy: cy, cu: cu, sid: sid, uid: uid, urls: urls };
   }
 
-  function stateSnapshot(rawState) {
-    var snap = {
-      ci: rawState.ci,
-      ct: rawState.ct,
-      iv: rawState.iv,
-      cy: rawState.cy,
-      cu: rawState.cu,
-      sid: rawState.sid
-    };
-    if (rawState.uid) snap.uid = rawState.uid;  // ← 新增
-    return snap;
+  // 从 hash 读取状态（不含 ct）
+  function parseStateFromHash() {
+    var raw = window.location.hash;
+    if (!raw || raw.length < 2) return null;
+    var params = new URLSearchParams(raw.substring(1));
+    return normalizeStateObject({
+      ci: params.get('_ci'),
+      iv: params.get('_iv'),
+      cy: params.get('_cy'),
+      cu: params.get('_cu'),
+      sid: params.get('_sid') || createSessionId(),
+      uid: params.get('_u') || null
+    });
   }
 
-  function loadStateFromStorage() {
+  // 从 localStorage 读取状态
+  function parseStateFromStorage() {
     try {
-      var saved = sessionStorage.getItem(STATE_STORAGE_KEY);
-      if (!saved) {
-        // fallback to localStorage (cross-page within same origin)
-        saved = localStorage.getItem(STATE_STORAGE_KEY_LOCAL);
-      }
+      var saved = localStorage.getItem(LS_STATE);
       if (!saved) return null;
       var parsed = JSON.parse(saved);
       if (!parsed || !parsed.state) return null;
       return normalizeStateObject(parsed.state);
-    } catch (e) {
-      return null;
-    }
+    } catch (e) { return null; }
   }
 
-  function saveStateToStorage(rawState) {
+  // 获取全局周期开始时间（所有页面共享）
+  function getCycleStart(cy) {
     try {
-      var payload = {
-        state: stateSnapshot(rawState),
-        saved_at: Date.now()
-      };
-      var payloadStr = JSON.stringify(payload);
-      sessionStorage.setItem(STATE_STORAGE_KEY, payloadStr);
-      localStorage.setItem(STATE_STORAGE_KEY_LOCAL, payloadStr);
+      var saved = localStorage.getItem(LS_CYCLE_START);
+      if (saved) {
+        var ct = parseInt(saved, 10);
+        var age = Date.now() - ct;
+        // 如果周期还没结束，继续用旧的
+        if (!isNaN(ct) && age >= 0 && age < cy * 1000) {
+          return ct;
+        }
+      }
+    } catch (e) {}
+    // 周期已结束或没有保存的，创建新的
+    var now = Date.now();
+    try { localStorage.setItem(LS_CYCLE_START, String(now)); } catch (e) {}
+    return now;
+  }
+
+  // 保存状态到 localStorage
+  function saveState(rawState) {
+    try {
+      localStorage.setItem(LS_STATE, JSON.stringify({ state: rawState, saved_at: Date.now() }));
     } catch (e) {}
   }
 
+  // 把状态写入链接 hash（不含 ct）
   function mergeStateIntoUrl(targetUrl, rawState) {
     var mergedParams = new URLSearchParams(targetUrl.hash ? targetUrl.hash.substring(1) : '');
     mergedParams.set('_ci', String(rawState.ci));
-    mergedParams.set('_ct', String(rawState.ct));
     mergedParams.set('_iv', String(rawState.iv));
     mergedParams.set('_cy', String(rawState.cy));
     mergedParams.set('_cu', rawState.cu);
     mergedParams.set('_sid', rawState.sid);
-    if (rawState.uid) {
-      mergedParams.set('_u', rawState.uid);   // ← 新增：传递身份
-    }
+    if (rawState.uid) mergedParams.set('_u', rawState.uid);
+    // 注意: 不再写入 _ct，ct 通过 localStorage 全局共享
     targetUrl.hash = mergedParams.toString();
     return targetUrl;
   }
@@ -207,85 +193,52 @@
     return false;
   }
 
-  function propagateStateToAnchor(anchor) {
-    try {
-      if (!anchor || !anchor.href) return;
-      var targetUrl = new URL(anchor.href, window.location.href);
-      if (targetUrl.origin !== window.location.origin) return;
-      if (targetUrl.protocol !== 'http:' && targetUrl.protocol !== 'https:') return;
-
-      mergeStateIntoUrl(targetUrl, state);
-      anchor.href = targetUrl.toString();
-      saveStateToStorage(state);
-    } catch (err) {}
-  }
-
   function attachInSiteLinkPropagation() {
-    // Capture phase to intercept before page scripts handle the click
     document.addEventListener('click', function (e) {
-      var anchor = e.target && e.target.closest ? e.target.closest('a') : null;
-      if (shouldSkipLinkPropagation(e, anchor)) return;
-      propagateStateToAnchor(anchor);
-    }, true);
-
-    // Also handle mousedown for faster interception
-    document.addEventListener('mousedown', function (e) {
-      var anchor = e.target && e.target.closest ? e.target.closest('a') : null;
-      if (!anchor || !anchor.href) return;
-      if (e.button !== 0) return;
-      propagateStateToAnchor(anchor);
+      try {
+        var anchor = e.target && e.target.closest ? e.target.closest('a') : null;
+        if (shouldSkipLinkPropagation(e, anchor)) return;
+        var targetUrl = new URL(anchor.href, window.location.href);
+        if (targetUrl.origin !== window.location.origin) return;
+        if (targetUrl.protocol !== 'http:' && targetUrl.protocol !== 'https:') return;
+        mergeStateIntoUrl(targetUrl, state);
+        anchor.href = targetUrl.toString();
+        saveState(state);
+      } catch (err) {}
     }, true);
   }
 
-  function parseState() {
-    var raw = window.location.hash;
-    var fromStorage = loadStateFromStorage();
+  // 解析状态：优先用 hash，fallback 到 storage
+  var fromHash = parseStateFromHash();
+  var fromStorage = parseStateFromStorage();
+  var baseState = fromHash || fromStorage;
 
-    if (!raw || raw.length < 2) {
-      return fromStorage;
-    }
-
-    var params = new URLSearchParams(raw.substring(1));
-
-    var fromHash = normalizeStateObject({
-      ci: params.get('_ci'),
-      ct: params.get('_ct'),
-      iv: params.get('_iv'),
-      cy: params.get('_cy'),
-      cu: params.get('_cu'),
-      sid: params.get('_sid') || createSessionId(),
-      uid: params.get('_u') || null          // ← 新增：从 hash 读取 _u
-    });
-
-    // hash 存在但参数无效（如只有锚点 #section1），fallback 到 storage
-    if (!fromHash) {
-      return fromStorage;
-    }
-
-    // 如果 hash 里的 ct 非常新（<5秒），但 storage 里有更旧的 ct，
-    // 说明 hash 可能被错误地重置了，优先用 storage 里的旧 ct
-    if (fromStorage && fromStorage.ct) {
-      var now = Date.now();
-      var hashCtAge = now - fromHash.ct;
-      var storageCtAge = now - fromStorage.ct;
-      if (hashCtAge < 5000 && storageCtAge > hashCtAge && storageCtAge < fromHash.cy * 1000) {
-        // 用 storage 的 ct，但保留 hash 的其他参数（如 ci, uid 等）
-        fromHash.ct = fromStorage.ct;
-      }
-    }
-
-    return fromHash;
+  if (!baseState) {
+    // 没有任何状态，carousel.js 退出
+    return;
   }
 
-  var state = parseState();
-  if (!state) return;
+  // 获取全局周期开始时间
+  var cycleStart = getCycleStart(baseState.cy);
+
+  // 组装最终状态
+  var state = {
+    ci: baseState.ci,
+    ct: cycleStart,
+    iv: baseState.iv,
+    cy: baseState.cy,
+    cu: baseState.cu,
+    sid: baseState.sid,
+    uid: baseState.uid,
+    urls: baseState.urls
+  };
 
   /* ====================================================================
-   * Module 2 — 定时器（timestamp-based）— 无变化
+   * Module 2 — 定时器
    * ==================================================================== */
 
   var intervalSec = state.iv;
-  var startTime = 0;
+  var startTime = state.ct;
   var tickTimer = null;
   var lastHeartbeatSec = -1;
 
@@ -293,27 +246,20 @@
     return Math.floor((Date.now() - startTime) / 1000);
   }
 
-  function remaining() {
-    var r = intervalSec - elapsed();
-    return r > 0 ? r : 0;
-  }
-
   function tick() {
     var e = elapsed();
     updateUI(e);
-
     if (e >= 0 && e % HEARTBEAT_INTERVAL_SEC === 0 && e !== lastHeartbeatSec) {
       lastHeartbeatSec = e;
       sendExposure('heartbeat', { dwell_ms: e * 1000 });
     }
-
     if (e >= intervalSec) {
       navigate();
     }
   }
 
   /* ====================================================================
-   * Module 3 — Wake Lock + 降级 — 无变化
+   * Module 3 — Wake Lock
    * ==================================================================== */
 
   var wakeLockSentinel = null;
@@ -324,13 +270,9 @@
       navigator.wakeLock.request('screen')
         .then(function (sentinel) {
           wakeLockSentinel = sentinel;
-          sentinel.addEventListener('release', function () {
-            wakeLockSentinel = null;
-          });
+          sentinel.addEventListener('release', function () { wakeLockSentinel = null; });
         })
-        .catch(function () {
-          ensureSilentVideo();
-        });
+        .catch(function () { ensureSilentVideo(); });
     } else {
       ensureSilentVideo();
     }
@@ -345,12 +287,7 @@
       video.muted = true;
       video.loop = true;
       video.autoplay = true;
-      video.style.position = 'fixed';
-      video.style.width = '1px';
-      video.style.height = '1px';
-      video.style.opacity = '0';
-      video.style.pointerEvents = 'none';
-      video.style.zIndex = '-1';
+      video.style.cssText = 'position:fixed;width:1px;height:1px;opacity:0;pointerEvents:none;zIndex:-1;';
       video.src = 'data:video/mp4;base64,AAAAIGZ0eXBpc29tAAACAGlzb21pc28yYXZjMQAAAAhmcmVlAAABQG1kYXQhEAUgpAABthYQAAAD6GxhdmM1OC4xMzQ=';
       document.body.appendChild(video);
       var p = video.play();
@@ -366,7 +303,7 @@
   }
 
   /* ====================================================================
-   * Module 4 — 跳转逻辑 — 无变化（mergeStateIntoUrl 已自动带 _u）
+   * Module 4 — 跳转逻辑
    * ==================================================================== */
 
   var navigated = false;
@@ -376,44 +313,42 @@
     navigated = true;
 
     sendExposure('page_leave', { dwell_ms: Date.now() - startTime });
-
     if (tickTimer) clearInterval(tickTimer);
     try { if (wakeLockSentinel) wakeLockSentinel.release(); } catch (e) {}
     try { if (silentVideo && silentVideo.parentNode) silentVideo.parentNode.removeChild(silentVideo); } catch (e) {}
 
     var urls = state.urls;
     var nextIndex = state.ci + 1;
-    var cycleStart = state.ct;
     var now = Date.now();
 
-    if (nextIndex >= urls.length || (now - cycleStart) >= state.cy * 1000) {
+    // 检查是否需要开始新周期
+    if (nextIndex >= urls.length || (now - state.ct) >= state.cy * 1000) {
       nextIndex = 0;
-      cycleStart = now;
+      // 新周期，重置全局 cycle start
+      state.ct = now;
+      try { localStorage.setItem(LS_CYCLE_START, String(now)); } catch (e) {}
     }
 
     var nextUrl;
     try {
       nextUrl = new URL(urls[nextIndex], window.location.href);
-      // HIGH-RISK FIX: Validate protocol to prevent javascript: and data: URLs
       if (nextUrl.protocol !== 'http:' && nextUrl.protocol !== 'https:') {
         console.error('[carousel] Invalid protocol:', nextUrl.protocol);
         return;
       }
     } catch (e) {
-      // Invalid URL format - do not navigate
       console.error('[carousel] Invalid URL:', urls[nextIndex]);
       return;
     }
 
     state.ci = nextIndex;
-    state.ct = cycleStart;
-    saveStateToStorage(state);
-    mergeStateIntoUrl(nextUrl, state);    // _u 会自动带上
+    saveState(state);
+    mergeStateIntoUrl(nextUrl, state);
     window.location.href = nextUrl.toString();
   }
 
   /* ====================================================================
-   * Module 5 — UI（新增：显示播放人员身份）
+   * Module 5 — UI
    * ==================================================================== */
 
   var containerEl = null;
@@ -423,31 +358,15 @@
   function initUI() {
     containerEl = document.createElement('div');
     containerEl.id = '__carousel_container';
-    containerEl.style.position = 'fixed';
-    containerEl.style.left = '0';
-    containerEl.style.bottom = '0';
-    containerEl.style.width = '100%';
-    containerEl.style.zIndex = '2147483647';
-    containerEl.style.pointerEvents = 'none';
-    containerEl.style.fontFamily = '-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif';
+    containerEl.style.cssText = 'position:fixed;left:0;bottom:0;width:100%;zIndex:2147483647;pointerEvents:none;fontFamily:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;';
 
     barEl = document.createElement('div');
     barEl.id = '__carousel_bar';
-    barEl.style.height = '4px';
-    barEl.style.width = '0%';
-    barEl.style.background = '#35a3ff';
-    barEl.style.transition = 'width 0.25s linear';
+    barEl.style.cssText = 'height:4px;width:0%;background:#35a3ff;transition:width 0.25s linear;';
 
     textEl = document.createElement('div');
     textEl.id = '__carousel_text';
-    textEl.style.position = 'fixed';
-    textEl.style.right = '10px';
-    textEl.style.bottom = '8px';
-    textEl.style.padding = '2px 8px';
-    textEl.style.fontSize = '12px';
-    textEl.style.color = '#fff';
-    textEl.style.background = 'rgba(0,0,0,0.55)';
-    textEl.style.borderRadius = '10px';
+    textEl.style.cssText = 'position:fixed;right:10px;bottom:8px;padding:2px 8px;fontSize:12px;color:#fff;background:rgba(0,0,0,0.55);borderRadius:10px;';
     textEl.textContent = '...';
 
     containerEl.appendChild(barEl);
@@ -457,61 +376,30 @@
 
   function updateUI(elapsedSec) {
     if (!barEl || !textEl) return;
-
     var pct = Math.min((elapsedSec / intervalSec) * 100, 100);
     barEl.style.width = pct + '%';
-
     var rem = intervalSec - elapsedSec;
     if (rem < 0) rem = 0;
     var min = Math.floor(rem / 60);
     var sec = rem % 60;
     var timeStr = min + ':' + (sec < 10 ? '0' : '') + sec;
-
     var pageLabel = (state.ci + 1) + '/' + state.urls.length;
-    // 如果有 uid，显示在角标上
     var uidLabel = state.uid ? ' [' + state.uid + ']' : '';
     textEl.textContent = pageLabel + ' — ' + timeStr + uidLabel;
   }
 
   /* ====================================================================
-   * 启动 — 无变化
+   * 启动
    * ==================================================================== */
 
   function boot() {
-    // 使用 cycle start time (state.ct) 作为计时起点，确保同周期内跳转时倒计时连续
-    // 但如果 state.ct 非常新（<5秒前），而 localStorage 里有更旧的 ct，说明状态可能被错误重置了
-    var now = Date.now();
-    var ctAge = now - state.ct;
-    if (ctAge < 5000) {
-      try {
-        var localSaved = localStorage.getItem(STATE_STORAGE_KEY_LOCAL);
-        if (localSaved) {
-          var localParsed = JSON.parse(localSaved);
-          if (localParsed && localParsed.state && localParsed.state.ct) {
-            var localCtAge = now - localParsed.state.ct;
-            // 如果 localStorage 里的 ct 更旧（但不超过一个周期），用它
-            if (localCtAge > ctAge && localCtAge < state.cy * 1000) {
-              state.ct = localParsed.state.ct;
-              ctAge = now - state.ct;
-            }
-          }
-        }
-      } catch (e) {}
-    }
-    startTime = state.ct;
-    saveStateToStorage(state);
+    saveState(state);
     syncAddressHash(state);
-    
-    // DEBUG: log state source and age to help diagnose reset issues
-    console.log('[carousel] boot: ctAge=' + ctAge + 'ms, ct=' + state.ct + ', now=' + now + ', elapsed=' + Math.floor(ctAge/1000) + 's');
-
     initUI();
     requestWakeLock();
     document.addEventListener('visibilitychange', onVisibilityChange);
     attachInSiteLinkPropagation();
-
     sendExposure('page_enter');
-
     tickTimer = setInterval(tick, 1000);
     tick();
   }
