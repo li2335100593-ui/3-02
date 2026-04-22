@@ -524,13 +524,18 @@ tailwind.config = {
           <div id="urlsList" class="space-y-3 mb-6"></div>
         </div>
         <div class="card-block">
-          <h3 class="text-lg font-bold text-fg mb-4">更新 URL 配置</h3>
+          <h3 class="text-lg font-bold text-fg mb-2">更新 URL 配置</h3>
+          <p class="text-sm text-gray-500 mb-4">每行輸入一個網址，輪播系統會依次循環播放這些頁面。<b>必須帶 https:// 前綴</b>。</p>
           <div class="space-y-3">
-            <textarea id="urlsInput" class="input-flat font-mono text-sm" rows="4" placeholder='輸入 JSON 數組，例如：["https://example.com/"]'>[]</textarea>
+            <textarea id="urlsInput" class="input-flat font-mono text-sm" rows="6" placeholder='https://example.com/page1&#10;https://example.com/page2&#10;https://example.com/page3'></textarea>
             <button onclick="updateUrls()" class="btn-primary h-12 px-6 flex items-center gap-2">
               <span class="material-symbols-outlined">save</span>
               <span>更新配置</span>
             </button>
+          </div>
+          <div class="mt-4 p-3 bg-amber-50 rounded-lg flex items-start gap-2">
+            <span class="material-symbols-outlined filled" style="color:#F59E0B;font-size:20px;margin-top:2px;">warning</span>
+            <p class="text-sm text-amber-700">格式要求：每行一個 URL，必須以 <code>https://</code> 開頭，末尾可加或不加斜槓 <code>/</code>。修改後所有播放人員的專屬鏈接將自動使用新的 URL 列表。</p>
           </div>
         </div>
       </div>
@@ -597,15 +602,47 @@ tailwind.config = {
         <div class="card-block">
           <h3 class="text-lg font-bold text-fg mb-2">輪播 SDK 部署指南</h3>
           <p class="text-sm text-gray-500 mb-6">將以下腳本嵌入目標網站，即可實現自動輪播 + 數據追踪</p>
-          <div class="bg-gray-900 rounded-lg p-4 overflow-x-auto">
+          <div class="bg-gray-900 rounded-lg p-4 overflow-x-auto mb-4">
             <pre class="text-sm text-green-400 font-mono whitespace-pre-wrap">&lt;script src="https://li2335100593.github.io/3-02/carousel.js"&gt;&lt;/script&gt;</pre>
           </div>
-          <div class="mt-4 p-4 bg-blue-50 rounded-lg">
-            <h4 class="font-semibold text-blue-800 mb-2 flex items-center gap-2">
-              <span class="material-symbols-outlined">info</span>
-              內置配置說明
-            </h4>
-            <p class="text-sm text-blue-700">carousel.js v3.0 已內置 URL 列表（livingroom-design / old-house-renovation / incar），無需額外配置。直接引入腳本即可工作。</p>
+
+          <div class="space-y-4">
+            <div class="p-4 bg-blue-50 rounded-lg">
+              <h4 class="font-semibold text-blue-800 mb-2 flex items-center gap-2">
+                <span class="material-symbols-outlined">code</span>
+                放在網站的哪裡？
+              </h4>
+              <p class="text-sm text-blue-700 mb-2">把上面這一行代碼複製到目標網站的 <code>&lt;head&gt;</code> 標籤內，或放在 <code>&lt;/body&gt;</code> 結束標籤之前。</p>
+              <div class="bg-gray-900 rounded-lg p-3 overflow-x-auto">
+                <pre class="text-xs text-green-400 font-mono whitespace-pre-wrap">&lt;!DOCTYPE html&gt;
+&lt;html&gt;
+&lt;head&gt;
+  ...其他代碼...
+  <b style="color:#FCD34D">&lt;script src="https://li2335100593.github.io/3-02/carousel.js"&gt;&lt;/script&gt;</b>
+&lt;/head&gt;
+&lt;body&gt;
+  ...頁面內容...
+&lt;/body&gt;
+&lt;/html&gt;</pre>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div class="p-4 bg-gray-50 rounded-lg">
+                <h4 class="font-semibold text-fg mb-2 flex items-center gap-2">
+                  <span class="material-symbols-outlined">wordpress</span>
+                  WordPress 網站
+                </h4>
+                <p class="text-sm text-gray-600">後台 → 外觀 → 主題編輯器 → 找到 header.php → 在 <code>&lt;/head&gt;</code> 前粘貼腳本代碼 → 更新文件。</p>
+              </div>
+              <div class="p-4 bg-gray-50 rounded-lg">
+                <h4 class="font-semibold text-fg mb-2 flex items-center gap-2">
+                  <span class="material-symbols-outlined">web</span>
+                  自建網站
+                </h4>
+                <p class="text-sm text-gray-600">直接編輯網站的 HTML 模板文件（如 index.html），在 <code>&lt;head&gt;</code> 標籤內加入腳本即可。</p>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -794,7 +831,7 @@ async function doLogin() {
   try {
     const data = await apiPost('/api/auth/login', { username, password }, false);
     gToken = data.token;
-    gUsername = data.username;
+    gUsername = data.user?.username || username;
     localStorage.setItem('report_token', gToken);
     localStorage.setItem('report_user', gUsername);
     enterDashboard();
@@ -818,7 +855,7 @@ async function doRegister() {
   try {
     const data = await apiPost('/api/auth/register', { username, password }, false);
     gToken = data.token;
-    gUsername = data.username;
+    gUsername = data.user?.username || username;
     localStorage.setItem('report_token', gToken);
     localStorage.setItem('report_user', gUsername);
     enterDashboard();
@@ -1366,21 +1403,29 @@ async function renderUrls() {
         <span class="text-xs text-gray-400">${r.is_active ? '啟用' : '停用'}</span>
       </div>
     `).join('');
-    // Pre-fill input with active URLs
+    // Pre-fill input with active URLs (one per line)
     const activeUrls = rows.filter(r => r.is_active).map(r => r.url);
-    $('urlsInput').value = JSON.stringify(activeUrls, null, 2);
+    $('urlsInput').value = activeUrls.join('\n');
   } catch(e) { $('urlsList').innerHTML = '<p class="text-sm text-gray-400">載入失敗</p>'; }
 }
 
 async function updateUrls() {
   try {
-    const urls = JSON.parse($('urlsInput').value);
-    if (!Array.isArray(urls)) throw new Error('必須是 JSON 數組');
+    const raw = $('urlsInput').value.trim();
+    if (!raw) throw new Error('請輸入至少一個 URL');
+    const urls = raw.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+    if (!urls.length) throw new Error('請輸入至少一個 URL');
+    // Validate URLs
+    for (const url of urls) {
+      if (!url.startsWith('http://') && !url.startsWith('https://')) {
+        throw new Error('URL 必須以 http:// 或 https:// 開頭：' + url);
+      }
+    }
     await d1Query(`UPDATE configured_urls SET is_active = 0, updated_at = ${Date.now()}`);
     for (const url of urls) {
       await d1Query(`INSERT INTO configured_urls (url, source, is_active, updated_at) VALUES ('${url}', 'scheduler', 1, ${Date.now()}) ON CONFLICT(url) DO UPDATE SET source='scheduler', is_active=1, updated_at=${Date.now()}`);
     }
-    alert('更新成功');
+    alert('更新成功，共 ' + urls.length + ' 個 URL');
     renderUrls();
   } catch(e) { alert('更新失敗：' + e.message); }
 }
