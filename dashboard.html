@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>轮播监控后台 - 链接生成 & 数据报表</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #f0f2f5;
+      color: #333;
+      line-height: 1.6;
+    }
+    .header {
+      background: #1a1a2e;
+      color: #fff;
+      padding: 20px 30px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .header h1 { font-size: 20px; font-weight: 600; }
+    .header .subtitle { font-size: 13px; color: #aaa; margin-top: 4px; }
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+    .card {
+      background: #fff;
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 20px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    }
+    .card h2 {
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .card h2 .icon { font-size: 20px; }
+    .form-row {
+      display: flex;
+      gap: 12px;
+      align-items: flex-end;
+      flex-wrap: wrap;
+    }
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .form-group label {
+      font-size: 13px;
+      font-weight: 500;
+      color: #666;
+    }
+    .form-group input, .form-group select {
+      padding: 10px 14px;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      font-size: 14px;
+      min-width: 180px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .form-group input:focus, .form-group select:focus {
+      border-color: #4a90d9;
+    }
+    .btn {
+      padding: 10px 20px;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+      white-space: nowrap;
+    }
+    .btn-primary {
+      background: #4a90d9;
+      color: #fff;
+    }
+    .btn-primary:hover { background: #357abd; }
+    .btn-success {
+      background: #52c41a;
+      color: #fff;
+    }
+    .btn-success:hover { background: #389e0d; }
+    .btn-copy {
+      background: #f0f0f0;
+      color: #333;
+      padding: 6px 12px;
+      font-size: 12px;
+    }
+    .btn-copy:hover { background: #e0e0e0; }
+
+    /* 链接列表 */
+    .link-list {
+      margin-top: 16px;
+    }
+    .link-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 16px;
+      background: #f8f9fa;
+      border-radius: 8px;
+      margin-bottom: 8px;
+      border: 1px solid #eee;
+    }
+    .link-item .info {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      flex: 1;
+      min-width: 0;
+    }
+    .link-item .uid {
+      font-weight: 600;
+      color: #4a90d9;
+      font-size: 14px;
+    }
+    .link-item .url {
+      font-size: 12px;
+      color: #666;
+      word-break: break-all;
+      font-family: monospace;
+    }
+    .link-item .meta {
+      font-size: 11px;
+      color: #999;
+    }
+    .link-item .actions {
+      display: flex;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+    .link-item .tag {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 500;
+    }
+    .tag-new { background: #e6f7ff; color: #1890ff; }
+    .tag-active { background: #f6ffed; color: #52c41a; }
+    .tag-stopped { background: #fff1f0; color: #ff4d4f; }
+
+    /* 报表区域 */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+    .stat-box {
+      background: #f8f9fa;
+      border-radius: 10px;
+      padding: 20px;
+      text-align: center;
+      border: 1px solid #eee;
+    }
+    .stat-box .number {
+      font-size: 32px;
+      font-weight: 700;
+      color: #1a1a2e;
+    }
+    .stat-box .label {
+      font-size: 13px;
+      color: #888;
+      margin-top: 4px;
+    }
+
+    /* 用户数据表格 */
+    .data-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    .data-table th {
+      background: #f5f5f5;
+      padding: 12px;
+      text-align: left;
+      font-weight: 600;
+      color: #666;
+      border-bottom: 2px solid #e0e0e0;
+    }
+    .data-table td {
+      padding: 12px;
+      border-bottom: 1px solid #f0f0f0;
+    }
+    .data-table tr:hover { background: #fafafa; }
+    .data-table .uid-cell {
+      font-weight: 600;
+      color: #4a90d9;
+    }
+    .data-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+    .data-table .time { color: #888; font-size: 12px; }
+
+    .empty-state {
+      text-align: center;
+      padding: 40px;
+      color: #999;
+    }
+    .empty-state .icon { font-size: 48px; margin-bottom: 12px; }
+
+    .refresh-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+    .last-update { font-size: 12px; color: #999; }
+
+    .tabs {
+      display: flex;
+      gap: 4px;
+      margin-bottom: 20px;
+      background: #fff;
+      padding: 4px;
+      border-radius: 10px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    }
+    .tab {
+      padding: 10px 20px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 500;
+      color: #666;
+      transition: all 0.2s;
+      border: none;
+      background: transparent;
+    }
+    .tab.active {
+      background: #1a1a2e;
+      color: #fff;
+    }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: #1a1a2e;
+      color: #fff;
+      padding: 12px 20px;
+      border-radius: 8px;
+      font-size: 14px;
+      z-index: 1000;
+      opacity: 0;
+      transform: translateY(20px);
+      transition: all 0.3s;
+    }
+    .toast.show {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <h1>🎯 轮播监控后台</h1>
+    <div class="subtitle">链接生成 · 人员管理 · 数据报表</div>
+  </div>
+  <div style="font-size:13px;color:#aaa;">v2.0</div>
+</div>
+
+<div class="container">
+
+  <!-- Tabs -->
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab('links')">🔗 链接管理</button>
+    <button class="tab" onclick="switchTab('report')">📊 数据报表</button>
+  </div>
+
+  <!-- Tab: 链接管理 -->
+  <div id="tab-links" class="tab-content active">
+    <div class="card">
+      <h2><span class="icon">➕</span>生成新链接</h2>
+      <div class="form-row">
+        <div class="form-group">
+          <label>人员身份 ID</label>
+          <input type="text" id="newUid" placeholder="例如: staff1, client, admin" maxlength="30">
+        </div>
+        <div class="form-group">
+          <label>备注（可选）</label>
+          <input type="text" id="newNote" placeholder="例如: 小王, 客户自己" maxlength="50">
+        </div>
+        <button class="btn btn-primary" onclick="generateLink()">生成链接</button>
+      </div>
+      <p style="margin-top:12px;font-size:12px;color:#999;">
+        💡 提示：ID 只能包含字母、数字、下划线。每个人用不同的 ID，后台才能分开统计。
+      </p>
+    </div>
+
+    <div class="card">
+      <h2><span class="icon">📋</span>已生成的链接</h2>
+      <div id="linkList" class="link-list">
+        <div class="empty-state">
+          <div class="icon">📭</div>
+          <div>还没有生成任何链接</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tab: 数据报表 -->
+  <div id="tab-report" class="tab-content">
+    <div class="card">
+      <div class="refresh-bar">
+        <h2><span class="icon">📊</span>实时数据报表</h2>
+        <div>
+          <span class="last-update" id="lastUpdate">未更新</span>
+          <button class="btn btn-primary" onclick="loadReport()" style="margin-left:12px;">🔄 刷新数据</button>
+        </div>
+      </div>
+
+      <div class="stats-grid" id="statsGrid">
+        <div class="stat-box">
+          <div class="number" id="statTotal">-</div>
+          <div class="label">总曝光次数</div>
+        </div>
+        <div class="stat-box">
+          <div class="number" id="statSessions">-</div>
+          <div class="label">独立会话</div>
+        </div>
+        <div class="stat-box">
+          <div class="number" id="statUsers">-</div>
+          <div class="label">独立用户(VID)</div>
+        </div>
+        <div class="stat-box">
+          <div class="number" id="statUids">-</div>
+          <div class="label">身份标识数</div>
+        </div>
+      </div>
+
+      <h3 style="font-size:14px;font-weight:600;margin:20px 0 12px;color:#666;">按人员身份统计</h3>
+      <div id="reportTable">
+        <div class="empty-state">
+          <div class="icon">📊</div>
+          <div>点击刷新按钮加载数据</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ===== 配置 =====
+const BASE_URL = 'https://li2335100593-ui.github.io/3-02/scheduler.html';
+const API_BASE = 'https://exposure-analytics.li2335100593.workers.dev';
+
+// ===== 本地存储 =====
+function getLinks() {
+  try {
+    return JSON.parse(localStorage.getItem('__carousel_links') || '[]');
+  } catch(e) { return []; }
+}
+function saveLinks(links) {
+  localStorage.setItem('__carousel_links', JSON.stringify(links));
+}
+
+// ===== 生成链接 =====
+function generateLink() {
+  const uid = document.getElementById('newUid').value.trim();
+  const note = document.getElementById('newNote').value.trim();
+
+  if (!uid) {
+    showToast('❌ 请输入人员身份 ID');
+    return;
+  }
+  if (!/^[a-zA-Z0-9_\-]+$/.test(uid)) {
+    showToast('❌ ID 只能包含字母、数字、下划线、横线');
+    return;
+  }
+
+  const links = getLinks();
+  if (links.some(l => l.uid === uid)) {
+    showToast('❌ 该 ID 已存在');
+    return;
+  }
+
+  const url = BASE_URL + '?u=' + encodeURIComponent(uid);
+  links.push({
+    uid: uid,
+    note: note || uid,
+    url: url,
+    createdAt: Date.now(),
+    status: 'active'
+  });
+  saveLinks(links);
+
+  document.getElementById('newUid').value = '';
+  document.getElementById('newNote').value = '';
+  renderLinks();
+  showToast('✅ 链接已生成: ' + uid);
+}
+
+// ===== 渲染链接列表 =====
+function renderLinks() {
+  const links = getLinks();
+  const container = document.getElementById('linkList');
+
+  if (links.length === 0) {
+    container.innerHTML = `
+      <div class="empty-state">
+        <div class="icon">📭</div>
+        <div>还没有生成任何链接</div>
+      </div>`;
+    return;
+  }
+
+  container.innerHTML = links.map(link => {
+    const date = new Date(link.createdAt);
+    const dateStr = date.getMonth()+1 + '/' + date.getDate() + ' ' +
+                    date.getHours().toString().padStart(2,'0') + ':' +
+                    date.getMinutes().toString().padStart(2,'0');
+    return `
+      <div class="link-item">
+        <div class="info">
+          <div>
+            <span class="uid">${escapeHtml(link.uid)}</span>
+            ${link.note !== link.uid ? '<span style="color:#888;margin-left:8px;">' + escapeHtml(link.note) + '</span>' : ''}
+            <span class="tag tag-${link.status}">${link.status === 'active' ? '生效中' : '已停用'}</span>
+          </div>
+          <div class="url">${escapeHtml(link.url)}</div>
+          <div class="meta">生成时间: ${dateStr}</div>
+        </div>
+        <div class="actions">
+          <button class="btn btn-copy" onclick="copyLink('${escapeHtml(link.url)}')">复制</button>
+          <button class="btn btn-copy" onclick="deleteLink('${escapeHtml(link.uid)}')" style="color:#ff4d4f;">删除</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function deleteLink(uid) {
+  if (!confirm('确定要删除 ' + uid + ' 的链接吗？')) return;
+  const links = getLinks().filter(l => l.uid !== uid);
+  saveLinks(links);
+  renderLinks();
+  showToast('已删除: ' + uid);
+}
+
+function copyLink(url) {
+  navigator.clipboard.writeText(url).then(() => {
+    showToast('✅ 链接已复制到剪贴板');
+  }).catch(() => {
+    // fallback
+    const ta = document.createElement('textarea');
+    ta.value = url;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    showToast('✅ 链接已复制');
+  });
+}
+
+// ===== 加载报表 =====
+async function loadReport() {
+  const btn = document.querySelector('#tab-report .btn-primary');
+  btn.textContent = '⏳ 加载中...';
+  btn.disabled = true;
+
+  try {
+    // 获取最近 7 天的数据
+    const now = Date.now();
+    const from = now - 7 * 24 * 60 * 60 * 1000;
+    const resp = await fetch(`${API_BASE}/api/report?from=${from}&to=${now}`);
+    const data = await resp.json();
+
+    if (!data.ok) {
+      showToast('❌ 加载失败: ' + (data.error || '未知错误'));
+      return;
+    }
+
+    // 更新统计数字
+    document.getElementById('statTotal').textContent = data.summary?.total_exposures || 0;
+    document.getElementById('statSessions').textContent = data.summary?.unique_sessions || 0;
+    document.getElementById('statUsers').textContent = data.summary?.unique_ips || 0;
+    document.getElementById('statUids').textContent = data.summary?.unique_users || 0;
+
+    // 更新表格
+    const byUid = data.by_uid || [];
+    const tableContainer = document.getElementById('reportTable');
+
+    if (byUid.length === 0) {
+      tableContainer.innerHTML = `
+        <div class="empty-state">
+          <div class="icon">📭</div>
+          <div>暂无数据，请让人员打开链接后刷新</div>
+        </div>`;
+    } else {
+      tableContainer.innerHTML = `
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>身份 ID</th>
+              <th class="num">曝光次数</th>
+              <th class="num">心跳数</th>
+              <th class="num">总会话</th>
+              <th class="num">独立设备</th>
+              <th>首次访问</th>
+              <th>最后访问</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${byUid.map(row => {
+              const first = row.first_seen_iso ? formatDate(row.first_seen_iso) : '-';
+              const last = row.last_seen_iso ? formatDate(row.last_seen_iso) : '-';
+              return `
+                <tr>
+                  <td class="uid-cell">${escapeHtml(row.uid)}</td>
+                  <td class="num">${row.exposures}</td>
+                  <td class="num">${row.heartbeats}</td>
+                  <td class="num">${row.unique_sessions}</td>
+                  <td class="num">${row.unique_vids}</td>
+                  <td class="time">${first}</td>
+                  <td class="time">${last}</td>
+                </tr>
+              `;
+            }).join('')}
+          </tbody>
+        </table>
+      `;
+    }
+
+    document.getElementById('lastUpdate').textContent = '最后更新: ' + new Date().toLocaleString('zh-CN');
+    showToast('✅ 数据已更新');
+
+  } catch (err) {
+    showToast('❌ 加载失败: ' + err.message);
+  } finally {
+    btn.textContent = '🔄 刷新数据';
+    btn.disabled = false;
+  }
+}
+
+// ===== 工具函数 =====
+function escapeHtml(str) {
+  if (!str) return '';
+  return str.replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[m]));
+}
+
+function formatDate(isoStr) {
+  try {
+    const d = new Date(isoStr);
+    return (d.getMonth()+1) + '/' + d.getDate() + ' ' +
+           d.getHours().toString().padStart(2,'0') + ':' +
+           d.getMinutes().toString().padStart(2,'0');
+  } catch(e) { return isoStr; }
+}
+
+function showToast(msg) {
+  const toast = document.getElementById('toast');
+  toast.textContent = msg;
+  toast.classList.add('show');
+  setTimeout(() => toast.classList.remove('show'), 3000);
+}
+
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  event.target.classList.add('active');
+  document.getElementById('tab-' + name).classList.add('active');
+}
+
+// ===== 初始化 =====
+renderLinks();
+</script>
+
+</body>
+</html>
