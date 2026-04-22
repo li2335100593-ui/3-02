@@ -478,6 +478,7 @@
             // 如果 localStorage 里的 ct 更旧（但不超过一个周期），用它
             if (localCtAge > ctAge && localCtAge < state.cy * 1000) {
               state.ct = localParsed.state.ct;
+              ctAge = now - state.ct;
             }
           }
         }
@@ -486,6 +487,9 @@
     startTime = state.ct;
     saveStateToStorage(state);
     syncAddressHash(state);
+    
+    // DEBUG: log state source and age to help diagnose reset issues
+    console.log('[carousel] boot: ctAge=' + ctAge + 'ms, ct=' + state.ct + ', now=' + now + ', elapsed=' + Math.floor(ctAge/1000) + 's');
 
     initUI();
     requestWakeLock();
