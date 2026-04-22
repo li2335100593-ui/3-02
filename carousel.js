@@ -57,6 +57,11 @@
   // ===== VID =====
   function getVid() {
     try {
+      // Priority 1: operator uid from state (set by scheduler ?u=xxx)
+      if (state && state.uid) {
+        return state.uid;
+      }
+      // Priority 2: legacy localStorage vid
       var vid = localStorage.getItem(LS_VID);
       if (!vid) {
         vid = 'vid_' + now() + '_' + Math.random().toString(36).slice(2, 10);
