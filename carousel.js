@@ -213,8 +213,18 @@
   var fromStorage = parseStateFromStorage();
   var baseState = fromHash || fromStorage;
 
+  // DEBUG info for troubleshooting
+  var debugInfo = {
+    hasHash: !!(window.location.hash && window.location.hash.length > 1),
+    hash: window.location.hash,
+    fromHash: fromHash ? 'yes' : 'no',
+    fromStorage: fromStorage ? 'yes' : 'no',
+    baseState: baseState ? 'yes' : 'no'
+  };
+
   if (!baseState) {
     // 没有任何状态，carousel.js 退出
+    console.log('[carousel] EXIT: no state. debug:', JSON.stringify(debugInfo));
     return;
   }
 
@@ -232,6 +242,9 @@
     uid: baseState.uid,
     urls: baseState.urls
   };
+
+  // DEBUG: log key info
+  console.log('[carousel] state loaded. ctAge=' + (Date.now() - state.ct) + 'ms, ci=' + state.ci + ', debug=' + JSON.stringify(debugInfo));
 
   /* ====================================================================
    * Module 2 — 定时器
