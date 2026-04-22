@@ -333,69 +333,93 @@ tailwind.config = {
 
       <!-- ===== DAILY TAB ===== -->
       <div id="tab-daily" class="hidden fade-in">
+        <!-- Filters -->
         <div class="card-block mb-6">
-          <div class="flex flex-wrap items-center gap-4 mb-4">
-            <div class="flex items-center gap-2">
-              <label class="text-sm font-semibold text-gray-500 uppercase">開始日期</label>
-              <input id="dailyFrom" type="date" class="input-flat w-40">
+          <h3 class="text-lg font-bold text-fg mb-4">數據篩選</h3>
+          <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-4">
+            <div>
+              <label class="block text-sm font-semibold text-gray-500 uppercase mb-2">開始日期</label>
+              <input id="dailyFrom" type="date" class="input-flat">
             </div>
-            <div class="flex items-center gap-2">
-              <label class="text-sm font-semibold text-gray-500 uppercase">結束日期</label>
-              <input id="dailyTo" type="date" class="input-flat w-40">
+            <div>
+              <label class="block text-sm font-semibold text-gray-500 uppercase mb-2">結束日期</label>
+              <input id="dailyTo" type="date" class="input-flat">
             </div>
-            <div class="flex items-center gap-2">
-              <label class="text-sm font-semibold text-gray-500 uppercase">播放人員</label>
-              <select id="dailyOperator" class="input-flat w-40">
+            <div>
+              <label class="block text-sm font-semibold text-gray-500 uppercase mb-2">播放人員</label>
+              <select id="dailyOperator" class="input-flat">
                 <option value="">全部</option>
               </select>
             </div>
-            <button onclick="queryDaily()" class="btn-primary h-10 px-5 text-sm">查詢</button>
-          </div>
-        </div>
-        <div class="card-block overflow-x-auto">
-          <table class="w-full data-table" id="dailyTable">
-            <thead>
-              <tr>
-                <th>日期</th>
-                <th>Session 數</th>
-                <th>事件總數</th>
-                <th>運行時長</th>
-                <th>播放人員</th>
-                <th>狀態</th>
-                <th>操作</th>
-              </tr>
-            </thead>
-            <tbody id="dailyTableBody"></tbody>
-          </table>
-        </div>
-
-        <!-- Day Detail Panel -->
-        <div id="dayDetailPanel" class="card-block hidden">
-          <div class="flex items-center justify-between mb-4">
             <div>
-              <h3 class="text-lg font-bold text-fg" id="dayDetailTitle">2026-04-01 詳細記錄</h3>
-              <p class="text-sm text-gray-400 mt-1">該日所有曝光事件明細</p>
+              <label class="block text-sm font-semibold text-gray-500 uppercase mb-2">設備類型</label>
+              <select id="dailyDevice" class="input-flat">
+                <option value="">全部</option>
+                <option value="desktop">桌面端</option>
+                <option value="mobile">移動端</option>
+                <option value="tablet">平板</option>
+              </select>
             </div>
-            <button onclick="hideDayDetail()" class="btn-secondary h-10 px-4 text-sm flex items-center gap-2">
-              <span class="material-symbols-outlined">close</span>
-              <span>關閉</span>
+            <div>
+              <label class="block text-sm font-semibold text-gray-500 uppercase mb-2">事件類型</label>
+              <select id="dailyEventType" class="input-flat">
+                <option value="">全部</option>
+                <option value="page_enter">進入頁面</option>
+                <option value="heartbeat">心跳</option>
+                <option value="page_leave">離開頁面</option>
+              </select>
+            </div>
+          </div>
+          <div class="flex items-center gap-4">
+            <div class="flex-1">
+              <label class="block text-sm font-semibold text-gray-500 uppercase mb-2">URL 關鍵詞</label>
+              <input id="dailyUrlFilter" type="text" class="input-flat" placeholder="輸入 URL 關鍵詞篩選...">
+            </div>
+            <button onclick="queryDaily()" class="btn-primary h-14 px-8 text-base flex items-center gap-2 mt-6">
+              <span class="material-symbols-outlined">search</span>
+              <span>查詢</span>
             </button>
           </div>
-          <div class="overflow-x-auto">
-            <table class="w-full data-table" id="dayDetailTable">
-              <thead>
-                <tr>
-                  <th>時間</th>
-                  <th>播放人員</th>
-                  <th>設備</th>
-                  <th>URL</th>
-                  <th>事件類型</th>
-                  <th>頁面索引</th>
-                  <th>IP</th>
-                </tr>
-              </thead>
-              <tbody id="dayDetailBody"></tbody>
-            </table>
+        </div>
+
+        <!-- Field Selector -->
+        <div class="card-block mb-6">
+          <h3 class="text-lg font-bold text-fg mb-4">顯示指標 <span class="text-xs font-normal text-gray-400">（點擊選擇要顯示的字段）</span></h3>
+          <div class="flex flex-wrap gap-2" id="fieldSelector"></div>
+        </div>
+
+        <!-- Data Table -->
+        <div class="card-block overflow-x-auto">
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <h3 class="text-lg font-bold text-fg">數據明細</h3>
+              <p class="text-sm text-gray-400 mt-1">共 <span id="dailyTotalCount" class="font-bold text-fg">0</span> 條記錄</p>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="text-sm text-gray-500">每頁</span>
+              <select id="dailyPageSize" class="input-flat w-20" onchange="queryDaily()">
+                <option value="50">50</option>
+                <option value="100">100</option>
+                <option value="200">200</option>
+                <option value="500">500</option>
+              </select>
+            </div>
+          </div>
+          <table class="w-full data-table" id="dailyTable">
+            <thead id="dailyTableHead"></thead>
+            <tbody id="dailyTableBody"></tbody>
+          </table>
+          <!-- Pagination -->
+          <div class="flex items-center justify-between mt-4 pt-4 border-t border-gray-100" id="dailyPagination" style="display:none;">
+            <button onclick="changeDailyPage(-1)" id="dailyPrevBtn" class="btn-secondary h-10 px-4 text-sm flex items-center gap-2">
+              <span class="material-symbols-outlined">chevron_left</span>
+              <span>上一頁</span>
+            </button>
+            <span class="text-sm text-gray-500">第 <span id="dailyPageNum" class="font-bold text-fg">1</span> 頁</span>
+            <button onclick="changeDailyPage(1)" id="dailyNextBtn" class="btn-secondary h-10 px-4 text-sm flex items-center gap-2">
+              <span>下一頁</span>
+              <span class="material-symbols-outlined">chevron_right</span>
+            </button>
           </div>
         </div>
       </div>
@@ -1016,121 +1040,146 @@ async function renderOperatorRanking() {
   }
 }
 
-// ========== DAILY TABLE ==========
-function renderDailyTable(data) {
-  const tbody = $('dailyTableBody');
-  if (!data.length) { tbody.innerHTML = '<tr><td colspan="7" class="text-center text-gray-400 py-8">暫無數據</td></tr>'; return; }
+// ========== DAILY ANALYSIS (CUSTOM METRICS) ==========
+const FIELD_DEFS = {
+  time:        { label: '時間', sql: "datetime(received_at/1000,'unixepoch','+8 hours')" },
+  day:         { label: '日期', sql: "date(received_at/1000,'unixepoch','+8 hours')" },
+  vid:         { label: '播放人員', sql: 'vid' },
+  device_type: { label: '設備', sql: 'device_type' },
+  url:         { label: 'URL', sql: 'url' },
+  event_type:  { label: '事件類型', sql: 'event_type' },
+  page_index:  { label: '頁面索引', sql: 'page_index' },
+  ip:          { label: 'IP', sql: 'ip' },
+  sid:         { label: 'Session ID', sql: 'sid' },
+  ua:          { label: 'User Agent', sql: 'ua' },
+};
+let gSelectedFields = ['time','vid','device_type','url','event_type','page_index','ip'];
+let gDailyPage = 1;
+let gDailyAllData = [];
 
-  tbody.innerHTML = data.map(d => {
-    const status = (d.duration_min || 0) >= 60
-      ? '<span class="tag-pill bg-emerald-100 text-emerald-700">正常</span>'
-      : ((d.duration_min || 0) >= 10
-        ? '<span class="tag-pill bg-amber-100 text-amber-700">偏短</span>'
-        : '<span class="tag-pill bg-red-100 text-red-700">異常</span>');
-    return `
-      <tr class="cursor-pointer hover:bg-blue-50/50 transition-colors" onclick="showDayDetail('${d.day}')">
-        <td class="font-semibold text-primary">${d.day}</td>
-        <td>${d.sessions || 0}</td>
-        <td>${d.total_events || 0}</td>
-        <td class="font-semibold">${fmtDuration(d.duration_min || 0)}</td>
-        <td>${d.operators || 0} 人</td>
-        <td>${status}</td>
-        <td>
-          <button class="text-primary hover:text-blue-700 flex items-center gap-1 text-sm font-medium">
-            <span class="material-symbols-outlined" style="font-size:18px">visibility</span>
-            <span>查看詳情</span>
-          </button>
-        </td>
-      </tr>
-    `;
+function renderFieldSelector() {
+  const container = $('fieldSelector');
+  container.innerHTML = Object.entries(FIELD_DEFS).map(([key, def]) => {
+    const active = gSelectedFields.includes(key);
+    return `<button onclick="toggleField('${key}')" class="px-3 py-1.5 rounded-md text-sm font-medium transition-all ${active ? 'bg-primary text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}">${def.label}</button>`;
   }).join('');
+}
+
+function toggleField(key) {
+  if (gSelectedFields.includes(key)) {
+    if (gSelectedFields.length <= 1) { alert('至少選擇一個字段'); return; }
+    gSelectedFields = gSelectedFields.filter(f => f !== key);
+  } else {
+    gSelectedFields.push(key);
+  }
+  renderFieldSelector();
+  if (gDailyAllData.length) renderDailyData(gDailyAllData);
+}
+
+function renderDailyHead() {
+  const thead = $('dailyTableHead');
+  thead.innerHTML = '<tr>' + gSelectedFields.map(f => `<th>${FIELD_DEFS[f].label}</th>`).join('') + '</tr>';
+}
+
+function renderDailyData(rows) {
+  renderDailyHead();
+  const tbody = $('dailyTableBody');
+  const labels = { desktop:'桌面端', mobile:'移動端', tablet:'平板', unknown:'未知', '':'未知' };
+  const evtLabels = { page_enter:'進入頁面', heartbeat:'心跳', page_leave:'離開頁面' };
+
+  if (!rows.length) {
+    tbody.innerHTML = `<tr><td colspan="${gSelectedFields.length}" class="text-center text-gray-400 py-8">暫無數據</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = rows.map(r => '<tr>' + gSelectedFields.map(f => {
+    const val = r[f];
+    if (f === 'device_type') return `<td><span class="tag-pill bg-gray-100 text-gray-600">${labels[val] || val || '未知'}</span></td>`;
+    if (f === 'event_type') return `<td><span class="tag-pill ${val==='page_enter'?'bg-blue-100 text-blue-700':(val==='heartbeat'?'bg-emerald-100 text-emerald-700':'bg-gray-100 text-gray-600')}">${evtLabels[val] || val || '--'}</span></td>`;
+    if (f === 'url') return `<td class="text-xs truncate max-w-[220px]" title="${val || ''}">${val ? val.replace(/^https?:\/\//,'') : '--'}</td>`;
+    if (f === 'page_index') return `<td class="text-center">${val != null ? val : '--'}</td>`;
+    if (f === 'time') return `<td class="font-mono text-xs">${val || '--'}</td>`;
+    if (f === 'sid') return `<td class="font-mono text-xs text-gray-400">${val || '--'}</td>`;
+    if (f === 'ua') return `<td class="text-xs truncate max-w-[200px]" title="${val || ''}">${val ? (val.length > 40 ? val.slice(0,40)+'...' : val) : '--'}</td>`;
+    return `<td>${val != null ? val : '--'}</td>`;
+  }).join('') + '</tr>').join('');
 }
 
 async function queryDaily() {
   const from = $('dailyFrom').value;
   const to = $('dailyTo').value;
   const op = $('dailyOperator').value;
+  const device = $('dailyDevice').value;
+  const eventType = $('dailyEventType').value;
+  const urlKw = $('dailyUrlFilter').value.trim();
+  const pageSize = parseInt($('dailyPageSize').value, 10) || 50;
   if (!from || !to) { alert('請選擇日期範圍'); return; }
 
+  gDailyPage = 1;
   try {
-    let sql = `
-      WITH ds AS (
-        SELECT date(received_at/1000,'unixepoch','+8 hours') as day,
-               COUNT(DISTINCT sid) as sessions,
-               COUNT(*) as total_events,
-               COUNT(CASE WHEN event_type='page_enter' THEN 1 END) as enters,
-               COUNT(CASE WHEN event_type='heartbeat' THEN 1 END) as heartbeats,
-               COUNT(DISTINCT vid) as operators,
-               ROUND((MAX(received_at)-MIN(received_at))/1000.0/60.0,1) as duration_min
-        FROM exposure_events
-        WHERE date(received_at/1000,'unixepoch','+8 hours') >= '${from}' AND date(received_at/1000,'unixepoch','+8 hours') <= '${to}'
-        ${op ? `AND vid = '${op}'` : ''}
-        GROUP BY day
-      )
-      SELECT * FROM ds ORDER BY day DESC
-    `;
+    // Build WHERE
+    let where = `date(received_at/1000,'unixepoch','+8 hours') >= '${from}' AND date(received_at/1000,'unixepoch','+8 hours') <= '${to}'`;
+    if (op) where += ` AND vid = '${op}'`;
+    if (device) where += ` AND device_type = '${device}'`;
+    if (eventType) where += ` AND event_type = '${eventType}'`;
+    if (urlKw) where += ` AND url LIKE '%${urlKw}%'`;
+
+    // Count total
+    const countRes = await d1Query(`SELECT COUNT(*) as cnt FROM exposure_events WHERE ${where}`);
+    const total = countRes[0].results[0].cnt;
+    $('dailyTotalCount').textContent = total.toLocaleString();
+
+    // Build SELECT
+    const cols = gSelectedFields.map(f => `${FIELD_DEFS[f].sql} as ${f}`).join(', ');
+    const offset = (gDailyPage - 1) * pageSize;
+    const sql = `SELECT ${cols} FROM exposure_events WHERE ${where} ORDER BY received_at DESC LIMIT ${pageSize} OFFSET ${offset}`;
     const res = await d1Query(sql);
-    const filtered = res[0].results;
-    renderDailyTable(filtered);
-    hideDayDetail();
+    gDailyAllData = res[0].results;
+    renderDailyData(gDailyAllData);
+
+    // Pagination
+    const totalPages = Math.ceil(total / pageSize);
+    $('dailyPagination').style.display = totalPages > 1 ? 'flex' : 'none';
+    $('dailyPageNum').textContent = gDailyPage;
+    $('dailyPrevBtn').disabled = gDailyPage <= 1;
+    $('dailyNextBtn').disabled = gDailyPage >= totalPages;
   } catch(e) { alert('查詢失敗：' + e.message); }
 }
 
-async function showDayDetail(day) {
+async function changeDailyPage(delta) {
+  const from = $('dailyFrom').value;
+  const to = $('dailyTo').value;
   const op = $('dailyOperator').value;
-  $('dayDetailTitle').textContent = day + ' 詳細記錄';
-  $('dayDetailPanel').classList.remove('hidden');
-  $('dayDetailBody').innerHTML = '<tr><td colspan="7" class="text-center text-gray-400 py-8">加載中...</td></tr>';
+  const device = $('dailyDevice').value;
+  const eventType = $('dailyEventType').value;
+  const urlKw = $('dailyUrlFilter').value.trim();
+  const pageSize = parseInt($('dailyPageSize').value, 10) || 50;
+  gDailyPage += delta;
+  if (gDailyPage < 1) gDailyPage = 1;
 
   try {
-    let sql = `
-      SELECT
-        datetime(received_at/1000,'unixepoch','+8 hours') as time,
-        vid as operator_code,
-        device_type,
-        url,
-        event_type,
-        page_index,
-        ip
-      FROM exposure_events
-      WHERE date(received_at/1000,'unixepoch','+8 hours') = '${day}'
-      ${op ? `AND vid = '${op}'` : ''}
-      ORDER BY received_at ASC
-    `;
+    let where = `date(received_at/1000,'unixepoch','+8 hours') >= '${from}' AND date(received_at/1000,'unixepoch','+8 hours') <= '${to}'`;
+    if (op) where += ` AND vid = '${op}'`;
+    if (device) where += ` AND device_type = '${device}'`;
+    if (eventType) where += ` AND event_type = '${eventType}'`;
+    if (urlKw) where += ` AND url LIKE '%${urlKw}%'`;
+
+    const countRes = await d1Query(`SELECT COUNT(*) as cnt FROM exposure_events WHERE ${where}`);
+    const total = countRes[0].results[0].cnt;
+    const totalPages = Math.ceil(total / pageSize);
+    if (gDailyPage > totalPages) gDailyPage = totalPages;
+
+    const cols = gSelectedFields.map(f => `${FIELD_DEFS[f].sql} as ${f}`).join(', ');
+    const offset = (gDailyPage - 1) * pageSize;
+    const sql = `SELECT ${cols} FROM exposure_events WHERE ${where} ORDER BY received_at DESC LIMIT ${pageSize} OFFSET ${offset}`;
     const res = await d1Query(sql);
-    const rows = res[0].results;
-    renderDayDetail(rows);
-    // Scroll to detail panel
-    $('dayDetailPanel').scrollIntoView({ behavior: 'smooth', block: 'start' });
-  } catch(e) {
-    $('dayDetailBody').innerHTML = '<tr><td colspan="7" class="text-center text-red-400 py-8">加載失敗：' + e.message + '</td></tr>';
-  }
-}
+    gDailyAllData = res[0].results;
+    renderDailyData(gDailyAllData);
 
-function hideDayDetail() {
-  $('dayDetailPanel').classList.add('hidden');
-}
-
-function renderDayDetail(rows) {
-  const tbody = $('dayDetailBody');
-  if (!rows || !rows.length) {
-    tbody.innerHTML = '<tr><td colspan="7" class="text-center text-gray-400 py-8">該日暫無明細數據</td></tr>';
-    return;
-  }
-  const labels = { desktop:'桌面端', mobile:'移動端', tablet:'平板', unknown:'未知', '':'未知' };
-  const evtLabels = { page_enter:'進入頁面', heartbeat:'心跳', page_leave:'離開頁面' };
-
-  tbody.innerHTML = rows.map(r => `
-    <tr>
-      <td class="font-mono text-xs">${r.time || '--'}</td>
-      <td class="font-semibold text-sm">${r.operator_code || '--'}</td>
-      <td><span class="tag-pill bg-gray-100 text-gray-600">${labels[r.device_type] || r.device_type || '未知'}</span></td>
-      <td class="text-xs truncate max-w-[200px]" title="${r.url}">${r.url?.replace(/^https?:\/\//,'') || '--'}</td>
-      <td><span class="tag-pill ${r.event_type==='page_enter'?'bg-blue-100 text-blue-700':(r.event_type==='heartbeat'?'bg-emerald-100 text-emerald-700':'bg-gray-100 text-gray-600')}">${evtLabels[r.event_type] || r.event_type || '--'}</span></td>
-      <td class="text-center">${r.page_index != null ? r.page_index : '--'}</td>
-      <td class="font-mono text-xs text-gray-400">${r.ip || '--'}</td>
-    </tr>
-  `).join('');
+    $('dailyPageNum').textContent = gDailyPage;
+    $('dailyPrevBtn').disabled = gDailyPage <= 1;
+    $('dailyNextBtn').disabled = gDailyPage >= totalPages;
+  } catch(e) { alert('查詢失敗：' + e.message); }
 }
 
 async function loadOperatorsForSelect() {
@@ -1378,6 +1427,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const thirtyDaysAgo = new Date(today.getTime() - 30*24*60*60*1000);
   ['dailyFrom','csvFrom','jsonFrom'].forEach(id => $(id).value = fmtDate(thirtyDaysAgo.getTime()));
   ['dailyTo','csvTo','jsonTo'].forEach(id => $(id).value = fmtDate(today.getTime()));
+  renderFieldSelector();
 
   if (gToken) checkAutoLogin();
 });
