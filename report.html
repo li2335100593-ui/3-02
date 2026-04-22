@@ -1,880 +1,1288 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="zh-TW">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Exposure Journal V2</title>
-  <style>
-    :root {
-      --bg: #ffffff;
-      --ink: #1b1b1b;
-      --muted: #686868;
-      --line: #e5e7eb;
-      --line-strong: #d5d8de;
-      --card: #ffffff;
-      --soft: #f8fafc;
-      --accent: #0f5bd8;
-      --accent-soft: #e8f0ff;
-      --danger: #b42318;
-      --radius: 10px;
-      --shadow: 0 6px 18px rgba(20, 24, 32, 0.06);
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>輪播系統報表中心</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/material-symbols@0.27.2/index.css" />
+<script>
+tailwind.config = {
+  theme: {
+    extend: {
+      fontFamily: {
+        outfit: ['Outfit', 'sans-serif'],
+      },
+      colors: {
+        bg: '#FFFFFF',
+        fg: '#111827',
+        primary: '#3B82F6',
+        secondary: '#10B981',
+        accent: '#F59E0B',
+        muted: '#F3F4F6',
+        border: '#E5E7EB',
+      }
     }
-
-    * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      color: var(--ink);
-      background: var(--bg);
-      font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
-    }
-    .wrap {
-      max-width: 1360px;
-      margin: 0 auto;
-      padding: 20px 20px 36px;
-    }
-
-    .masthead {
-      display: flex;
-      justify-content: space-between;
-      align-items: baseline;
-      gap: 10px;
-      padding-bottom: 12px;
-      border-bottom: 2px solid #141414;
-      margin-bottom: 16px;
-    }
-    .title {
-      margin: 0;
-      font-size: clamp(28px, 3.6vw, 44px);
-      letter-spacing: 0.6px;
-      font-weight: 800;
-    }
-    .subtitle {
-      margin: 0;
-      color: var(--muted);
-      font-size: 12px;
-      letter-spacing: 1.1px;
-      text-transform: uppercase;
-      font-weight: 700;
-    }
-
-    .toolbar,
-    .filters,
-    .kpis,
-    .main-panel {
-      background: var(--card);
-      border: 1px solid var(--line);
-      border-radius: var(--radius);
-      box-shadow: var(--shadow);
-      padding: 12px;
-      margin-bottom: 12px;
-    }
-
-    .toolbar {
-      display: grid;
-      grid-template-columns: 1fr 1fr 170px auto auto auto;
-      gap: 8px;
-    }
-
-    .filters {
-      display: grid;
-      grid-template-columns: 1.3fr 1fr auto auto auto;
-      gap: 8px;
-      align-items: start;
-    }
-
-    .chip-list {
-      border: 1px solid var(--line-strong);
-      border-radius: 8px;
-      background: #fff;
-      min-height: 124px;
-      max-height: 180px;
-      overflow: auto;
-      padding: 8px;
-      display: flex;
-      flex-wrap: wrap;
-      align-content: flex-start;
-      gap: 8px;
-    }
-
-    .chip {
-      border: 1px solid var(--line-strong);
-      background: #fff;
-      color: var(--ink);
-      border-radius: 999px;
-      padding: 7px 12px;
-      font-size: 13px;
-      line-height: 1.2;
-      cursor: pointer;
-      max-width: 100%;
-      word-break: break-all;
-      min-height: 40px;
-      display: inline-flex;
-      align-items: center;
-    }
-
-    .chip.selected {
-      border-color: var(--accent);
-      background: var(--accent-soft);
-      color: #0b3f9a;
-      font-weight: 700;
-    }
-
-    .selected-count {
-      margin-top: 4px;
-      color: var(--muted);
-      font-size: 12px;
-    }
-
-    input, button, select {
-      width: 100%;
-      border: 1px solid var(--line-strong);
-      background: #fff;
-      color: var(--ink);
-      border-radius: 8px;
-      padding: 9px 10px;
-      font: 14px/1.2 "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
-    }
-    select[multiple] {
-      min-height: 124px;
-      padding: 6px;
-    }
-    button {
-      cursor: pointer;
-      font-weight: 600;
-    }
-    button.primary {
-      background: #161616;
-      color: #fff;
-      border-color: #161616;
-    }
-
-    .kpis {
-      display: grid;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
-      gap: 10px;
-    }
-    .kpi {
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      padding: 10px;
-      background: var(--soft);
-    }
-    .kpi h4 {
-      margin: 0;
-      color: var(--muted);
-      font-size: 12px;
-      font-weight: 700;
-      letter-spacing: 0.6px;
-      text-transform: uppercase;
-    }
-    .kpi .v {
-      margin-top: 6px;
-      font-size: 34px;
-      line-height: 1;
-      font-weight: 800;
-    }
-
-    .main-panel h3 {
-      margin: 0 0 10px;
-      font-size: 24px;
-      font-weight: 800;
-      letter-spacing: 0.3px;
-    }
-
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 13px;
-    }
-    th, td {
-      border-bottom: 1px solid var(--line);
-      padding: 9px 8px;
-      text-align: left;
-      vertical-align: top;
-    }
-    th {
-      color: var(--muted);
-      font-size: 11px;
-      letter-spacing: 0.4px;
-      text-transform: uppercase;
-      white-space: nowrap;
-    }
-    td.url {
-      max-width: 320px;
-      word-break: break-all;
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
-      font-size: 12px;
-    }
-    tr.url-row:hover {
-      background: #f7faff;
-    }
-    tr.url-row.active {
-      background: var(--accent-soft);
-    }
-
-    .actions {
-      white-space: nowrap;
-    }
-    .tiny {
-      width: auto;
-      padding: 5px 8px;
-      font-size: 12px;
-    }
-
-    .detail-box {
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      background: #fff;
-      padding: 10px;
-      margin: 8px 0;
-    }
-    .detail-grid {
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 8px;
-      margin-bottom: 8px;
-    }
-    .detail-metric {
-      border: 1px solid var(--line);
-      border-radius: 6px;
-      padding: 8px;
-      background: var(--soft);
-    }
-    .detail-metric .k {
-      color: var(--muted);
-      font-size: 11px;
-      text-transform: uppercase;
-      letter-spacing: 0.4px;
-      font-weight: 700;
-    }
-    .detail-metric .v {
-      margin-top: 4px;
-      font-size: 24px;
-      font-weight: 800;
-      color: var(--accent);
-    }
-
-    .subtables {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 8px;
-    }
-    .user-ids {
-      border: 1px solid var(--line);
-      border-radius: 6px;
-      padding: 8px;
-      margin-top: 8px;
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
-      font-size: 12px;
-      max-height: 160px;
-      overflow: auto;
-      background: #fff;
-    }
-    .muted { color: var(--muted); }
-    .status {
-      margin-top: 8px;
-      font-size: 12px;
-      color: var(--muted);
-    }
-    .danger { color: var(--danger); }
-
-    @media (max-width: 1080px) {
-      .toolbar { grid-template-columns: 1fr 1fr; }
-      .filters { grid-template-columns: 1fr 1fr; }
-      .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-      .detail-grid { grid-template-columns: 1fr; }
-      .subtables { grid-template-columns: 1fr; }
-    }
-    @media (max-width: 680px) {
-      .toolbar,
-      .filters,
-      .kpis { grid-template-columns: 1fr; }
-      .title { font-size: 30px; }
-    }
-  </style>
+  }
+}
+</script>
+<style>
+  body { font-family: 'Outfit', sans-serif; background: #F3F4F6; }
+  .no-shadow { box-shadow: none !important; }
+  .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 500, 'GRAD' 0, 'opsz' 24; vertical-align: middle; font-size: 20px; }
+  .material-symbols-outlined.filled { font-variation-settings: 'FILL' 1, 'wght' 500, 'GRAD' 0, 'opsz' 24; }
+  .icon-lg { font-size: 24px; }
+  .icon-xl { font-size: 32px; }
+  .btn-primary {
+    background: #3B82F6; color: white; border-radius: 6px;
+    transition: all 200ms; font-weight: 600; border: none; cursor: pointer;
+  }
+  .btn-primary:hover { background: #2563EB; transform: scale(1.05); }
+  .btn-primary:active { transform: scale(0.98); }
+  .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+  .btn-secondary {
+    background: #F3F4F6; color: #111827; border-radius: 6px;
+    transition: all 200ms; font-weight: 600; border: none; cursor: pointer;
+  }
+  .btn-secondary:hover { background: #E5E7EB; transform: scale(1.05); }
+  .btn-danger {
+    background: #EF4444; color: white; border-radius: 6px;
+    transition: all 200ms; font-weight: 600; border: none; cursor: pointer;
+  }
+  .btn-danger:hover { background: #DC2626; transform: scale(1.05); }
+  .card-block {
+    background: white; border-radius: 8px; padding: 24px;
+    transition: all 200ms;
+  }
+  .card-block:hover { transform: scale(1.02); }
+  .card-colored {
+    border-radius: 8px; padding: 24px;
+    transition: all 200ms;
+  }
+  .card-colored:hover { transform: scale(1.02); }
+  .input-flat {
+    background: #F3F4F6; border: none; border-radius: 6px;
+    padding: 14px 16px; font-size: 15px; color: #111827;
+    transition: all 200ms; width: 100%;
+  }
+  .input-flat:focus {
+    outline: none; background: white; border: 2px solid #3B82F6;
+  }
+  .input-flat::placeholder { color: #9CA3AF; }
+  .tag-pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 6px 14px; border-radius: 6px; font-size: 13px;
+    font-weight: 600;
+  }
+  .bar-col { transition: height 300ms ease-out; border-radius: 4px 4px 0 0; }
+  .section-block { padding: 64px 24px; }
+  .fade-in { animation: fadeIn 400ms ease-out; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+  .slide-in { animation: slideIn 300ms ease-out; }
+  @keyframes slideIn { from { opacity: 0; transform: translateX(-20px); } to { opacity: 1; transform: translateX(0); } }
+  .loader-spin { animation: spin 1s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  table.data-table th { background: #F3F4F6; font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: #6B7280; padding: 12px 16px; text-align: left; }
+  table.data-table td { padding: 12px 16px; border-bottom: 1px solid #F3F4F6; font-size: 14px; }
+  table.data-table tr:hover td { background: #F9FAFB; }
+  .nav-item { padding: 10px 16px; border-radius: 6px; font-weight: 500; font-size: 14px; color: #6B7280; cursor: pointer; transition: all 200ms; display: flex; align-items: center; gap: 10px; }
+  .nav-item:hover { background: #F3F4F6; color: #111827; }
+  .nav-item.active { background: #3B82F6; color: white; }
+  .login-tab { padding: 8px 16px; font-size: 14px; font-weight: 600; color: #9CA3AF; cursor: pointer; border-bottom: 2px solid transparent; transition: all 200ms; }
+  .login-tab.active { color: #3B82F6; border-color: #3B82F6; }
+  .link-card { background: #F9FAFB; border-radius: 8px; padding: 16px; border: 1px dashed #E5E7EB; }
+  .operator-row { transition: all 150ms; }
+  .operator-row:hover { background: #F9FAFB; }
+  .progress-bar { height: 8px; border-radius: 4px; background: #F3F4F6; overflow: hidden; }
+  .progress-fill { height: 100%; border-radius: 4px; transition: width 500ms ease-out; }
+</style>
 </head>
-<body>
-  <div class="wrap">
-    <header class="masthead">
-      <h1 class="title">曝光儀表板</h1>
-      <p class="subtitle">內部分析 · 自動輪播</p>
+<body class="min-h-screen text-fg">
+
+<!-- ==================== LOGIN VIEW ==================== -->
+<div id="loginView" class="min-h-screen flex items-center justify-center relative overflow-hidden">
+  <div class="absolute inset-0 bg-white"></div>
+  <div class="absolute top-[-10%] right-[-5%] w-[500px] h-[500px] rounded-full bg-blue-500/5"></div>
+  <div class="absolute bottom-[-10%] left-[-5%] w-[400px] h-[400px] rounded-full bg-emerald-500/5"></div>
+  <div class="absolute top-[20%] left-[10%] w-[120px] h-[120px] bg-amber-500/10 rotate-12 rounded-lg"></div>
+
+  <div class="relative z-10 w-full max-w-md px-6">
+    <div class="text-center mb-10">
+      <div class="inline-flex items-center justify-center w-16 h-16 rounded-lg bg-primary text-white mb-6">
+        <span class="material-symbols-outlined icon-xl" style="color:white;font-size:32px;">bar_chart</span>
+      </div>
+      <h1 class="text-4xl font-extrabold tracking-tight text-fg" style="letter-spacing: -0.02em;">報表中心</h1>
+      <p class="mt-3 text-gray-500 font-medium">輪播系統數據分析平台</p>
+    </div>
+
+    <div class="card-block no-shadow">
+      <div class="flex justify-center gap-6 mb-6 border-b border-gray-100">
+        <div id="tabLogin" class="login-tab active" onclick="switchLoginTab('login')">登錄</div>
+        <div id="tabRegister" class="login-tab" onclick="switchLoginTab('register')">註冊</div>
+      </div>
+
+      <div id="loginForm" class="space-y-5">
+        <div>
+          <label class="block text-sm font-semibold text-fg mb-2 uppercase tracking-wider">用戶名</label>
+          <input id="loginUsername" type="text" class="input-flat" placeholder="輸入用戶名" value="admin">
+        </div>
+        <div>
+          <label class="block text-sm font-semibold text-fg mb-2 uppercase tracking-wider">密碼</label>
+          <input id="loginPassword" type="password" class="input-flat" placeholder="輸入密碼" value="admin123">
+        </div>
+        <button onclick="doLogin()" id="loginBtn" class="btn-primary w-full h-14 text-base flex items-center justify-center gap-2">
+          <span class="material-symbols-outlined">login</span>
+          <span>登錄</span>
+        </button>
+      </div>
+
+      <div id="registerForm" class="space-y-5 hidden">
+        <div>
+          <label class="block text-sm font-semibold text-fg mb-2 uppercase tracking-wider">用戶名</label>
+          <input id="regUsername" type="text" class="input-flat" placeholder="設置用戶名（至少2位）">
+        </div>
+        <div>
+          <label class="block text-sm font-semibold text-fg mb-2 uppercase tracking-wider">密碼</label>
+          <input id="regPassword" type="password" class="input-flat" placeholder="設置密碼（至少4位）">
+        </div>
+        <div>
+          <label class="block text-sm font-semibold text-fg mb-2 uppercase tracking-wider">確認密碼</label>
+          <input id="regPassword2" type="password" class="input-flat" placeholder="再次輸入密碼">
+        </div>
+        <button onclick="doRegister()" id="registerBtn" class="btn-primary w-full h-14 text-base flex items-center justify-center gap-2">
+          <span class="material-symbols-outlined">person_add</span>
+          <span>註冊賬號</span>
+        </button>
+      </div>
+
+      <p id="loginError" class="mt-4 text-sm text-red-600 text-center hidden"></p>
+      <p class="mt-4 text-xs text-gray-400 text-center">默認賬號：admin / admin123</p>
+    </div>
+
+    <p class="text-center mt-6 text-xs text-gray-400">輪播系統 v2.0 · Worker 認證系統</p>
+  </div>
+</div>
+
+<!-- ==================== DASHBOARD VIEW ==================== -->
+<div id="dashboardView" class="hidden min-h-screen flex">
+  <!-- Sidebar -->
+  <aside class="w-64 bg-white border-r border-gray-100 flex flex-col sticky top-0 h-screen">
+    <div class="p-6 border-b border-gray-100">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-lg bg-primary text-white flex items-center justify-center">
+          <span class="material-symbols-outlined filled" style="color:white;font-size:22px;">bar_chart</span>
+        </div>
+        <div>
+          <h2 class="font-bold text-fg leading-tight">報表中心</h2>
+          <p class="text-xs text-gray-400">Analytics</p>
+        </div>
+      </div>
+    </div>
+    <nav class="flex-1 p-4 space-y-1 overflow-y-auto">
+      <div class="nav-item active" onclick="switchTab('overview')">
+        <span class="material-symbols-outlined">space_dashboard</span>
+        <span>數據概覽</span>
+      </div>
+      <div class="nav-item" onclick="switchTab('daily')">
+        <span class="material-symbols-outlined">calendar_month</span>
+        <span>每日分析</span>
+      </div>
+      <div class="nav-item" onclick="switchTab('operators')">
+        <span class="material-symbols-outlined">group</span>
+        <span>播放人員</span>
+      </div>
+      <div class="nav-item" onclick="switchTab('urls')">
+        <span class="material-symbols-outlined">link</span>
+        <span>URL 管理</span>
+      </div>
+      <div class="nav-item" onclick="switchTab('deploy')">
+        <span class="material-symbols-outlined">deployed_code</span>
+        <span>系統部署</span>
+      </div>
+      <div class="nav-item" onclick="switchTab('raw')">
+        <span class="material-symbols-outlined">database</span>
+        <span>原始數據</span>
+      </div>
+      <div class="nav-item" onclick="switchTab('export')">
+        <span class="material-symbols-outlined">download</span>
+        <span>導出報告</span>
+      </div>
+    </nav>
+    <div class="p-4 border-t border-gray-100">
+      <div class="flex items-center gap-2 px-3 py-2 mb-2">
+        <div class="w-8 h-8 rounded-full bg-blue-100 text-primary flex items-center justify-center text-xs font-bold" id="userAvatar">A</div>
+        <div class="text-sm font-medium text-fg truncate" id="userName">admin</div>
+      </div>
+      <button onclick="logout()" class="nav-item w-full text-red-500 hover:bg-red-50 hover:text-red-600">
+        <span class="material-symbols-outlined">logout</span>
+        <span>退出登錄</span>
+      </button>
+    </div>
+  </aside>
+
+  <!-- Main Content -->
+  <main class="flex-1 min-w-0">
+    <!-- Header -->
+    <header class="bg-white border-b border-gray-100 px-8 py-4 flex items-center justify-between sticky top-0 z-20">
+      <div>
+        <h2 id="pageTitle" class="text-xl font-bold text-fg">數據概覽</h2>
+        <p class="text-sm text-gray-400 mt-0.5">最後更新：<span id="lastUpdate">--</span></p>
+      </div>
+      <div class="flex items-center gap-3">
+        <button onclick="refreshAll()" id="refreshBtn" class="btn-secondary h-10 px-4 flex items-center gap-2 text-sm">
+          <span class="material-symbols-outlined" id="refreshIcon">refresh</span>
+          <span>刷新</span>
+        </button>
+      </div>
     </header>
 
-    <section class="toolbar">
-      <input id="from" type="datetime-local" />
-      <input id="to" type="datetime-local" />
-      <input id="dayPicker" type="date" />
-      <button id="applyDayBtn">查看當日</button>
-      <button id="refreshBtn" class="primary">重新整理</button>
-      <button id="csvBtn">下載 CSV</button>
-    </section>
+    <div class="p-8 space-y-8 max-w-7xl mx-auto">
 
-    <section class="filters">
-      <div>
-        <div id="urlFilterChips" class="chip-list"></div>
-        <div id="urlSelectedCount" class="selected-count">已選 0 個主站</div>
+      <!-- ===== OVERVIEW TAB ===== -->
+      <div id="tab-overview" class="fade-in">
+        <!-- Summary Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
+          <div class="card-block group cursor-pointer">
+            <div class="flex items-center justify-between mb-3">
+              <span class="text-sm font-semibold text-gray-500 uppercase tracking-wider">總記錄數</span>
+              <div class="w-10 h-10 rounded-lg bg-blue-50 text-primary flex items-center justify-center group-hover:scale-110 transition-transform">
+                <span class="material-symbols-outlined filled" style="color:#3B82F6;font-size:22px;">activity_zone</span>
+              </div>
+            </div>
+            <div class="text-3xl font-extrabold text-fg" id="cardTotalRecords">--</div>
+            <div class="text-xs text-gray-400 mt-1">曝光事件總量</div>
+          </div>
+          <div class="card-block group cursor-pointer">
+            <div class="flex items-center justify-between mb-3">
+              <span class="text-sm font-semibold text-gray-500 uppercase tracking-wider">總運行時長</span>
+              <div class="w-10 h-10 rounded-lg bg-emerald-50 text-secondary flex items-center justify-center group-hover:scale-110 transition-transform">
+                <span class="material-symbols-outlined filled" style="color:#10B981;font-size:22px;">schedule</span>
+              </div>
+            </div>
+            <div class="text-3xl font-extrabold text-fg" id="cardTotalHours">--</div>
+            <div class="text-xs text-gray-400 mt-1">小時</div>
+          </div>
+          <div class="card-block group cursor-pointer">
+            <div class="flex items-center justify-between mb-3">
+              <span class="text-sm font-semibold text-gray-500 uppercase tracking-wider">有記錄天數</span>
+              <div class="w-10 h-10 rounded-lg bg-amber-50 text-accent flex items-center justify-center group-hover:scale-110 transition-transform">
+                <span class="material-symbols-outlined filled" style="color:#F59E0B;font-size:22px;">calendar_today</span>
+              </div>
+            </div>
+            <div class="text-3xl font-extrabold text-fg" id="cardTotalDays">--</div>
+            <div class="text-xs text-gray-400 mt-1">天</div>
+          </div>
+          <div class="card-block group cursor-pointer">
+            <div class="flex items-center justify-between mb-3">
+              <span class="text-sm font-semibold text-gray-500 uppercase tracking-wider">播放人員</span>
+              <div class="w-10 h-10 rounded-lg bg-purple-50 text-purple-500 flex items-center justify-center group-hover:scale-110 transition-transform">
+                <span class="material-symbols-outlined filled" style="color:#A855F7;font-size:22px;">groups</span>
+              </div>
+            </div>
+            <div class="text-3xl font-extrabold text-fg" id="cardTotalOperators">--</div>
+            <div class="text-xs text-gray-400 mt-1">位已註冊</div>
+          </div>
+        </div>
+
+        <!-- Chart Section -->
+        <div class="card-block mb-8">
+          <div class="flex items-center justify-between mb-6">
+            <h3 class="text-lg font-bold text-fg">每日運行時長分佈</h3>
+            <div class="flex items-center gap-4 text-sm">
+              <div class="flex items-center gap-2">
+                <div class="w-3 h-3 rounded bg-primary"></div>
+                <span class="text-gray-500">≥1小時</span>
+              </div>
+              <div class="flex items-center gap-2">
+                <div class="w-3 h-3 rounded bg-accent"></div>
+                <span class="text-gray-500">10-60分鐘</span>
+              </div>
+              <div class="flex items-center gap-2">
+                <div class="w-3 h-3 rounded bg-red-500"></div>
+                <span class="text-gray-500">&lt;10分鐘</span>
+              </div>
+            </div>
+          </div>
+          <div class="h-64 flex items-end gap-1.5" id="dailyChart"></div>
+        </div>
+
+        <!-- Two Column Stats -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+          <div class="card-block">
+            <h3 class="text-lg font-bold text-fg mb-4">設備分佈</h3>
+            <div id="deviceChart" class="space-y-3"></div>
+          </div>
+          <div class="card-block">
+            <h3 class="text-lg font-bold text-fg mb-4">URL 訪問排行</h3>
+            <div id="urlRanking" class="space-y-3"></div>
+          </div>
+        </div>
+
+        <!-- Operator Ranking -->
+        <div class="card-block">
+          <div class="flex items-center justify-between mb-6">
+            <h3 class="text-lg font-bold text-fg">播放人員排行</h3>
+            <span class="text-xs text-gray-400">按總運行時長排序</span>
+          </div>
+          <div id="operatorRanking" class="space-y-4"></div>
+        </div>
       </div>
-      <input id="urlSearch" type="text" placeholder="搜尋 URL 關鍵字" />
-      <button id="applyFilterBtn" class="primary">套用篩選</button>
-      <button id="clearFilterBtn">清除篩選</button>
-      <button id="selectAllBtn">全選可見</button>
-    </section>
 
-    <section class="filters">
-      <input id="newUrlInput" type="text" placeholder="新增輪播 URL（https://...）" />
-      <button id="addUrlBtn" class="primary">新增 URL</button>
-      <button id="removeSelectedBtn">刪除已選 URL</button>
-      <button id="saveUrlsBtn">儲存輪播 URL</button>
-      <div class="muted" id="urlManageHint">提示：在上方多選框選取後可刪除，儲存後輪播入口會同步使用新清單。</div>
-    </section>
+      <!-- ===== DAILY TAB ===== -->
+      <div id="tab-daily" class="hidden fade-in">
+        <div class="card-block mb-6">
+          <div class="flex flex-wrap items-center gap-4 mb-4">
+            <div class="flex items-center gap-2">
+              <label class="text-sm font-semibold text-gray-500 uppercase">開始日期</label>
+              <input id="dailyFrom" type="date" class="input-flat w-40">
+            </div>
+            <div class="flex items-center gap-2">
+              <label class="text-sm font-semibold text-gray-500 uppercase">結束日期</label>
+              <input id="dailyTo" type="date" class="input-flat w-40">
+            </div>
+            <div class="flex items-center gap-2">
+              <label class="text-sm font-semibold text-gray-500 uppercase">播放人員</label>
+              <select id="dailyOperator" class="input-flat w-40">
+                <option value="">全部</option>
+              </select>
+            </div>
+            <button onclick="queryDaily()" class="btn-primary h-10 px-5 text-sm">查詢</button>
+          </div>
+        </div>
+        <div class="card-block overflow-x-auto">
+          <table class="w-full data-table" id="dailyTable">
+            <thead>
+              <tr>
+                <th>日期</th>
+                <th>Session 數</th>
+                <th>Page Enter</th>
+                <th>Heartbeat</th>
+                <th>運行時長</th>
+                <th>狀態</th>
+              </tr>
+            </thead>
+            <tbody id="dailyTableBody"></tbody>
+          </table>
+        </div>
+      </div>
 
-    <section class="kpis">
-      <article class="kpi"><h4>總曝光</h4><div class="v" id="kTotal">0</div></article>
-      <article class="kpi"><h4>獨立會話</h4><div class="v" id="kSid">0</div></article>
-      <article class="kpi"><h4>獨立 IP</h4><div class="v" id="kIp">0</div></article>
-      <article class="kpi"><h4>裝置類型數</h4><div class="v" id="kDevice">0</div></article>
-    </section>
+      <!-- ===== OPERATORS TAB ===== -->
+      <div id="tab-operators" class="hidden fade-in">
+        <div class="card-block mb-6">
+          <div class="flex items-center justify-between mb-4">
+            <h3 class="text-lg font-bold text-fg">播放人員管理</h3>
+            <button onclick="showOperatorForm()" class="btn-primary h-10 px-4 text-sm flex items-center gap-2">
+              <span class="material-symbols-outlined">add</span>
+              <span>新增人員</span>
+            </button>
+          </div>
+          <p class="text-sm text-gray-500">為每位播放人員生成專屬鏈接，系統將自動追蹤其播放數據</p>
+        </div>
 
-    <section class="main-panel">
-      <h3>全部 URL 資料（表格優先）</h3>
-      <table>
-        <thead>
-          <tr>
-            <th style="width: 30%;">URL</th>
-            <th>曝光</th>
-            <th>獨立IP</th>
-            <th>每日重複IP</th>
-            <th>主要裝置類型</th>
-            <th>互動率代理</th>
-            <th>最後曝光時間</th>
-            <th>操作</th>
-          </tr>
-        </thead>
-        <tbody id="mainBody"></tbody>
-      </table>
-      <div class="status" id="status">初始化中...</div>
-    </section>
-  </div>
+        <!-- Operator Form -->
+        <div id="operatorFormWrap" class="card-block mb-6 hidden">
+          <h4 class="font-bold text-fg mb-4" id="operatorFormTitle">新增播放人員</h4>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            <div>
+              <label class="block text-sm font-semibold text-fg mb-2">人員編碼 *</label>
+              <input id="opCode" type="text" class="input-flat" placeholder="如 OP001">
+            </div>
+            <div>
+              <label class="block text-sm font-semibold text-fg mb-2">姓名</label>
+              <input id="opName" type="text" class="input-flat" placeholder="播放人員姓名">
+            </div>
+            <div>
+              <label class="block text-sm font-semibold text-fg mb-2">電話</label>
+              <input id="opPhone" type="text" class="input-flat" placeholder="聯繫電話">
+            </div>
+            <div>
+              <label class="block text-sm font-semibold text-fg mb-2">備註</label>
+              <input id="opNote" type="text" class="input-flat" placeholder="備註信息">
+            </div>
+          </div>
+          <div class="flex gap-3">
+            <button onclick="saveOperator()" class="btn-primary h-12 px-6" id="opSaveBtn">保存</button>
+            <button onclick="hideOperatorForm()" class="btn-secondary h-12 px-6">取消</button>
+          </div>
+        </div>
 
-  <script>
-    var API_BASE = "https://exposure-analytics.li2335100593.workers.dev";
-    var POLL_MS = 30000;
+        <!-- Generated Link -->
+        <div id="generatedLinkWrap" class="card-block mb-6 hidden">
+          <div class="flex items-center gap-2 mb-3">
+            <span class="material-symbols-outlined filled" style="color:#10B981;">check_circle</span>
+            <h4 class="font-bold text-fg">專屬鏈接已生成</h4>
+          </div>
+          <div class="link-card mb-3">
+            <code id="generatedLink" class="text-sm text-fg break-all"></code>
+          </div>
+          <div class="flex gap-3">
+            <button onclick="copyGeneratedLink()" class="btn-primary h-10 px-4 text-sm flex items-center gap-2">
+              <span class="material-symbols-outlined">content_copy</span>
+              <span>複製鏈接</span>
+            </button>
+            <button onclick="hideGeneratedLink()" class="btn-secondary h-10 px-4 text-sm">關閉</button>
+          </div>
+        </div>
 
-    var state = {
-      allRows: [],
-      configuredUrls: [],
-      selectedUrls: [],
-      expandedUrl: null,
-      detailCache: Object.create(null),
-      urlSearch: ""
-    };
+        <!-- Operator List -->
+        <div class="card-block overflow-x-auto">
+          <table class="w-full data-table" id="operatorTable">
+            <thead>
+              <tr>
+                <th>編碼</th>
+                <th>姓名</th>
+                <th>電話</th>
+                <th>專屬鏈接</th>
+                <th>創建時間</th>
+                <th>狀態</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody id="operatorTableBody"></tbody>
+          </table>
+        </div>
+      </div>
 
-    var TAIPEI_OFFSET_MS = 8 * 60 * 60 * 1000;
-    
-    // MEDIUM-RISK FIX: Timezone fallback if Asia/Taipei is not supported by browser
-    var taipeiFormatter;
-    try {
-      taipeiFormatter = new Intl.DateTimeFormat("zh-TW", {
-        timeZone: "Asia/Taipei",
-        year: "numeric",
-        month: "2-digit",
-        day: "2-digit",
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit",
-        hour12: false
-      });
-      // Test if timezone actually works
-      var testParts = taipeiFormatter.formatToParts(new Date());
-      if (!testParts || testParts.length === 0) throw new Error("Timezone formatting failed");
-    } catch (e) {
-      console.warn('[report] Asia/Taipei timezone not supported, falling back to UTC');
-      taipeiFormatter = new Intl.DateTimeFormat("en-US", {
-        timeZone: "UTC",
-        year: "numeric",
-        month: "2-digit",
-        day: "2-digit",
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit",
-        hour12: false
-      });
+      <!-- ===== URLS TAB ===== -->
+      <div id="tab-urls" class="hidden fade-in">
+        <div class="card-block mb-6">
+          <h3 class="text-lg font-bold text-fg mb-2">URL 管理</h3>
+          <p class="text-sm text-gray-500 mb-4">管理輪播系統需要循環播放的目標頁面。修改後播放人員的專屬鏈接將自動使用新的 URL 列表。</p>
+          <div id="urlsList" class="space-y-3 mb-6"></div>
+        </div>
+        <div class="card-block">
+          <h3 class="text-lg font-bold text-fg mb-4">更新 URL 配置</h3>
+          <div class="space-y-3">
+            <textarea id="urlsInput" class="input-flat font-mono text-sm" rows="4" placeholder='輸入 JSON 數組，例如：["https://example.com/"]'>[]</textarea>
+            <button onclick="updateUrls()" class="btn-primary h-12 px-6 flex items-center gap-2">
+              <span class="material-symbols-outlined">save</span>
+              <span>更新配置</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== RAW DATA TAB ===== -->
+      <div id="tab-raw" class="hidden fade-in">
+        <div class="card-block mb-6">
+          <h3 class="text-lg font-bold text-fg mb-4">自定義 SQL 查詢</h3>
+          <div class="space-y-3">
+            <textarea id="sqlInput" class="input-flat font-mono text-sm" rows="6" placeholder="輸入 SQL 查詢..."></textarea>
+            <button onclick="runSql()" class="btn-primary h-12 px-6 flex items-center gap-2">
+              <span class="material-symbols-outlined">play_arrow</span>
+              <span>執行查詢</span>
+            </button>
+          </div>
+          <p id="sqlError" class="mt-3 text-sm text-red-600 hidden"></p>
+        </div>
+        <div class="card-block overflow-x-auto" id="sqlResultWrap" style="display:none;">
+          <table class="w-full data-table" id="sqlResultTable">
+            <thead id="sqlResultHead"></thead>
+            <tbody id="sqlResultBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ===== EXPORT TAB ===== -->
+      <div id="tab-export" class="hidden fade-in">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div class="card-block">
+            <div class="w-12 h-12 rounded-lg bg-blue-50 text-primary flex items-center justify-center mb-4">
+              <span class="material-symbols-outlined filled" style="color:#3B82F6;font-size:28px;">table</span>
+            </div>
+            <h3 class="text-lg font-bold text-fg mb-2">導出 CSV 報告</h3>
+            <p class="text-sm text-gray-500 mb-6">導出指定日期範圍的完整數據報告</p>
+            <div class="space-y-3">
+              <input id="csvFrom" type="date" class="input-flat">
+              <input id="csvTo" type="date" class="input-flat">
+              <button onclick="exportCsv()" class="btn-primary w-full h-12 flex items-center justify-center gap-2">
+                <span class="material-symbols-outlined">download</span>
+                <span>下載 CSV</span>
+              </button>
+            </div>
+          </div>
+          <div class="card-block">
+            <div class="w-12 h-12 rounded-lg bg-emerald-50 text-secondary flex items-center justify-center mb-4">
+              <span class="material-symbols-outlined filled" style="color:#10B981;font-size:28px;">data_object</span>
+            </div>
+            <h3 class="text-lg font-bold text-fg mb-2">導出 JSON 數據</h3>
+            <p class="text-sm text-gray-500 mb-6">導出原始數據用於進一步分析</p>
+            <div class="space-y-3">
+              <input id="jsonFrom" type="date" class="input-flat">
+              <input id="jsonTo" type="date" class="input-flat">
+              <button onclick="exportJson()" class="btn-secondary w-full h-12 flex items-center justify-center gap-2">
+                <span class="material-symbols-outlined">download</span>
+                <span>下載 JSON</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== DEPLOY TAB ===== -->
+      <div id="tab-deploy" class="hidden fade-in space-y-6">
+        <div class="card-block">
+          <h3 class="text-lg font-bold text-fg mb-2">輪播 SDK 部署指南</h3>
+          <p class="text-sm text-gray-500 mb-6">將以下腳本嵌入目標網站，即可實現自動輪播 + 數據追踪</p>
+          <div class="bg-gray-900 rounded-lg p-4 overflow-x-auto">
+            <pre class="text-sm text-green-400 font-mono whitespace-pre-wrap">&lt;script src="https://li2335100593.github.io/3-02/carousel.js"&gt;&lt;/script&gt;</pre>
+          </div>
+          <div class="mt-4 p-4 bg-blue-50 rounded-lg">
+            <h4 class="font-semibold text-blue-800 mb-2 flex items-center gap-2">
+              <span class="material-symbols-outlined">info</span>
+              內置配置說明
+            </h4>
+            <p class="text-sm text-blue-700">carousel.js v3.0 已內置 URL 列表（livingroom-design / old-house-renovation / incar），無需額外配置。直接引入腳本即可工作。</p>
+          </div>
+        </div>
+
+        <div class="card-block">
+          <h3 class="text-lg font-bold text-fg mb-4">同域鏈接順延機制</h3>
+          <p class="text-sm text-gray-500 mb-4">用戶在目標網站 A 中點擊任意同域鏈接時，輪播狀態會自動合併到新鏈接，倒計時<b>順延</b>而非重置。</p>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="p-4 bg-emerald-50 rounded-lg">
+              <div class="flex items-center gap-2 mb-2">
+                <span class="material-symbols-outlined filled" style="color:#10B981">check_circle</span>
+                <span class="font-semibold text-emerald-800">已實現</span>
+              </div>
+              <p class="text-sm text-emerald-700">點擊同域鏈接時，輪播計時器狀態（已過時間、當前頁面索引）會通過 URL hash 傳遞到新頁面，倒計時從當前進度繼續。</p>
+            </div>
+            <div class="p-4 bg-amber-50 rounded-lg">
+              <div class="flex items-center gap-2 mb-2">
+                <span class="material-symbols-outlined filled" style="color:#F59E0B">warning</span>
+                <span class="font-semibold text-amber-800">注意</span>
+              </div>
+              <p class="text-sm text-amber-700">跨域鏈接（跳转到其他域名）會導致輪播狀態丟失，計時器重置。建議確保輪播目標頁面都在同一域名下。</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="card-block">
+          <h3 class="text-lg font-bold text-fg mb-4">Scheduler 調度器使用</h3>
+          <p class="text-sm text-gray-500 mb-4">播放人員專屬鏈接的格式。調度器會將播放人員標識傳入輪播狀態，後續所有頁面事件都會標記為該人員。</p>
+          <div class="link-card mb-3">
+            <code class="text-sm text-fg break-all">https://li2335100593.github.io/3-02/scheduler.html?u=OP001</code>
+          </div>
+          <ul class="text-sm text-gray-600 space-y-2 list-disc list-inside">
+            <li><code>?u=OP001</code> — 播放人員編碼（必填）</li>
+            <li>調度器讀取配置後自動跳轉到第一個目標 URL</li>
+            <li>所有後續輪播頁面都會攜帶該人員標識</li>
+            <li>無需在目標網站手動配置任何參數</li>
+          </ul>
+        </div>
+
+        <div class="card-block">
+          <h3 class="text-lg font-bold text-fg mb-4">部署報表系統</h3>
+          <p class="text-sm text-gray-500 mb-4">本報表系統為純前端 HTML，可部署到任意靜態托管服務。</p>
+          <div class="space-y-3">
+            <div class="flex items-center gap-3 p-3 bg-muted rounded-lg">
+              <span class="material-symbols-outlined">cloud</span>
+              <div>
+                <div class="text-sm font-semibold">GitHub Pages</div>
+                <div class="text-xs text-gray-400">推送到 GitHub 倉庫，自動部署</div>
+              </div>
+            </div>
+            <div class="flex items-center gap-3 p-3 bg-muted rounded-lg">
+              <span class="material-symbols-outlined">storage</span>
+              <div>
+                <div class="text-sm font-semibold">Cloudflare Pages</div>
+                <div class="text-xs text-gray-400">直接上傳 HTML 文件即可</div>
+              </div>
+            </div>
+            <div class="flex items-center gap-3 p-3 bg-muted rounded-lg">
+              <span class="material-symbols-outlined">dns</span>
+              <div>
+                <div class="text-sm font-semibold">任意 Web 服務器</div>
+                <div class="text-xs text-gray-400">Nginx / Apache / CDN 均可</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+</div>
+
+<script>
+
+// ========== GLOBAL STATE ==========
+const API_BASE = 'https://exposure-analytics.li2335100593.workers.dev';
+const SCHEDULER_BASE = 'https://li2335100593.github.io/3-02/scheduler.html';
+let gToken = localStorage.getItem('report_token') || '';
+let gUsername = localStorage.getItem('report_user') || '';
+let gDailyData = [];
+let gOperators = [];
+let gEditingOperatorId = null;
+
+// ========== UTILS ==========
+const $ = id => document.getElementById(id);
+const fmtDate = ts => {
+  if (!ts) return '--';
+  const d = new Date(ts);
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+};
+const fmtDateTime = ts => {
+  if (!ts) return '--';
+  const d = new Date(ts);
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+};
+const fmtDuration = min => {
+  if (min >= 60) return (min/60).toFixed(1) + 'h';
+  return Math.round(min) + 'm';
+};
+
+function setLoading(btnId, loading) {
+  const btn = $(btnId);
+  if (!btn) return;
+  btn.disabled = loading;
+  if (loading) {
+    btn._originalHtml = btn.innerHTML;
+    btn.innerHTML = '<div class="loader-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full"></div>';
+  } else {
+    btn.innerHTML = btn._originalHtml || btn.innerHTML;
+  }
+}
+
+function showError(msg) {
+  $('loginError').textContent = msg;
+  $('loginError').classList.remove('hidden');
+}
+function hideError() {
+  $('loginError').classList.add('hidden');
+}
+
+// ========== API ==========
+async function apiPost(path, body, needAuth = true) {
+  const headers = { 'Content-Type': 'application/json' };
+  if (needAuth && gToken) headers['Authorization'] = `Bearer ${gToken}`;
+  const res = await fetch(API_BASE + path, { method: 'POST', headers, body: JSON.stringify(body) });
+  const data = await res.json();
+  if (!data.ok) throw new Error(data.error || 'API Error');
+  return data;
+}
+
+async function apiGet(path, needAuth = true) {
+  const headers = {};
+  if (needAuth && gToken) headers['Authorization'] = `Bearer ${gToken}`;
+  const res = await fetch(API_BASE + path, { headers });
+  const data = await res.json();
+  if (!data.ok) throw new Error(data.error || 'API Error');
+  return data;
+}
+
+async function apiDelete(path) {
+  const res = await fetch(API_BASE + path, {
+    method: 'DELETE',
+    headers: gToken ? { 'Authorization': `Bearer ${gToken}` } : {}
+  });
+  const data = await res.json();
+  if (!data.ok) throw new Error(data.error || 'API Error');
+  return data;
+}
+
+async function d1Query(sql) {
+  const res = await fetch(API_BASE + '/api/d1/query', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${gToken}`
+    },
+    body: JSON.stringify({ sql })
+  });
+  const data = await res.json();
+  if (!data.ok) throw new Error(data.error || 'Query failed');
+  return data.result;
+}
+
+// ========== LOGIN / REGISTER ==========
+function switchLoginTab(mode) {
+  hideError();
+  if (mode === 'login') {
+    $('tabLogin').classList.add('active');
+    $('tabRegister').classList.remove('active');
+    $('loginForm').classList.remove('hidden');
+    $('registerForm').classList.add('hidden');
+  } else {
+    $('tabRegister').classList.add('active');
+    $('tabLogin').classList.remove('active');
+    $('registerForm').classList.remove('hidden');
+    $('loginForm').classList.add('hidden');
+  }
+}
+
+async function doLogin() {
+  hideError();
+  const username = $('loginUsername').value.trim();
+  const password = $('loginPassword').value;
+  if (!username || !password) { showError('請輸入用戶名和密碼'); return; }
+
+  setLoading('loginBtn', true);
+  try {
+    const data = await apiPost('/api/auth/login', { username, password }, false);
+    gToken = data.token;
+    gUsername = data.username;
+    localStorage.setItem('report_token', gToken);
+    localStorage.setItem('report_user', gUsername);
+    enterDashboard();
+  } catch (err) {
+    showError('登錄失敗：' + err.message);
+    setLoading('loginBtn', false);
+  }
+}
+
+async function doRegister() {
+  hideError();
+  const username = $('regUsername').value.trim();
+  const password = $('regPassword').value;
+  const password2 = $('regPassword2').value;
+  if (!username || !password) { showError('請填寫所有字段'); return; }
+  if (password !== password2) { showError('兩次密碼不一致'); return; }
+  if (username.length < 2) { showError('用戶名至少2位'); return; }
+  if (password.length < 4) { showError('密碼至少4位'); return; }
+
+  setLoading('registerBtn', true);
+  try {
+    const data = await apiPost('/api/auth/register', { username, password }, false);
+    gToken = data.token;
+    gUsername = data.username;
+    localStorage.setItem('report_token', gToken);
+    localStorage.setItem('report_user', gUsername);
+    enterDashboard();
+  } catch (err) {
+    showError('註冊失敗：' + err.message);
+    setLoading('registerBtn', false);
+  }
+}
+
+function enterDashboard() {
+  $('loginView').classList.add('hidden');
+  $('dashboardView').classList.remove('hidden');
+  $('userName').textContent = gUsername;
+  $('userAvatar').textContent = gUsername.charAt(0).toUpperCase();
+  refreshAll();
+}
+
+function logout() {
+  gToken = '';
+  gUsername = '';
+  localStorage.removeItem('report_token');
+  localStorage.removeItem('report_user');
+  $('loginView').classList.remove('hidden');
+  $('dashboardView').classList.add('hidden');
+  hideError();
+  setLoading('loginBtn', false);
+  setLoading('registerBtn', false);
+}
+
+async function checkAutoLogin() {
+  if (!gToken) return;
+  try {
+    await apiGet('/api/auth/verify');
+    enterDashboard();
+  } catch {
+    gToken = '';
+    gUsername = '';
+    localStorage.removeItem('report_token');
+    localStorage.removeItem('report_user');
+  }
+}
+
+// ========== TABS ==========
+function switchTab(name) {
+  document.querySelectorAll('[id^="tab-"]').forEach(el => el.classList.add('hidden'));
+  document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+  $(`tab-${name}`).classList.remove('hidden');
+  event.currentTarget.classList.add('active');
+  const titles = { overview:'數據概覽', daily:'每日分析', operators:'播放人員', urls:'URL 管理', deploy:'系統部署', raw:'原始數據', export:'導出報告' };
+  $('pageTitle').textContent = titles[name];
+}
+
+// ========== DATA LOADING ==========
+async function refreshAll() {
+  const icon = $('refreshIcon');
+  icon.classList.add('loader-spin');
+  $('lastUpdate').textContent = '更新中...';
+
+  try {
+    // Overview data
+    const totalRes = await d1Query("SELECT COUNT(*) as cnt FROM exposure_events");
+    const totalRecords = totalRes[0].results[0].cnt;
+    $('cardTotalRecords').textContent = totalRecords.toLocaleString();
+
+    const dailyRes = await d1Query(`
+      WITH ds AS (
+        SELECT date(received_at/1000,'unixepoch','+8 hours') as day,
+               COUNT(DISTINCT sid) as sessions,
+               COUNT(CASE WHEN event_type='page_enter' THEN 1 END) as enters,
+               COUNT(CASE WHEN event_type='heartbeat' THEN 1 END) as heartbeats,
+               ROUND((MAX(received_at)-MIN(received_at))/1000.0/60.0,1) as duration_min
+        FROM exposure_events
+        GROUP BY day
+      )
+      SELECT * FROM ds ORDER BY day DESC
+    `);
+    gDailyData = dailyRes[0].results;
+    $('cardTotalDays').textContent = gDailyData.length;
+
+    const totalMin = gDailyData.reduce((a,r) => a + (r.duration_min || 0), 0);
+    $('cardTotalHours').textContent = (totalMin / 60).toFixed(1);
+
+    const urlRes = await d1Query("SELECT COUNT(DISTINCT url) as cnt FROM exposure_events");
+    $('cardTotalUrls').textContent = urlRes[0].results[0].cnt;
+
+    // Operator count
+    const opCountRes = await d1Query("SELECT COUNT(*) as cnt FROM operators");
+    $('cardTotalOperators').textContent = opCountRes[0].results[0].cnt;
+
+    renderChart(gDailyData);
+    renderDeviceChart();
+    renderUrlRanking();
+    renderDailyTable(gDailyData);
+    renderUrls();
+    await renderOperatorRanking();
+    await loadOperatorsForSelect();
+
+    $('lastUpdate').textContent = fmtDateTime(Date.now());
+  } catch(e) {
+    console.error(e);
+    $('lastUpdate').textContent = '更新失敗';
+    if (e.message.includes('Unauthorized')) {
+      logout();
+      showError('登錄已過期，請重新登錄');
     }
+  } finally {
+    icon.classList.remove('loader-spin');
+  }
+}
 
-    function nowMs() { return Date.now(); }
+// ========== CHARTS ==========
+function renderChart(data) {
+  const container = $('dailyChart');
+  container.innerHTML = '';
+  if (!data.length) return;
 
-    function getTaipeiParts(ms) {
-      var parts = taipeiFormatter.formatToParts(new Date(ms));
-      var out = {};
-      for (var i = 0; i < parts.length; i++) {
-        var p = parts[i];
-        if (p.type !== "literal") out[p.type] = p.value;
-      }
-      return out;
+  const showData = data.slice(0, 30).reverse();
+  const maxMin = Math.max(...showData.map(d => d.duration_min || 0), 1);
+
+  showData.forEach(d => {
+    const min = d.duration_min || 0;
+    const h = Math.max((min / maxMin) * 100, 2);
+    let color = 'bg-red-500';
+    if (min >= 60) color = 'bg-primary';
+    else if (min >= 10) color = 'bg-accent';
+
+    const el = document.createElement('div');
+    el.className = 'flex-1 flex flex-col justify-end items-center group relative';
+    el.innerHTML = `
+      <div class="absolute -top-6 text-[10px] font-bold text-gray-600 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
+        ${d.day}<br>${fmtDuration(min)}
+      </div>
+      <div class="w-full ${color} bar-col" style="height:${h}%"></div>
+      <div class="text-[9px] text-gray-400 mt-1 rotate-45 origin-left">${d.day.slice(5)}</div>
+    `;
+    container.appendChild(el);
+  });
+}
+
+async function renderDeviceChart() {
+  try {
+    const res = await d1Query(`
+      SELECT device_type, COUNT(*) as cnt
+      FROM exposure_events
+      WHERE device_type IS NOT NULL
+      GROUP BY device_type
+      ORDER BY cnt DESC
+    `);
+    const rows = res[0].results;
+    const total = rows.reduce((a,r) => a + r.cnt, 0);
+    const colors = ['bg-primary','bg-secondary','bg-accent','bg-purple-500','bg-gray-400'];
+    const labels = { desktop:'桌面端', mobile:'移動端', tablet:'平板', unknown:'未知' };
+
+    $('deviceChart').innerHTML = rows.map((r, i) => {
+      const pct = Math.round((r.cnt / total) * 100);
+      return `
+        <div class="flex items-center gap-3">
+          <div class="w-24 text-sm font-medium text-gray-600">${labels[r.device_type] || r.device_type}</div>
+          <div class="flex-1 h-3 bg-gray-100 rounded-full overflow-hidden">
+            <div class="h-full ${colors[i % colors.length]} rounded-full transition-all duration-500" style="width:${pct}%"></div>
+          </div>
+          <div class="text-sm font-bold text-fg w-12 text-right">${pct}%</div>
+        </div>
+      `;
+    }).join('');
+  } catch(e) { $('deviceChart').innerHTML = '<p class="text-sm text-gray-400">暫無數據</p>'; }
+}
+
+async function renderUrlRanking() {
+  try {
+    const res = await d1Query(`
+      SELECT url, COUNT(*) as cnt
+      FROM exposure_events
+      GROUP BY url
+      ORDER BY cnt DESC
+      LIMIT 5
+    `);
+    const rows = res[0].results;
+    const max = Math.max(...rows.map(r => r.cnt), 1);
+    const colors = ['bg-primary','bg-secondary','bg-accent','bg-purple-500','bg-gray-400'];
+
+    $('urlRanking').innerHTML = rows.map((r, i) => {
+      const pct = Math.round((r.cnt / max) * 100);
+      const shortUrl = r.url.replace(/^https?:\/\//, '').replace(/\/$/, '');
+      return `
+        <div class="flex items-center gap-3">
+          <div class="text-sm font-medium text-gray-600 truncate max-w-[180px]" title="${r.url}">${shortUrl}</div>
+          <div class="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
+            <div class="h-full ${colors[i % colors.length]} rounded-full transition-all duration-500" style="width:${pct}%"></div>
+          </div>
+          <div class="text-sm font-bold text-fg w-10 text-right">${r.cnt}</div>
+        </div>
+      `;
+    }).join('');
+  } catch(e) { $('urlRanking').innerHTML = '<p class="text-sm text-gray-400">暫無數據</p>'; }
+}
+
+async function renderOperatorRanking() {
+  try {
+    const data = await apiGet('/api/operators/all-stats?from=' + (Date.now() - 30*24*60*60*1000) + '&to=' + Date.now());
+    const ops = data.operators || [];
+    if (!ops.length) {
+      $('operatorRanking').innerHTML = '<p class="text-sm text-gray-400">暫無播放人員數據</p>';
+      return;
     }
+    const maxMin = Math.max(...ops.map(o => o.duration_min || 0), 1);
+    const colors = ['bg-primary','bg-secondary','bg-accent','bg-purple-500','bg-gray-400'];
 
-    function toTaipeiInputValue(ms) {
-      var p = getTaipeiParts(ms);
-      return p.year + "-" + p.month + "-" + p.day + "T" + p.hour + ":" + p.minute;
+    $('operatorRanking').innerHTML = ops.slice(0, 10).map((op, i) => {
+      const pct = Math.round(((op.duration_min || 0) / maxMin) * 100);
+      const hours = ((op.duration_min || 0) / 60).toFixed(1);
+      return `
+        <div class="operator-row flex items-center gap-4 p-3 rounded-lg">
+          <div class="w-8 h-8 rounded-full bg-blue-100 text-primary flex items-center justify-center text-sm font-bold">${i + 1}</div>
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center justify-between mb-1">
+              <span class="text-sm font-semibold text-fg">${op.operator_code}</span>
+              <span class="text-sm font-bold text-fg">${hours}h</span>
+            </div>
+            <div class="progress-bar">
+              <div class="h-full ${colors[i % colors.length]} progress-fill" style="width:${pct}%"></div>
+            </div>
+            <div class="flex items-center justify-between mt-1">
+              <span class="text-xs text-gray-400">${op.total_events} 事件 · ${op.sessions} 會話</span>
+              <span class="text-xs text-gray-400">最後活動 ${fmtDate(op.last_active)}</span>
+            </div>
+          </div>
+        </div>
+      `;
+    }).join('');
+  } catch(e) {
+    $('operatorRanking').innerHTML = '<p class="text-sm text-gray-400">載入失敗</p>';
+  }
+}
+
+// ========== DAILY TABLE ==========
+function renderDailyTable(data) {
+  const tbody = $('dailyTableBody');
+  if (!data.length) { tbody.innerHTML = '<tr><td colspan="6" class="text-center text-gray-400 py-8">暫無數據</td></tr>'; return; }
+
+  tbody.innerHTML = data.map(d => {
+    const status = (d.duration_min || 0) >= 60
+      ? '<span class="tag-pill bg-emerald-100 text-emerald-700">正常</span>'
+      : ((d.duration_min || 0) >= 10
+        ? '<span class="tag-pill bg-amber-100 text-amber-700">偏短</span>'
+        : '<span class="tag-pill bg-red-100 text-red-700">異常</span>');
+    return `
+      <tr>
+        <td class="font-semibold">${d.day}</td>
+        <td>${d.sessions || 0}</td>
+        <td>${d.enters || 0}</td>
+        <td>${d.heartbeats || 0}</td>
+        <td class="font-semibold">${fmtDuration(d.duration_min || 0)}</td>
+        <td>${status}</td>
+      </tr>
+    `;
+  }).join('');
+}
+
+async function queryDaily() {
+  const from = $('dailyFrom').value;
+  const to = $('dailyTo').value;
+  const op = $('dailyOperator').value;
+  if (!from || !to) { alert('請選擇日期範圍'); return; }
+
+  try {
+    let sql = `
+      WITH ds AS (
+        SELECT date(received_at/1000,'unixepoch','+8 hours') as day,
+               COUNT(DISTINCT sid) as sessions,
+               COUNT(CASE WHEN event_type='page_enter' THEN 1 END) as enters,
+               COUNT(CASE WHEN event_type='heartbeat' THEN 1 END) as heartbeats,
+               ROUND((MAX(received_at)-MIN(received_at))/1000.0/60.0,1) as duration_min
+        FROM exposure_events
+        WHERE date(received_at/1000,'unixepoch','+8 hours') >= '${from}' AND date(received_at/1000,'unixepoch','+8 hours') <= '${to}'
+        ${op ? `AND vid = '${op}'` : ''}
+        GROUP BY day
+      )
+      SELECT * FROM ds ORDER BY day DESC
+    `;
+    const res = await d1Query(sql);
+    const filtered = res[0].results;
+    renderDailyTable(filtered);
+  } catch(e) { alert('查詢失敗：' + e.message); }
+}
+
+async function loadOperatorsForSelect() {
+  try {
+    const data = await apiGet('/api/operators?active=1');
+    const ops = data.operators || [];
+    const select = $('dailyOperator');
+    const currentVal = select.value;
+    select.innerHTML = '<option value="">全部</option>' + ops.map(op =>
+      `<option value="${op.operator_code}">${op.operator_code}${op.name ? ' - ' + op.name : ''}</option>`
+    ).join('');
+    select.value = currentVal;
+  } catch(e) { console.error('loadOperatorsForSelect', e); }
+}
+
+// ========== OPERATORS ==========
+async function loadOperators() {
+  try {
+    const data = await apiGet('/api/operators');
+    gOperators = data.operators || [];
+    renderOperatorTable();
+  } catch(e) { $('operatorTableBody').innerHTML = '<tr><td colspan="7" class="text-center text-gray-400 py-8">載入失敗</td></tr>'; }
+}
+
+function renderOperatorTable() {
+  const tbody = $('operatorTableBody');
+  if (!gOperators.length) {
+    tbody.innerHTML = '<tr><td colspan="7" class="text-center text-gray-400 py-8">暫無播放人員，請點擊上方按鈕新增</td></tr>';
+    return;
+  }
+  tbody.innerHTML = gOperators.map(op => {
+    const link = `${SCHEDULER_BASE}?u=${encodeURIComponent(op.operator_code)}`;
+    const status = op.is_active
+      ? '<span class="tag-pill bg-emerald-100 text-emerald-700">啟用</span>'
+      : '<span class="tag-pill bg-gray-100 text-gray-500">停用</span>';
+    return `
+      <tr>
+        <td class="font-semibold">${op.operator_code}</td>
+        <td>${op.name || '--'}</td>
+        <td>${op.phone || '--'}</td>
+        <td>
+          <div class="flex items-center gap-2">
+            <code class="text-xs bg-gray-100 px-2 py-1 rounded truncate max-w-[200px]">${link}</code>
+            <button onclick="copyLink('${link}')" class="text-primary hover:text-blue-700" title="複製鏈接">
+              <span class="material-symbols-outlined" style="font-size:18px;">content_copy</span>
+            </button>
+          </div>
+        </td>
+        <td class="text-sm text-gray-500">${fmtDateTime(op.created_at)}</td>
+        <td>${status}</td>
+        <td>
+          <div class="flex items-center gap-1">
+            <button onclick="editOperator(${op.id})" class="text-gray-400 hover:text-primary p-1" title="編輯">
+              <span class="material-symbols-outlined" style="font-size:18px;">edit</span>
+            </button>
+            <button onclick="deleteOperator(${op.id})" class="text-gray-400 hover:text-red-500 p-1" title="刪除">
+              <span class="material-symbols-outlined" style="font-size:18px;">delete</span>
+            </button>
+          </div>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+function showOperatorForm() {
+  gEditingOperatorId = null;
+  $('operatorFormTitle').textContent = '新增播放人員';
+  $('opCode').value = '';
+  $('opName').value = '';
+  $('opPhone').value = '';
+  $('opNote').value = '';
+  $('opCode').disabled = false;
+  $('operatorFormWrap').classList.remove('hidden');
+  $('generatedLinkWrap').classList.add('hidden');
+}
+
+function hideOperatorForm() {
+  $('operatorFormWrap').classList.add('hidden');
+  gEditingOperatorId = null;
+}
+
+function editOperator(id) {
+  const op = gOperators.find(o => o.id === id);
+  if (!op) return;
+  gEditingOperatorId = id;
+  $('operatorFormTitle').textContent = '編輯播放人員';
+  $('opCode').value = op.operator_code;
+  $('opCode').disabled = true;
+  $('opName').value = op.name || '';
+  $('opPhone').value = op.phone || '';
+  $('opNote').value = op.note || '';
+  $('operatorFormWrap').classList.remove('hidden');
+  $('generatedLinkWrap').classList.add('hidden');
+}
+
+async function saveOperator() {
+  const code = $('opCode').value.trim();
+  const name = $('opName').value.trim();
+  const phone = $('opPhone').value.trim();
+  const note = $('opNote').value.trim();
+
+  if (!code) { alert('請輸入人員編碼'); return; }
+
+  setLoading('opSaveBtn', true);
+  try {
+    if (gEditingOperatorId) {
+      await apiPost('/api/operators', { id: gEditingOperatorId, name, phone, note });
+      alert('更新成功');
+    } else {
+      await apiPost('/api/operators', { operator_code: code, name, phone, note });
+      // Show generated link
+      const link = `${SCHEDULER_BASE}?u=${encodeURIComponent(code)}`;
+      $('generatedLink').textContent = link;
+      $('generatedLinkWrap').classList.remove('hidden');
+      alert('創建成功');
     }
+    hideOperatorForm();
+    await loadOperators();
+    await loadOperatorsForSelect();
+    await renderOperatorRanking();
+  } catch(e) {
+    alert('保存失敗：' + e.message);
+  } finally {
+    setLoading('opSaveBtn', false);
+  }
+}
 
-    function toTaipeiDateValue(ms) {
-      var p = getTaipeiParts(ms);
-      return p.year + "-" + p.month + "-" + p.day;
+async function deleteOperator(id) {
+  if (!confirm('確定要刪除此播放人員嗎？相關數據不會被刪除。')) return;
+  try {
+    await apiDelete(`/api/operators?id=${id}`);
+    await loadOperators();
+    await loadOperatorsForSelect();
+    await renderOperatorRanking();
+  } catch(e) { alert('刪除失敗：' + e.message); }
+}
+
+function copyLink(link) {
+  navigator.clipboard.writeText(link).then(() => alert('鏈接已複製到剪貼板'));
+}
+
+function copyGeneratedLink() {
+  const link = $('generatedLink').textContent;
+  navigator.clipboard.writeText(link).then(() => alert('鏈接已複製到剪貼板'));
+}
+
+function hideGeneratedLink() {
+  $('generatedLinkWrap').classList.add('hidden');
+}
+
+// ========== URLS ==========
+async function renderUrls() {
+  try {
+    const res = await d1Query("SELECT url, is_active, updated_at FROM configured_urls ORDER BY is_active DESC, url ASC");
+    const rows = res[0].results;
+    $('urlsList').innerHTML = rows.map(r => `
+      <div class="flex items-center justify-between p-4 bg-muted rounded-lg">
+        <div class="flex items-center gap-3">
+          <div class="w-2 h-2 rounded-full ${r.is_active ? 'bg-secondary' : 'bg-gray-400'}"></div>
+          <span class="text-sm font-medium ${r.is_active ? 'text-fg' : 'text-gray-400 line-through'}">${r.url}</span>
+        </div>
+        <span class="text-xs text-gray-400">${r.is_active ? '啟用' : '停用'}</span>
+      </div>
+    `).join('');
+    // Pre-fill input with active URLs
+    const activeUrls = rows.filter(r => r.is_active).map(r => r.url);
+    $('urlsInput').value = JSON.stringify(activeUrls, null, 2);
+  } catch(e) { $('urlsList').innerHTML = '<p class="text-sm text-gray-400">載入失敗</p>'; }
+}
+
+async function updateUrls() {
+  try {
+    const urls = JSON.parse($('urlsInput').value);
+    if (!Array.isArray(urls)) throw new Error('必須是 JSON 數組');
+    await d1Query(`UPDATE configured_urls SET is_active = 0, updated_at = ${Date.now()}`);
+    for (const url of urls) {
+      await d1Query(`INSERT INTO configured_urls (url, source, is_active, updated_at) VALUES ('${url}', 'scheduler', 1, ${Date.now()}) ON CONFLICT(url) DO UPDATE SET source='scheduler', is_active=1, updated_at=${Date.now()}`);
     }
+    alert('更新成功');
+    renderUrls();
+  } catch(e) { alert('更新失敗：' + e.message); }
+}
 
-    function parseTaipeiInputToTs(v) {
-      if (!v) return null;
-      var m = String(v).match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/);
-      if (!m) return null;
-      var y = Number(m[1]);
-      var mo = Number(m[2]);
-      var d = Number(m[3]);
-      var h = Number(m[4]);
-      var mi = Number(m[5]);
-      if (!Number.isFinite(y) || !Number.isFinite(mo) || !Number.isFinite(d) || !Number.isFinite(h) || !Number.isFinite(mi)) {
-        return null;
-      }
-      return Date.UTC(y, mo - 1, d, h, mi) - TAIPEI_OFFSET_MS;
+// ========== RAW SQL ==========
+async function runSql() {
+  const sql = $('sqlInput').value.trim();
+  if (!sql) return;
+  $('sqlError').classList.add('hidden');
+  try {
+    const res = await d1Query(sql);
+    const rows = res[0].results;
+    if (!rows || !rows.length) {
+      $('sqlResultWrap').style.display = 'block';
+      $('sqlResultHead').innerHTML = '<tr><th>結果</th></tr>';
+      $('sqlResultBody').innerHTML = '<tr><td class="text-gray-400">無數據返回</td></tr>';
+      return;
     }
-    function setStatus(msg, isError) {
-      var el = document.getElementById("status");
-      el.textContent = msg;
-      el.classList.toggle("danger", !!isError);
-    }
+    const keys = Object.keys(rows[0]);
+    $('sqlResultHead').innerHTML = '<tr>' + keys.map(k => `<th>${k}</th>`).join('') + '</tr>';
+    $('sqlResultBody').innerHTML = rows.map(r => '<tr>' + keys.map(k => `<td>${r[k] ?? ''}</td>`).join('') + '</tr>').join('');
+    $('sqlResultWrap').style.display = 'block';
+  } catch(e) {
+    $('sqlError').textContent = e.message;
+    $('sqlError').classList.remove('hidden');
+  }
+}
 
-    function setManageHint(msg) {
-      var el = document.getElementById("urlManageHint");
-      if (el) el.textContent = msg;
-    }
+// ========== EXPORT ==========
+function exportCsv() {
+  const from = $('csvFrom').value;
+  const to = $('csvTo').value;
+  if (!from || !to) { alert('請選擇日期範圍'); return; }
+  const filtered = gDailyData.filter(d => d.day >= from && d.day <= to);
+  if (!filtered.length) { alert('該範圍無數據'); return; }
 
-    function normalizeUrlInput(v) {
-      if (!v) return null;
-      var t = String(v).trim();
-      if (!t) return null;
-      try {
-        var u = new URL(t);
-        return u.toString();
-      } catch (e) {
-        return null;
-      }
-    }
+  const headers = ['日期','Session數','PageEnter','Heartbeat','運行時長(分鐘)'];
+  const rows = filtered.map(d => [d.day, d.sessions, d.enters, d.heartbeats, d.duration_min].join(','));
+  const csv = [headers.join(','), ...rows].join('\n');
 
-    function setDefaultRange() {
-      var now = nowMs();
-      var today = toTaipeiDateValue(now);
-      document.getElementById("from").value = today + "T00:00";
-      document.getElementById("to").value = toTaipeiInputValue(now);
-      document.getElementById("dayPicker").value = today;
-    }
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = `輪播報告_${from}_to_${to}.csv`;
+  link.click();
+}
 
-    function applyDayRange(dayStr) {
-      if (!dayStr) return;
-      var today = toTaipeiDateValue(nowMs());
-      document.getElementById("from").value = dayStr + "T00:00";
-      if (dayStr === today) {
-        document.getElementById("to").value = toTaipeiInputValue(nowMs());
-      } else {
-        document.getElementById("to").value = dayStr + "T23:59";
-      }
-    }
+function exportJson() {
+  const from = $('jsonFrom').value;
+  const to = $('jsonTo').value;
+  if (!from || !to) { alert('請選擇日期範圍'); return; }
+  const filtered = gDailyData.filter(d => d.day >= from && d.day <= to);
+  if (!filtered.length) { alert('該範圍無數據'); return; }
 
-    function getRange() {
-      var from = parseTaipeiInputToTs(document.getElementById("from").value);
-      var to = parseTaipeiInputToTs(document.getElementById("to").value);
-      if (!from || !to || from >= to) {
-        var fallbackTo = nowMs();
-        var fallbackFrom = fallbackTo - 24 * 60 * 60 * 1000;
-        return { from: fallbackFrom, to: fallbackTo };
-      }
-      return { from: from, to: to };
-    }
+  const blob = new Blob([JSON.stringify(filtered, null, 2)], { type: 'application/json' });
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = `輪播數據_${from}_to_${to}.json`;
+  link.click();
+}
 
-    function formatNum(v) {
-      var n = Number(v || 0);
-      if (!Number.isFinite(n)) return "0";
-      return n.toLocaleString();
-    }
+// ========== INIT ==========
+document.addEventListener('DOMContentLoaded', () => {
+  const today = new Date();
+  const thirtyDaysAgo = new Date(today.getTime() - 30*24*60*60*1000);
+  ['dailyFrom','csvFrom','jsonFrom'].forEach(id => $(id).value = fmtDate(thirtyDaysAgo.getTime()));
+  ['dailyTo','csvTo','jsonTo'].forEach(id => $(id).value = fmtDate(today.getTime()));
 
-    function formatRatio(v) {
-      var n = Number(v || 0);
-      if (!Number.isFinite(n)) return "0.0000";
-      return n.toFixed(4);
-    }
-
-    function formatTs(v, iso) {
-      var ms = 0;
-      if (iso) {
-        var dIso = new Date(iso);
-        ms = dIso.getTime();
-      } else {
-        ms = Number(v || 0);
-      }
-      if (!Number.isFinite(ms) || ms <= 0) return "-";
-      return taipeiFormatter.format(new Date(ms));
-    }
-
-    function escapeHtml(str) {
-      return String(str == null ? "" : str)
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/\"/g, "&quot;")
-        .replace(/'/g, "&#39;");
-    }
-
-    function selectedFromUi() {
-      var chips = Array.from(document.querySelectorAll("#urlFilterChips .chip.selected"));
-      return chips.map(function (c) { return c.getAttribute("data-url") || ""; }).filter(Boolean);
-    }
-
-    function refreshFilterOptions() {
-      var host = document.getElementById("urlFilterChips");
-      var countEl = document.getElementById("urlSelectedCount");
-      var pool = state.configuredUrls.length > 0
-        ? state.configuredUrls
-        : state.allRows.map(function (r) { return r.url; });
-
-      var filteredPool = pool.filter(function (u) {
-        if (!state.urlSearch) return true;
-        return u.toLowerCase().indexOf(state.urlSearch.toLowerCase()) >= 0;
-      });
-
-      host.innerHTML = filteredPool.map(function (u) {
-        var selectedClass = state.selectedUrls.indexOf(u) >= 0 ? " selected" : "";
-        return "<button type='button' class='chip" + selectedClass + "' data-url='" + escapeHtml(u) + "'>" + escapeHtml(u) + "</button>";
-      }).join("");
-
-      host.querySelectorAll(".chip").forEach(function (chip) {
-        chip.addEventListener("click", function () {
-          chip.classList.toggle("selected");
-          state.selectedUrls = selectedFromUi();
-          countEl.textContent = "已選 " + state.selectedUrls.length + " 個主站";
-        });
-      });
-
-      countEl.textContent = "已選 " + state.selectedUrls.length + " 個主站";
-    }
-
-    function updateKpis(data) {
-      var s = data.summary || {};
-      var byDevice = data.by_device || [];
-      document.getElementById("kTotal").textContent = formatNum(s.total_exposures);
-      document.getElementById("kSid").textContent = formatNum(s.unique_sessions);
-      document.getElementById("kIp").textContent = formatNum(s.unique_ips);
-      document.getElementById("kDevice").textContent = formatNum(byDevice.length);
-    }
-
-    function renderMainTable() {
-      var body = document.getElementById("mainBody");
-      var rows = state.allRows;
-      if (!rows || rows.length === 0) {
-        body.innerHTML = "<tr><td colspan='8'>暫無資料</td></tr>";
-        return;
-      }
-
-      var html = [];
-      rows.forEach(function (r) {
-        var active = state.expandedUrl === r.url ? " active" : "";
-        html.push(
-          "<tr class='url-row" + active + "' data-url='" + encodeURIComponent(r.url) + "'>" +
-            "<td class='url'>" + escapeHtml(r.url) + "</td>" +
-            "<td>" + formatNum(r.exposures) + "</td>" +
-            "<td>" + formatNum(r.unique_ips) + "</td>" +
-            "<td>" + formatNum(r.daily_repeated_ips) + "</td>" +
-            "<td>" + escapeHtml(r.primary_device_type || "unknown") + "</td>" +
-            "<td>" + formatRatio(r.engagement_ratio) + "</td>" +
-            "<td>" + escapeHtml(formatTs(r.last_exposure_time, r.last_exposure_iso)) + "</td>" +
-            "<td class='actions'><button class='tiny detail-btn' data-url='" + encodeURIComponent(r.url) + "'>詳情</button></td>" +
-          "</tr>"
-        );
-
-        if (state.expandedUrl === r.url) {
-          html.push(
-            "<tr><td colspan='8'>" + renderDetailBox(r.url) + "</td></tr>"
-          );
-        }
-      });
-      body.innerHTML = html.join("");
-
-      body.querySelectorAll(".detail-btn").forEach(function (btn) {
-        btn.addEventListener("click", function (e) {
-          e.stopPropagation();
-          var url = decodeURIComponent(btn.getAttribute("data-url"));
-          toggleDetail(url);
-        });
-      });
-
-      body.querySelectorAll("tr.url-row").forEach(function (tr) {
-        tr.addEventListener("click", function () {
-          var url = decodeURIComponent(tr.getAttribute("data-url"));
-          toggleDetail(url);
-        });
-      });
-    }
-
-    function renderDetailTable(rows, cols) {
-      if (!rows || rows.length === 0) {
-        return "<tr><td colspan='" + cols.length + "'>暫無資料</td></tr>";
-      }
-      return rows.map(function (r) {
-        return "<tr>" + cols.map(function (c) {
-          return "<td>" + escapeHtml(r[c]) + "</td>";
-        }).join("") + "</tr>";
-      }).join("");
-    }
-
-    function renderDetailBox(url) {
-      var d = state.detailCache[url];
-      if (!d) {
-        return "<div class='detail-box muted'>詳情載入中...</div>";
-      }
-
-      var users = d.user_ids || [];
-      var userHtml = users.length > 0
-        ? users.map(function (u) { return "<div>" + escapeHtml(u) + "</div>"; }).join("")
-        : "<div class='muted'>暫無使用者 ID</div>";
-
-      return (
-        "<div class='detail-box'>" +
-          "<div class='detail-grid'>" +
-            "<div class='detail-metric'><div class='k'>該 URL 曝光</div><div class='v'>" + formatNum(d.exposures) + "</div></div>" +
-            "<div class='detail-metric'><div class='k'>該 URL 獨立IP</div><div class='v'>" + formatNum(d.unique_ips) + "</div></div>" +
-            "<div class='detail-metric'><div class='k'>每日重複IP</div><div class='v'>" + formatNum(d.repeated_ip_days_total) + "</div></div>" +
-          "</div>" +
-          "<div class='subtables'>" +
-            "<div>" +
-              "<table><thead><tr><th>日期</th><th>重複IP</th><th>重複曝光</th></tr></thead><tbody>" +
-              renderDetailTable(d.daily_repeat_ip || [], ["day", "repeat_ips", "repeat_exposures"]) +
-              "</tbody></table>" +
-            "</div>" +
-            "<div>" +
-              "<table><thead><tr><th>裝置</th><th>曝光</th></tr></thead><tbody>" +
-              renderDetailTable(d.by_device || [], ["device_type", "exposures"]) +
-              "</tbody></table>" +
-            "</div>" +
-          "</div>" +
-          "<div style='margin-top:8px;'><table><thead><tr><th>站內連結</th><th>曝光</th><th>獨立IP</th><th>最後曝光</th></tr></thead><tbody>" +
-          renderDetailTable((d.sub_pages || []).map(function (x) { return {
-            url: x.url,
-            exposures: x.exposures,
-            unique_ips: x.unique_ips,
-            last_exposure: formatTs(x.last_exposure_time, x.last_exposure_iso)
-          }; }), ["url", "exposures", "unique_ips", "last_exposure"]) +
-          "</tbody></table></div>" +
-          "<div class='user-ids'><strong>使用者唯一 ID（文字）</strong><div style='margin-top:6px;'>" + userHtml + "</div></div>" +
-        "</div>"
-      );
-    }
-
-    async function loadDetail(url) {
-      var range = getRange();
-      var endpoint = API_BASE + "/api/report?from=" + range.from + "&to=" + range.to + "&url=" + encodeURIComponent(url) + "&page=1&page_size=100";
-      var res = await fetch(endpoint, { cache: "no-store" });
-      if (!res.ok) throw new Error("HTTP " + res.status);
-      var data = await res.json();
-      state.detailCache[url] = data.per_url_details || {
-        url: url,
-        exposures: 0,
-        unique_ips: 0,
-        repeated_ip_days_total: 0,
-        daily_repeat_ip: [],
-        by_device: [],
-        sub_pages: [],
-        user_ids: []
-      };
-    }
-
-    async function toggleDetail(url) {
-      if (state.expandedUrl === url) {
-        state.expandedUrl = null;
-        renderMainTable();
-        return;
-      }
-      state.expandedUrl = url;
-      renderMainTable();
-      try {
-        await loadDetail(url);
-      } catch (e) {
-        state.detailCache[url] = {
-          exposures: 0,
-          unique_ips: 0,
-          repeated_ip_days_total: 0,
-          daily_repeat_ip: [],
-          by_device: [],
-          sub_pages: [],
-          user_ids: []
-        };
-        setStatus("詳情載入失敗：" + e.message, true);
-      }
-      renderMainTable();
-    }
-
-    async function loadReport() {
-      var range = getRange();
-      var endpoint = API_BASE + "/api/report?from=" + range.from + "&to=" + range.to;
-      if (state.selectedUrls.length > 0) {
-        endpoint += "&urls=" + state.selectedUrls.map(function (u) { return encodeURIComponent(u); }).join(",");
-      }
-
-      setStatus("載入中...", false);
-      try {
-        var res = await fetch(endpoint, { cache: "no-store" });
-        if (!res.ok) throw new Error("HTTP " + res.status);
-        var data = await res.json();
-
-        state.allRows = data.by_url || [];
-        state.configuredUrls = data.configured_urls || [];
-        updateKpis(data);
-        refreshFilterOptions();
-        renderMainTable();
-        setStatus("更新於 " + taipeiFormatter.format(new Date()), false);
-      } catch (e) {
-        setStatus("載入失敗：" + e.message, true);
-      }
-    }
-
-    async function saveConfiguredUrls() {
-      var urls = Array.from(new Set(state.configuredUrls.map(function (u) { return String(u).trim(); }).filter(Boolean))).sort();
-      if (urls.length === 0) {
-        setManageHint("至少需要保留 1 個輪播 URL");
-        return;
-      }
-      try {
-        var res = await fetch(API_BASE + "/api/config/urls", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ source: "scheduler", urls: urls })
-        });
-        if (!res.ok) throw new Error("HTTP " + res.status);
-        setManageHint("已儲存輪播 URL 清單，輪播入口將自動同步。共 " + urls.length + " 筆");
-        state.selectedUrls = state.selectedUrls.filter(function (u) { return urls.indexOf(u) >= 0; });
-        await loadReport();
-      } catch (e) {
-        setManageHint("儲存失敗：" + e.message);
-      }
-    }
-
-    function downloadCsv() {
-      var range = getDateRange();
-      if (!range) {
-        setStatus("日期範圍無效", true);
-        return;
-      }
-      
-      // LOW-RISK FIX: Add error handling for CSV download
-      try {
-        var endpoint = API_BASE + "/api/report.csv?from=" + range.from + "&to=" + range.to;
-        if (state.selectedUrls.length > 0) {
-          endpoint += "&urls=" + state.selectedUrls.map(function (u) { return encodeURIComponent(u); }).join(",");
-        }
-        
-        if (!endpoint || endpoint.length === 0) {
-          throw new Error("Invalid download URL");
-        }
-        
-        window.open(endpoint, "_blank");
-      } catch (err) {
-        setStatus("下載失敗: " + err.message, true);
-      }
-    }
-      window.open(endpoint, "_blank");
-    }
-
-    function startAutoRefresh() {
-      var timerId = setInterval(function () {
-        loadReport();
-      }, POLL_MS);
-      
-      // LOW-RISK FIX: Clean up timer on page unload to prevent memory leaks
-      window.addEventListener('beforeunload', function () {
-        clearInterval(timerId);
-      });
-    }
-
-    document.getElementById("refreshBtn").addEventListener("click", function () {
-      loadReport();
-    });
-
-    document.getElementById("applyDayBtn").addEventListener("click", function () {
-      var day = document.getElementById("dayPicker").value;
-      if (!day) {
-        setStatus("請先選擇日期", true);
-        return;
-      }
-      applyDayRange(day);
-      loadReport();
-    });
-    document.getElementById("csvBtn").addEventListener("click", downloadCsv);
-
-    document.getElementById("urlSearch").addEventListener("input", function (e) {
-      state.urlSearch = e.target.value || "";
-      refreshFilterOptions();
-    });
-
-    document.getElementById("applyFilterBtn").addEventListener("click", function () {
-      state.selectedUrls = selectedFromUi();
-      state.expandedUrl = null;
-      state.detailCache = Object.create(null);
-      loadReport();
-    });
-
-    document.getElementById("clearFilterBtn").addEventListener("click", function () {
-      state.selectedUrls = [];
-      state.expandedUrl = null;
-      state.detailCache = Object.create(null);
-      refreshFilterOptions();
-      loadReport();
-    });
-
-    document.getElementById("selectAllBtn").addEventListener("click", function () {
-      var visible = Array.from(document.querySelectorAll("#urlFilterChips .chip"))
-        .map(function (c) { return c.getAttribute("data-url") || ""; })
-        .filter(Boolean);
-      state.selectedUrls = Array.from(new Set(visible));
-      state.expandedUrl = null;
-      state.detailCache = Object.create(null);
-      refreshFilterOptions();
-      loadReport();
-    });
-
-    document.getElementById("addUrlBtn").addEventListener("click", function () {
-      var input = document.getElementById("newUrlInput");
-      var normalized = normalizeUrlInput(input.value);
-      if (!normalized) {
-        setManageHint("URL 格式錯誤，請輸入完整網址（例如 https://example.com/）");
-        return;
-      }
-      if (state.configuredUrls.indexOf(normalized) >= 0) {
-        setManageHint("此 URL 已存在於輪播清單");
-        return;
-      }
-      state.configuredUrls.push(normalized);
-      state.configuredUrls.sort();
-      input.value = "";
-      refreshFilterOptions();
-      setManageHint("已加入待儲存清單，請點「儲存輪播 URL」生效");
-    });
-
-    document.getElementById("removeSelectedBtn").addEventListener("click", function () {
-      var picked = selectedFromUi();
-      if (picked.length === 0) {
-        setManageHint("請先在上方多選框選取要刪除的 URL");
-        return;
-      }
-      state.configuredUrls = state.configuredUrls.filter(function (u) { return picked.indexOf(u) === -1; });
-      state.selectedUrls = state.selectedUrls.filter(function (u) { return state.configuredUrls.indexOf(u) >= 0; });
-      refreshFilterOptions();
-      setManageHint("已從待儲存清單移除 " + picked.length + " 筆，請點「儲存輪播 URL」生效");
-    });
-
-    document.getElementById("saveUrlsBtn").addEventListener("click", function () {
-      saveConfiguredUrls();
-    });
-
-    setDefaultRange();
-    loadReport();
-    startAutoRefresh();
-  </script>
+  if (gToken) checkAutoLogin();
+});
+</script>
 </body>
 </html>
