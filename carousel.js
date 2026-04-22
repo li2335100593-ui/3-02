@@ -1,5 +1,9 @@
 /**
- * Carousel SDK v2.2 (robust: cycle timing persistence via localStorage + cookie fallback)
+ * Carousel SDK v3.0 (standalone: works with or without URL hash)
+ * 
+ * 两种使用方式：
+ * 1. 通过 scheduler.html 跳转：状态通过 URL hash 传递
+ * 2. 直接注入目标网站：配置内置在脚本中，不依赖 hash
  */
 ;(function () {
   'use strict';
@@ -7,11 +11,23 @@
   var ANALYTICS_URL = 'https://exposure-analytics.li2335100593.workers.dev/api/exposure';
   var HEARTBEAT_INTERVAL_SEC = 30;
 
+  // ===== 内置配置（直接注入模式用）=====
+  // 如果 URL hash 里没有配置，就使用这里的默认值
+  var BUILTIN_CONFIG = {
+    urls: [
+      'https://livingroom-design.ddmmoney.com/',
+      'https://old-house-renovation.chworld.com.tw/',
+      'https://incar.tw/'
+    ],
+    interval: 300,  // 5分钟
+    cycle: 3600     // 60分钟
+  };
+
   // Storage keys
   var LS_VID = '__carousel_vid';
-  var LS_CYCLE = '__carousel_cycle_v3';
-  var LS_STATE = '__carousel_state_v3';
-  var CK_CYCLE = '__carousel_cycle_v3';
+  var LS_CYCLE = '__carousel_cycle_v4';
+  var LS_STATE = '__carousel_state_v4';
+  var CK_CYCLE = '__carousel_cycle_v4';
 
   function now() { return Date.now(); }
 
@@ -78,7 +94,7 @@
     } catch (e) {}
   }
 
-  // ===== Base64 decode =====
+  // ===== Base64 =====
   function decodeB64(b64) {
     try {
       var bin = atob(b64);
@@ -90,77 +106,46 @@
     } catch (e) { return null; }
   }
 
-  // ===== Normalize state =====
-  function normalize(raw) {
-    if (!raw) return null;
-    var ci = parseInt(raw.ci, 10);
-    var iv = parseInt(raw.iv, 10);
-    var cy = parseInt(raw.cy, 10);
-    var cu = raw.cu;
-    var sid = raw.sid || createSid();
-    var uid = raw.uid || null;
-
-    if (cu == null) return null;
-    if (isNaN(ci) || isNaN(iv) || isNaN(cy)) return null;
-    if (iv <= 0 || cy <= 0) return null;
-
-    var decoded = decodeB64(cu);
-    if (!decoded) return null;
-
-    var urls;
-    try { urls = JSON.parse(decoded); } catch (e) { return null; }
-    if (!Array.isArray(urls) || urls.length === 0) return null;
-    if (ci < 0 || ci >= urls.length) ci = 0;
-
-    return { ci: ci, iv: iv, cy: cy, cu: cu, sid: sid, uid: uid, urls: urls };
-  }
-
-  // ===== Read state from hash =====
-  function fromHash() {
-    var raw = window.location.hash;
-    if (!raw || raw.length < 2) return null;
-    var p = new URLSearchParams(raw.substring(1));
-    return normalize({
-      ci: p.get('_ci'),
-      iv: p.get('_iv'),
-      cy: p.get('_cy'),
-      cu: p.get('_cu'),
-      sid: p.get('_sid') || createSid(),
-      uid: p.get('_u') || null
-    });
-  }
-
-  // ===== Read state from localStorage =====
-  function fromLS() {
+  function encodeB64(str) {
     try {
-      var s = localStorage.getItem(LS_STATE);
-      if (!s) return null;
-      var p = JSON.parse(s);
-      return p && p.state ? normalize(p.state) : null;
+      return btoa(encodeURIComponent(str).replace(/%([0-9A-F]{2})/g, function(m, p) {
+        return String.fromCharCode('0x' + p);
+      }));
     } catch (e) { return null; }
   }
 
-  // ===== Get cycle start (global, shared across all pages) =====
+  // ===== Find current page index in URL list =====
+  function findCurrentIndex(urls) {
+    var current = window.location.origin + window.location.pathname;
+    for (var i = 0; i < urls.length; i++) {
+      var url = urls[i];
+      // Remove trailing slash for comparison
+      var normalizedUrl = url.replace(/\/$/, '');
+      var normalizedCurrent = current.replace(/\/$/, '');
+      if (normalizedCurrent.indexOf(normalizedUrl) === 0 || normalizedUrl.indexOf(normalizedCurrent) === 0) {
+        return i;
+      }
+    }
+    return 0; // Default to first URL
+  }
+
+  // ===== Get cycle start =====
   function getCycleStart(cy) {
     var ct = null;
-    // Try localStorage first
     try {
       var s = localStorage.getItem(LS_CYCLE);
       if (s) ct = parseInt(s, 10);
     } catch (e) {}
-    // Fallback to cookie
     if (!ct || isNaN(ct)) {
       var c = getCookie(CK_CYCLE);
       if (c) ct = parseInt(c, 10);
     }
-    // Validate
     if (ct && !isNaN(ct)) {
       var age = now() - ct;
       if (age >= 0 && age < cy * 1000) {
-        return ct; // Cycle still running, reuse
+        return ct;
       }
     }
-    // Start new cycle
     var t = now();
     try { localStorage.setItem(LS_CYCLE, String(t)); } catch (e) {}
     setCookie(CK_CYCLE, String(t), cy);
@@ -173,6 +158,95 @@
       localStorage.setItem(LS_STATE, JSON.stringify({ state: st, saved_at: now() }));
     } catch (e) {}
   }
+
+  // ===== Read state from hash (scheduler mode) =====
+  function fromHash() {
+    var raw = window.location.hash;
+    if (!raw || raw.length < 2) return null;
+    var p = new URLSearchParams(raw.substring(1));
+    var cu = p.get('_cu');
+    if (!cu) return null;
+    var decoded = decodeB64(cu);
+    if (!decoded) return null;
+    try {
+      var urls = JSON.parse(decoded);
+      if (!Array.isArray(urls) || urls.length === 0) return null;
+      var ci = parseInt(p.get('_ci'), 10);
+      if (isNaN(ci) || ci < 0 || ci >= urls.length) ci = 0;
+      var iv = parseInt(p.get('_iv'), 10) || 300;
+      var cy = parseInt(p.get('_cy'), 10) || 3600;
+      return {
+        ci: ci,
+        iv: iv,
+        cy: cy,
+        cu: cu,
+        sid: p.get('_sid') || createSid(),
+        uid: p.get('_u') || null,
+        urls: urls
+      };
+    } catch (e) { return null; }
+  }
+
+  // ===== Read state from localStorage =====
+  function fromLS() {
+    try {
+      var s = localStorage.getItem(LS_STATE);
+      if (!s) return null;
+      var p = JSON.parse(s);
+      if (!p || !p.state) return null;
+      var st = p.state;
+      // Validate
+      if (!st.cu || !st.urls || !Array.isArray(st.urls)) return null;
+      return st;
+    } catch (e) { return null; }
+  }
+
+  // ===== Build state from builtin config =====
+  function fromBuiltin() {
+    var cu = encodeB64(JSON.stringify(BUILTIN_CONFIG.urls));
+    if (!cu) return null;
+    return {
+      ci: findCurrentIndex(BUILTIN_CONFIG.urls),
+      iv: BUILTIN_CONFIG.interval,
+      cy: BUILTIN_CONFIG.cycle,
+      cu: cu,
+      sid: createSid(),
+      uid: null,
+      urls: BUILTIN_CONFIG.urls
+    };
+  }
+
+  // ===== Parse state: try hash -> localStorage -> builtin =====
+  var hashState = fromHash();
+  var lsState = fromLS();
+  var builtinState = fromBuiltin();
+
+  var base = hashState || lsState || builtinState;
+
+  if (!base) {
+    console.log('[carousel] no state available, exiting');
+    return;
+  }
+
+  // If we have a UID from hash, use it
+  if (hashState && hashState.uid) {
+    base.uid = hashState.uid;
+  }
+
+  var cycleStart = getCycleStart(base.cy);
+
+  var state = {
+    ci: base.ci,
+    ct: cycleStart,
+    iv: base.iv,
+    cy: base.cy,
+    cu: base.cu,
+    sid: base.sid,
+    uid: base.uid,
+    urls: base.urls
+  };
+
+  console.log('[carousel] loaded ci=' + state.ci + ' ctAge=' + (now() - state.ct) + 'ms mode=' + (hashState ? 'hash' : (lsState ? 'storage' : 'builtin')));
 
   // ===== Merge state into link hash =====
   function mergeIntoUrl(targetUrl, st) {
@@ -221,31 +295,6 @@
       } catch (err) {}
     }, true);
   }
-
-  // ===== Parse state =====
-  var hashState = fromHash();
-  var lsState = fromLS();
-  var base = hashState || lsState;
-
-  if (!base) {
-    console.log('[carousel] no state, exiting');
-    return;
-  }
-
-  var cycleStart = getCycleStart(base.cy);
-
-  var state = {
-    ci: base.ci,
-    ct: cycleStart,
-    iv: base.iv,
-    cy: base.cy,
-    cu: base.cu,
-    sid: base.sid,
-    uid: base.uid,
-    urls: base.urls
-  };
-
-  console.log('[carousel] loaded ci=' + state.ci + ' ctAge=' + (now() - state.ct) + 'ms');
 
   // ===== Timer =====
   var intervalSec = state.iv;
@@ -376,9 +425,8 @@
     var timeStr = min + ':' + (sec < 10 ? '0' : '') + sec;
     var pageLabel = (state.ci + 1) + '/' + state.urls.length;
     var uidLabel = state.uid ? ' [' + state.uid + ']' : '';
-    // DEBUG: show ctAge in UI to diagnose reset issues
     var ctAgeSec = Math.floor((now() - state.ct) / 1000);
-    textEl.textContent = pageLabel + ' — ' + timeStr + uidLabel + ' | debug:' + ctAgeSec + 's';
+    textEl.textContent = pageLabel + ' — ' + timeStr + uidLabel + ' | d:' + ctAgeSec + 's';
   }
 
   // ===== Boot =====
