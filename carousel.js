@@ -239,8 +239,10 @@
 
   function parseState() {
     var raw = window.location.hash;
+    var fromStorage = loadStateFromStorage();
+
     if (!raw || raw.length < 2) {
-      return loadStateFromStorage();
+      return fromStorage;
     }
 
     var params = new URLSearchParams(raw.substring(1));
@@ -255,9 +257,21 @@
       uid: params.get('_u') || null          // ← 新增：从 hash 读取 _u
     });
 
-    // hash 存在但参数无效（如只有锚点 #section1），fallback 到 sessionStorage
+    // hash 存在但参数无效（如只有锚点 #section1），fallback 到 storage
     if (!fromHash) {
-      return loadStateFromStorage();
+      return fromStorage;
+    }
+
+    // 如果 hash 里的 ct 非常新（<5秒），但 storage 里有更旧的 ct，
+    // 说明 hash 可能被错误地重置了，优先用 storage 里的旧 ct
+    if (fromStorage && fromStorage.ct) {
+      var now = Date.now();
+      var hashCtAge = now - fromHash.ct;
+      var storageCtAge = now - fromStorage.ct;
+      if (hashCtAge < 5000 && storageCtAge > hashCtAge && storageCtAge < fromHash.cy * 1000) {
+        // 用 storage 的 ct，但保留 hash 的其他参数（如 ci, uid 等）
+        fromHash.ct = fromStorage.ct;
+      }
     }
 
     return fromHash;
