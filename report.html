@@ -98,6 +98,21 @@ tailwind.config = {
   .operator-row:hover { background: #F9FAFB; }
   .progress-bar { height: 8px; border-radius: 4px; background: #F3F4F6; overflow: hidden; }
   .progress-fill { height: 100%; border-radius: 4px; transition: width 500ms ease-out; }
+  .field-chip { position: relative; display: inline-flex; align-items: center; gap: 4px; }
+  .field-chip .tip-icon { cursor: help; opacity: 0.6; transition: opacity 150ms; }
+  .field-chip .tip-icon:hover { opacity: 1; }
+  .field-chip .tooltip {
+    position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%);
+    width: 260px; padding: 10px 14px; background: #1F2937; color: #F3F4F6;
+    border-radius: 8px; font-size: 13px; line-height: 1.5; font-weight: 400;
+    pointer-events: none; opacity: 0; visibility: hidden; transition: all 200ms;
+    z-index: 50; text-align: left; box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  }
+  .field-chip .tooltip::after {
+    content: ''; position: absolute; top: 100%; left: 50%; transform: translateX(-50%);
+    border: 6px solid transparent; border-top-color: #1F2937;
+  }
+  .field-chip:hover .tooltip, .field-chip.tip-show .tooltip { opacity: 1; visibility: visible; }
 </style>
 </head>
 <body class="min-h-screen text-fg">
@@ -1042,16 +1057,16 @@ async function renderOperatorRanking() {
 
 // ========== DAILY ANALYSIS (CUSTOM METRICS) ==========
 const FIELD_DEFS = {
-  time:        { label: '時間', sql: "datetime(received_at/1000,'unixepoch','+8 hours')" },
-  day:         { label: '日期', sql: "date(received_at/1000,'unixepoch','+8 hours')" },
-  vid:         { label: '播放人員', sql: 'vid' },
-  device_type: { label: '設備', sql: 'device_type' },
-  url:         { label: 'URL', sql: 'url' },
-  event_type:  { label: '事件類型', sql: 'event_type' },
-  page_index:  { label: '頁面索引', sql: 'page_index' },
-  ip:          { label: 'IP', sql: 'ip' },
-  sid:         { label: 'Session ID', sql: 'sid' },
-  ua:          { label: 'User Agent', sql: 'ua' },
+  time:        { label: '時間', sql: "datetime(received_at/1000,'unixepoch','+8 hours')", desc: '事件發生的精確時間（東八區），格式為 YYYY-MM-DD HH:MM:SS。所有時間均已轉換為台北/北京時間。' },
+  day:         { label: '日期', sql: "date(received_at/1000,'unixepoch','+8 hours')", desc: '事件發生的日期（東八區），格式為 YYYY-MM-DD。用於按天聚合統計和日期篩選。' },
+  vid:         { label: '播放人員', sql: 'vid', desc: '播放人員的唯一標識碼。通過專屬鏈接 scheduler.html?u=OP001 傳入，系統會將該人員的所有操作記錄在其名下，用於追蹤每位播放人員的播放時長和效率。' },
+  device_type: { label: '設備', sql: 'device_type', desc: '用戶設備類型，根據瀏覽器的 User-Agent 自動識別。分為：桌面端（Desktop）、移動端（Mobile）、平板（Tablet）。用於分析不同設備的播放穩定性。' },
+  url:         { label: 'URL', sql: 'url', desc: '事件發生時用戶正在瀏覽的頁面地址。即輪播系統當前展示的目標網站頁面，可用於確認播放人員是否正確打開了指定頁面。' },
+  event_type:  { label: '事件類型', sql: 'event_type', desc: '曝光事件類型。page_enter = 進入頁面（首次加載時觸發）；heartbeat = 心跳保活（每30秒觸發一次，用於計算實際運行時長）；page_leave = 離開頁面（跳轉前觸發）。' },
+  page_index:  { label: '頁面索引', sql: 'page_index', desc: '當前輪播頁面的索引位置。0 = 第一個URL，1 = 第二個URL... 用於確認輪播是否正常切換頁面，以及每個頁面的曝光次數。' },
+  ip:          { label: 'IP', sql: 'ip', desc: '用戶設備的公網IP地址，由 Cloudflare Worker 自動獲取。用於識別不同地理位置的播放來源，以及檢測是否有異常IP頻繁訪問。' },
+  sid:         { label: 'Session ID', sql: 'sid', desc: '每次打開 scheduler.html 時自動生成的唯一會話標識。一次完整的輪播會話（從打開到關閉）擁有相同的 Session ID，用於統計單次播放的總時長。' },
+  ua:          { label: 'User Agent', sql: 'ua', desc: '用戶瀏覽器的完整標識字符串，包含瀏覽器名稱、版本、操作系統、設備型號等信息。用於技術排查和設備兼容性分析。' },
 };
 let gSelectedFields = ['time','vid','device_type','url','event_type','page_index','ip'];
 let gDailyPage = 1;
@@ -1061,7 +1076,13 @@ function renderFieldSelector() {
   const container = $('fieldSelector');
   container.innerHTML = Object.entries(FIELD_DEFS).map(([key, def]) => {
     const active = gSelectedFields.includes(key);
-    return `<button onclick="toggleField('${key}')" class="px-3 py-1.5 rounded-md text-sm font-medium transition-all ${active ? 'bg-primary text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}">${def.label}</button>`;
+    return `
+      <span class="field-chip ${active ? 'bg-primary text-white' : 'bg-gray-100 text-gray-600'} px-3 py-1.5 rounded-md text-sm font-medium transition-all">
+        <button onclick="toggleField('${key}')" class="font-medium ${active ? 'text-white' : 'text-gray-600'}">${def.label}</button>
+        <span class="tip-icon material-symbols-outlined" style="font-size:16px;" onclick="this.parentElement.classList.toggle('tip-show')">help</span>
+        <span class="tooltip">${def.desc}</span>
+      </span>
+    `;
   }).join('');
 }
 
