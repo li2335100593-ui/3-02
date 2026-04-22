@@ -12,6 +12,7 @@
   var ANALYTICS_URL = 'https://exposure-analytics.li2335100593.workers.dev/api/exposure';
   var HEARTBEAT_INTERVAL_SEC = 30;
   var STATE_STORAGE_KEY = '__carousel_state_v1';
+  var STATE_STORAGE_KEY_LOCAL = '__carousel_state_v1_local';
 
   function createSessionId() {
     return 'sid_' + Date.now() + '_' + Math.random().toString(36).slice(2, 10);
@@ -145,6 +146,10 @@
   function loadStateFromStorage() {
     try {
       var saved = sessionStorage.getItem(STATE_STORAGE_KEY);
+      if (!saved) {
+        // fallback to localStorage (cross-page within same origin)
+        saved = localStorage.getItem(STATE_STORAGE_KEY_LOCAL);
+      }
       if (!saved) return null;
       var parsed = JSON.parse(saved);
       if (!parsed || !parsed.state) return null;
@@ -160,7 +165,9 @@
         state: stateSnapshot(rawState),
         saved_at: Date.now()
       };
-      sessionStorage.setItem(STATE_STORAGE_KEY, JSON.stringify(payload));
+      var payloadStr = JSON.stringify(payload);
+      sessionStorage.setItem(STATE_STORAGE_KEY, payloadStr);
+      localStorage.setItem(STATE_STORAGE_KEY_LOCAL, payloadStr);
     } catch (e) {}
   }
 
@@ -200,20 +207,33 @@
     return false;
   }
 
+  function propagateStateToAnchor(anchor) {
+    try {
+      if (!anchor || !anchor.href) return;
+      var targetUrl = new URL(anchor.href, window.location.href);
+      if (targetUrl.origin !== window.location.origin) return;
+      if (targetUrl.protocol !== 'http:' && targetUrl.protocol !== 'https:') return;
+
+      mergeStateIntoUrl(targetUrl, state);
+      anchor.href = targetUrl.toString();
+      saveStateToStorage(state);
+    } catch (err) {}
+  }
+
   function attachInSiteLinkPropagation() {
+    // Capture phase to intercept before page scripts handle the click
     document.addEventListener('click', function (e) {
-      try {
-        var anchor = e.target && e.target.closest ? e.target.closest('a') : null;
-        if (shouldSkipLinkPropagation(e, anchor)) return;
+      var anchor = e.target && e.target.closest ? e.target.closest('a') : null;
+      if (shouldSkipLinkPropagation(e, anchor)) return;
+      propagateStateToAnchor(anchor);
+    }, true);
 
-        var targetUrl = new URL(anchor.href, window.location.href);
-        if (targetUrl.origin !== window.location.origin) return;
-        if (targetUrl.protocol !== 'http:' && targetUrl.protocol !== 'https:') return;
-
-        mergeStateIntoUrl(targetUrl, state);
-        anchor.href = targetUrl.toString();
-        saveStateToStorage(state);
-      } catch (err) {}
+    // Also handle mousedown for faster interception
+    document.addEventListener('mousedown', function (e) {
+      var anchor = e.target && e.target.closest ? e.target.closest('a') : null;
+      if (!anchor || !anchor.href) return;
+      if (e.button !== 0) return;
+      propagateStateToAnchor(anchor);
     }, true);
   }
 
@@ -225,7 +245,7 @@
 
     var params = new URLSearchParams(raw.substring(1));
 
-    return normalizeStateObject({
+    var fromHash = normalizeStateObject({
       ci: params.get('_ci'),
       ct: params.get('_ct'),
       iv: params.get('_iv'),
@@ -234,6 +254,13 @@
       sid: params.get('_sid') || createSessionId(),
       uid: params.get('_u') || null          // ← 新增：从 hash 读取 _u
     });
+
+    // hash 存在但参数无效（如只有锚点 #section1），fallback 到 sessionStorage
+    if (!fromHash) {
+      return loadStateFromStorage();
+    }
+
+    return fromHash;
   }
 
   var state = parseState();
