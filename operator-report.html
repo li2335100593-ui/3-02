@@ -67,19 +67,19 @@
       </div>
       <div class="px-7 pb-6 space-y-4">
         <div>
-          <label class="block text-xs font-medium text-slate-700 mb-1.5">用户名 / 邮箱</label>
-          <input id="login-username" type="text" autocomplete="username" class="w-full h-10 px-3 rounded-md border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500" placeholder="username 或 email">
+          <label class="block text-xs font-medium text-slate-700 mb-1.5" data-i18n="login.username_label">用户名 / 邮箱</label>
+          <input id="login-username" type="text" autocomplete="username" class="w-full h-10 px-3 rounded-md border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500" data-i18n-placeholder="login.username_placeholder" placeholder="username 或 email">
         </div>
         <div id="login-email-row" class="hidden">
-          <label class="block text-xs font-medium text-slate-700 mb-1.5">邮箱（选填）</label>
+          <label class="block text-xs font-medium text-slate-700 mb-1.5" data-i18n="login.email_label">邮箱（选填）</label>
           <input id="login-email" type="email" autocomplete="email" class="w-full h-10 px-3 rounded-md border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500" placeholder="li2335100593@gmail.com">
         </div>
         <div>
-          <label class="block text-xs font-medium text-slate-700 mb-1.5">密码</label>
+          <label class="block text-xs font-medium text-slate-700 mb-1.5" data-i18n="login.password_label">密码</label>
           <input id="login-password" type="password" autocomplete="current-password" class="w-full h-10 px-3 rounded-md border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500" placeholder="">
         </div>
         <div id="login-confirm-row" class="hidden">
-          <label class="block text-xs font-medium text-slate-700 mb-1.5">确认密码</label>
+          <label class="block text-xs font-medium text-slate-700 mb-1.5" data-i18n="login.confirm_label">确认密码</label>
           <input id="login-confirm" type="password" autocomplete="new-password" class="w-full h-10 px-3 rounded-md border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500">
         </div>
         <div id="login-error" class="hidden text-xs px-3 py-2 rounded-md bg-rose-50 border border-rose-200 text-rose-700 flex items-start gap-1.5">
@@ -94,11 +94,11 @@
       <div id="bootstrap-notice" class="hidden px-7 py-3 bg-amber-50 border-t border-amber-200">
         <div class="text-xs text-amber-900 flex items-start gap-1.5">
           <i data-lucide="info" class="w-3.5 h-3.5 flex-shrink-0 mt-0.5"></i>
-          <span>系统首次启动 — 即将创建超级管理员。该账号永久拥有添加 / 删除其他账号的权限。完成后此页面变为登录页。</span>
+          <span data-i18n="login.bootstrap_notice">系统首次启动 — 即将创建超级管理员。该账号永久拥有添加 / 删除其他账号的权限。完成后此页面变为登录页。</span>
         </div>
       </div>
     </div>
-    <p class="text-center text-xs text-slate-400 mt-6">© 运营后台 · 仅授权管理员可用</p>
+    <p class="text-center text-xs text-slate-400 mt-6" data-i18n="login.copyright">© 运营后台 · 仅授权管理员可用</p>
   </div>
 </div>
 
@@ -109,33 +109,37 @@
         <i data-lucide="layout-dashboard" class="w-5 h-5"></i>
       </div>
       <div>
-        <h1 class="text-base font-semibold tracking-tight">运营后台</h1>
-        <p class="text-xs text-slate-500">Carousel Operations Console</p>
+        <h1 class="text-base font-semibold tracking-tight" data-i18n="app.title">运营后台</h1>
+        <p class="text-xs text-slate-500" data-i18n="app.subtitle">Carousel Operations Console</p>
       </div>
     </div>
     <nav class="ml-8 flex items-center gap-6">
       <button class="tab-btn active flex items-center gap-2" data-tab="report">
         <i data-lucide="bar-chart-3" class="w-4 h-4"></i>
-        工时报表
+        <span data-i18n="tab.report">工时报表</span>
       </button>
       <button class="tab-btn flex items-center gap-2" data-tab="site-report">
         <i data-lucide="trending-up" class="w-4 h-4"></i>
-        站点报表
+        <span data-i18n="tab.site_report">站点报表</span>
       </button>
       <button class="tab-btn flex items-center gap-2" data-tab="operators">
         <i data-lucide="users" class="w-4 h-4"></i>
-        播放员
+        <span data-i18n="tab.operators">播放员</span>
       </button>
       <button class="tab-btn flex items-center gap-2" data-tab="sites">
         <i data-lucide="globe" class="w-4 h-4"></i>
-        网站
+        <span data-i18n="tab.sites">网站</span>
       </button>
       <button id="tab-accounts-btn" class="tab-btn flex items-center gap-2 hidden" data-tab="accounts">
         <i data-lucide="shield" class="w-4 h-4"></i>
-        账户
+        <span data-i18n="tab.accounts">账户</span>
       </button>
     </nav>
-    <div class="ml-auto flex items-center gap-3">
+    <div class="ml-auto flex items-center gap-2">
+      <div class="flex items-center bg-slate-100 rounded-md p-0.5 text-xs font-medium">
+        <button class="lang-btn px-2.5 py-1 rounded text-slate-600" data-lang="zh-CN">简</button>
+        <button class="lang-btn px-2.5 py-1 rounded text-slate-600" data-lang="zh-TW">繁</button>
+      </div>
       <div id="user-menu" class="relative">
         <button id="user-menu-btn" class="flex items-center gap-2 px-3 py-1.5 rounded-md hover:bg-slate-100 text-sm">
           <div class="w-7 h-7 rounded-full bg-gradient-to-br from-brand-500 to-brand-700 text-white text-xs font-semibold grid place-items-center" id="user-menu-avatar">?</div>
@@ -149,11 +153,11 @@
           </div>
           <button id="change-password-btn" class="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2">
             <i data-lucide="key" class="w-4 h-4 text-slate-500"></i>
-            修改密码
+            <span data-i18n="menu.change_password">修改密码</span>
           </button>
           <button id="logout-btn" class="w-full text-left px-4 py-2 text-sm text-rose-600 hover:bg-rose-50 flex items-center gap-2">
             <i data-lucide="log-out" class="w-4 h-4"></i>
-            退出登录
+            <span data-i18n="menu.logout">退出登录</span>
           </button>
         </div>
       </div>
@@ -168,8 +172,8 @@
 
     <div class="flex items-center justify-between mb-6">
       <div>
-        <h2 class="text-lg font-semibold tracking-tight">工时审计</h2>
-        <p class="text-xs text-slate-500 mt-0.5">按播放员维度的精确工时记录</p>
+        <h2 class="text-lg font-semibold tracking-tight" data-i18n="report.title">工时审计</h2>
+        <p class="text-xs text-slate-500 mt-0.5" data-i18n="report.subtitle">按播放员维度的精确工时记录</p>
       </div>
       <div class="flex items-center gap-3">
         <div class="flex items-center gap-2 text-sm">
@@ -180,11 +184,11 @@
         </div>
         <button id="refresh-btn" class="h-9 px-4 rounded-md bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium flex items-center gap-2 transition-colors">
           <i data-lucide="refresh-cw" class="w-4 h-4"></i>
-          刷新
+          <span data-i18n="report.refresh">刷新</span>
         </button>
         <button id="export-btn" class="h-9 px-4 rounded-md border border-slate-300 hover:bg-slate-50 text-sm font-medium flex items-center gap-2 transition-colors">
           <i data-lucide="download" class="w-4 h-4"></i>
-          导出 CSV
+          <span data-i18n="report.export_csv">导出 CSV</span>
         </button>
       </div>
     </div>
@@ -195,9 +199,9 @@
         <div class="flex items-center gap-2">
           <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-medium">
             <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-            实时
+            <span data-i18n="report.realtime">实时</span>
           </span>
-          <h3 class="text-sm font-semibold text-slate-700">今日快照</h3>
+          <h3 class="text-sm font-semibold text-slate-700" data-i18n="report.today_snapshot">今日快照</h3>
           <span class="text-xs text-slate-400" id="today-label">—</span>
         </div>
         <div id="online-now" class="text-xs text-slate-500"></div>
@@ -207,8 +211,8 @@
 
     <!-- 累计统计（含周环比） -->
     <div class="mb-3 flex items-center gap-2">
-      <h3 class="text-sm font-semibold text-slate-700">区间汇总</h3>
-      <span class="text-xs text-slate-400">含周环比</span>
+      <h3 class="text-sm font-semibold text-slate-700" data-i18n="report.range_summary">区间汇总</h3>
+      <span class="text-xs text-slate-400" data-i18n="report.range_with_wow">含周环比</span>
     </div>
     <div id="stats-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6"></div>
 
@@ -218,9 +222,9 @@
           <div>
             <h2 class="text-sm font-semibold flex items-center gap-2">
               <i data-lucide="users" class="w-4 h-4 text-slate-500"></i>
-              播放员列表
+              <span data-i18n="op.list_title">播放员列表</span>
             </h2>
-            <p class="text-xs text-slate-500 mt-0.5">点击任意一行查看详细工时与设备指纹</p>
+            <p class="text-xs text-slate-500 mt-0.5" data-i18n="op.list_hint">点击任意一行查看详细工时与设备指纹</p>
           </div>
           <div class="text-xs text-slate-500" id="list-count">—</div>
         </div>
@@ -228,14 +232,14 @@
           <table class="w-full text-sm">
             <thead>
               <tr class="text-xs uppercase tracking-wider text-slate-500 border-b border-slate-200 bg-slate-50/50">
-                <th class="text-left font-medium px-6 py-3">播放员</th>
-                <th class="text-right font-medium px-6 py-3">总工时</th>
-                <th class="text-right font-medium px-6 py-3">活跃天数</th>
-                <th class="text-right font-medium px-6 py-3">会话数</th>
-                <th class="text-right font-medium px-6 py-3">访问站点</th>
-                <th class="text-right font-medium px-6 py-3">设备数</th>
-                <th class="text-left font-medium px-6 py-3">主用设备</th>
-                <th class="text-left font-medium px-6 py-3">最后活动</th>
+                <th class="text-left font-medium px-6 py-3" data-i18n="op.col_operator">播放员</th>
+                <th class="text-right font-medium px-6 py-3" data-i18n="op.col_total_hours">总工时</th>
+                <th class="text-right font-medium px-6 py-3" data-i18n="op.col_active_days">活跃天数</th>
+                <th class="text-right font-medium px-6 py-3" data-i18n="op.col_sessions">会话数</th>
+                <th class="text-right font-medium px-6 py-3" data-i18n="op.col_sites_visited">访问站点</th>
+                <th class="text-right font-medium px-6 py-3" data-i18n="op.col_devices">设备数</th>
+                <th class="text-left font-medium px-6 py-3" data-i18n="op.col_primary_device">主用设备</th>
+                <th class="text-left font-medium px-6 py-3" data-i18n="op.col_last_seen">最后活动</th>
                 <th class="px-2 py-3"></th>
               </tr>
             </thead>
@@ -249,7 +253,7 @@
       <div class="flex items-center justify-between">
         <button id="back-btn" class="text-sm text-slate-600 hover:text-slate-900 flex items-center gap-1.5 -ml-1">
           <i data-lucide="arrow-left" class="w-4 h-4"></i>
-          返回列表
+          <span data-i18n="op.back_to_list">返回列表</span>
         </button>
         <div id="detail-uid-badge" class="text-sm font-medium px-3 py-1.5 rounded-md bg-brand-50 text-brand-700 border border-brand-100"></div>
       </div>
@@ -260,17 +264,17 @@
         <div class="lg:col-span-2 bg-white rounded-xl shadow-card border border-slate-200 p-6">
           <h3 class="text-sm font-semibold mb-1 flex items-center gap-2">
             <i data-lucide="line-chart" class="w-4 h-4 text-slate-500"></i>
-            每日工时分布
+            <span data-i18n="detail.daily_chart_title">每日工时分布</span>
           </h3>
-          <p class="text-xs text-slate-500 mb-4">单位：小时（Asia/Shanghai 时区）</p>
+          <p class="text-xs text-slate-500 mb-4" data-i18n="detail.daily_chart_subtitle">单位：小时（Asia/Shanghai 时区）</p>
           <div class="h-72"><canvas id="daily-chart"></canvas></div>
         </div>
         <div class="bg-white rounded-xl shadow-card border border-slate-200 p-6">
           <h3 class="text-sm font-semibold mb-1 flex items-center gap-2">
             <i data-lucide="pie-chart" class="w-4 h-4 text-slate-500"></i>
-            站点工时分配
+            <span data-i18n="detail.url_chart_title">站点工时分配</span>
           </h3>
-          <p class="text-xs text-slate-500 mb-4">按域名聚合</p>
+          <p class="text-xs text-slate-500 mb-4" data-i18n="detail.url_chart_subtitle">按域名聚合</p>
           <div class="h-72"><canvas id="url-chart"></canvas></div>
         </div>
       </div>
@@ -278,9 +282,9 @@
       <div class="bg-white rounded-xl shadow-card border border-slate-200 p-6">
         <h3 class="text-sm font-semibold mb-1 flex items-center gap-2">
           <i data-lucide="grid-3x3" class="w-4 h-4 text-slate-500"></i>
-          作息热力图
+          <span data-i18n="detail.heatmap_title">作息热力图</span>
         </h3>
-        <p class="text-xs text-slate-500 mb-4">星期 × 小时 工时分布；颜色越深代表当时段工作越多</p>
+        <p class="text-xs text-slate-500 mb-4" data-i18n="detail.heatmap_subtitle">星期 × 小时 工时分布；颜色越深代表当时段工作越多</p>
         <div id="heatmap-container" class="overflow-x-auto"></div>
       </div>
 
@@ -288,18 +292,18 @@
         <div class="px-6 py-4 border-b border-slate-200">
           <h3 class="text-sm font-semibold flex items-center gap-2">
             <i data-lucide="globe" class="w-4 h-4 text-slate-500"></i>
-            站点详情
+            <span data-i18n="detail.url_table_title">站点详情</span>
           </h3>
         </div>
         <div class="overflow-x-auto scrollbar-thin">
           <table class="w-full text-sm">
             <thead>
               <tr class="text-xs uppercase tracking-wider text-slate-500 border-b border-slate-200 bg-slate-50/50">
-                <th class="text-left font-medium px-6 py-3">URL</th>
-                <th class="text-right font-medium px-6 py-3">工时</th>
-                <th class="text-right font-medium px-6 py-3">访问次数</th>
-                <th class="text-right font-medium px-6 py-3">会话数</th>
-                <th class="text-left font-medium px-6 py-3">最后访问</th>
+                <th class="text-left font-medium px-6 py-3" data-i18n="detail.url_col_url">URL</th>
+                <th class="text-right font-medium px-6 py-3" data-i18n="detail.url_col_dwell">工时</th>
+                <th class="text-right font-medium px-6 py-3" data-i18n="detail.url_col_visits">访问次数</th>
+                <th class="text-right font-medium px-6 py-3" data-i18n="detail.url_col_sessions">会话数</th>
+                <th class="text-left font-medium px-6 py-3" data-i18n="detail.url_col_last_visit">最后访问</th>
               </tr>
             </thead>
             <tbody id="url-tbody" class="divide-y divide-slate-100"></tbody>
@@ -312,9 +316,9 @@
           <div>
             <h3 class="text-sm font-semibold flex items-center gap-2">
               <i data-lucide="list" class="w-4 h-4 text-slate-500"></i>
-              会话记录
+              <span data-i18n="detail.session_table_title">会话记录</span>
             </h3>
-            <p class="text-xs text-slate-500 mt-0.5">每次打开 scheduler 即一个会话；含设备指纹</p>
+            <p class="text-xs text-slate-500 mt-0.5" data-i18n="detail.session_table_hint">每次打开 scheduler 即一个会话；含设备指纹</p>
           </div>
           <div class="text-xs text-slate-500" id="session-count">—</div>
         </div>
@@ -322,15 +326,15 @@
           <table class="w-full text-sm">
             <thead>
               <tr class="text-xs uppercase tracking-wider text-slate-500 border-b border-slate-200 bg-slate-50/50">
-                <th class="text-left font-medium px-6 py-3">开始时间 / 会话 ID</th>
-                <th class="text-right font-medium px-6 py-3">工时</th>
-                <th class="text-right font-medium px-6 py-3">访问页面</th>
-                <th class="text-right font-medium px-6 py-3">站点数</th>
-                <th class="text-left font-medium px-6 py-3">设备 / 浏览器</th>
-                <th class="text-left font-medium px-6 py-3">分辨率</th>
-                <th class="text-left font-medium px-6 py-3">IP</th>
-                <th class="text-left font-medium px-6 py-3">时区</th>
-                <th class="text-left font-medium px-6 py-3">完整结束</th>
+                <th class="text-left font-medium px-6 py-3" data-i18n="detail.session_col_started">开始时间 / 会话 ID</th>
+                <th class="text-right font-medium px-6 py-3" data-i18n="detail.session_col_dwell">工时</th>
+                <th class="text-right font-medium px-6 py-3" data-i18n="detail.session_col_pages">访问页面</th>
+                <th class="text-right font-medium px-6 py-3" data-i18n="detail.session_col_sites">站点数</th>
+                <th class="text-left font-medium px-6 py-3" data-i18n="detail.session_col_device">设备 / 浏览器</th>
+                <th class="text-left font-medium px-6 py-3" data-i18n="detail.session_col_resolution">分辨率</th>
+                <th class="text-left font-medium px-6 py-3" data-i18n="detail.session_col_ip">IP</th>
+                <th class="text-left font-medium px-6 py-3" data-i18n="detail.session_col_tz">时区</th>
+                <th class="text-left font-medium px-6 py-3" data-i18n="detail.session_col_clean">完整结束</th>
               </tr>
             </thead>
             <tbody id="session-tbody" class="divide-y divide-slate-100"></tbody>
@@ -343,8 +347,8 @@
       <div class="w-12 h-12 mx-auto rounded-full bg-slate-100 grid place-items-center mb-3">
         <i data-lucide="inbox" class="w-6 h-6 text-slate-400"></i>
       </div>
-      <h3 class="text-sm font-semibold text-slate-900">所选时段无数据</h3>
-      <p class="text-xs text-slate-500 mt-1">尝试扩大日期范围，或检查播放员是否开始工作。</p>
+      <h3 class="text-sm font-semibold text-slate-900" data-i18n="empty.no_range_data">所选时段无数据</h3>
+      <p class="text-xs text-slate-500 mt-1" data-i18n="empty.no_range_data_hint">尝试扩大日期范围，或检查播放员是否开始工作。</p>
     </div>
 
   </div>
@@ -354,8 +358,8 @@
 
     <div class="flex items-center justify-between mb-6">
       <div>
-        <h2 class="text-lg font-semibold tracking-tight">站点维度报表</h2>
-        <p class="text-xs text-slate-500 mt-0.5">从客户网站角度看曝光、播放员分布、设备情况</p>
+        <h2 class="text-lg font-semibold tracking-tight" data-i18n="site_report.title">站点维度报表</h2>
+        <p class="text-xs text-slate-500 mt-0.5" data-i18n="site_report.subtitle">从客户网站角度看曝光、播放员分布、设备情况</p>
       </div>
       <div class="flex items-center gap-3">
         <div class="flex items-center gap-2 text-sm">
@@ -366,7 +370,7 @@
         </div>
         <button id="site-refresh-btn" class="h-9 px-4 rounded-md bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium flex items-center gap-2">
           <i data-lucide="refresh-cw" class="w-4 h-4"></i>
-          刷新
+          <span data-i18n="report.refresh">刷新</span>
         </button>
       </div>
     </div>
@@ -379,9 +383,9 @@
           <div>
             <h2 class="text-sm font-semibold flex items-center gap-2">
               <i data-lucide="globe" class="w-4 h-4 text-slate-500"></i>
-              网站列表
+              <span data-i18n="site_report.list_title">网站列表</span>
             </h2>
-            <p class="text-xs text-slate-500 mt-0.5">点击查看播放员明细</p>
+            <p class="text-xs text-slate-500 mt-0.5" data-i18n="site_report.list_hint">点击查看播放员明细</p>
           </div>
           <div class="text-xs text-slate-500" id="site-list-count">—</div>
         </div>
@@ -389,14 +393,14 @@
           <table class="w-full text-sm">
             <thead>
               <tr class="text-xs uppercase tracking-wider text-slate-500 border-b border-slate-200 bg-slate-50/50">
-                <th class="text-left font-medium px-6 py-3">网站</th>
-                <th class="text-right font-medium px-6 py-3">总工时</th>
-                <th class="text-right font-medium px-6 py-3">访问次数</th>
-                <th class="text-right font-medium px-6 py-3">会话数</th>
-                <th class="text-right font-medium px-6 py-3">播放员</th>
-                <th class="text-right font-medium px-6 py-3">设备数</th>
-                <th class="text-left font-medium px-6 py-3">主用设备</th>
-                <th class="text-left font-medium px-6 py-3">最后访问</th>
+                <th class="text-left font-medium px-6 py-3" data-i18n="site_report.col_name">网站</th>
+                <th class="text-right font-medium px-6 py-3" data-i18n="site_report.col_hours">总工时</th>
+                <th class="text-right font-medium px-6 py-3" data-i18n="site_report.col_visits">访问次数</th>
+                <th class="text-right font-medium px-6 py-3" data-i18n="site_report.col_sessions">会话数</th>
+                <th class="text-right font-medium px-6 py-3" data-i18n="site_report.col_operators">播放员</th>
+                <th class="text-right font-medium px-6 py-3" data-i18n="site_report.col_devices">设备数</th>
+                <th class="text-left font-medium px-6 py-3" data-i18n="site_report.col_primary_device">主用设备</th>
+                <th class="text-left font-medium px-6 py-3" data-i18n="site_report.col_last_visit">最后访问</th>
                 <th class="px-2 py-3"></th>
               </tr>
             </thead>
@@ -410,7 +414,7 @@
       <div class="flex items-center justify-between">
         <button id="site-back-btn" class="text-sm text-slate-600 hover:text-slate-900 flex items-center gap-1.5 -ml-1">
           <i data-lucide="arrow-left" class="w-4 h-4"></i>
-          返回列表
+          <span data-i18n="op.back_to_list">返回列表</span>
         </button>
         <div id="site-detail-url-badge" class="text-sm font-medium px-3 py-1.5 rounded-md bg-brand-50 text-brand-700 border border-brand-100"></div>
       </div>
@@ -420,9 +424,9 @@
       <div class="bg-white rounded-xl shadow-card border border-slate-200 p-6">
         <h3 class="text-sm font-semibold mb-1 flex items-center gap-2">
           <i data-lucide="line-chart" class="w-4 h-4 text-slate-500"></i>
-          每日工时
+          <span data-i18n="site_report.daily_title">每日工时</span>
         </h3>
-        <p class="text-xs text-slate-500 mb-4">该站点每日累计工作时长</p>
+        <p class="text-xs text-slate-500 mb-4" data-i18n="site_report.daily_subtitle">该站点每日累计工作时长</p>
         <div class="h-72"><canvas id="site-daily-chart"></canvas></div>
       </div>
 
@@ -430,18 +434,18 @@
         <div class="px-6 py-4 border-b border-slate-200">
           <h3 class="text-sm font-semibold flex items-center gap-2">
             <i data-lucide="users" class="w-4 h-4 text-slate-500"></i>
-            播放员明细
+            <span data-i18n="site_report.operator_table_title">播放员明细</span>
           </h3>
-          <p class="text-xs text-slate-500 mt-0.5">谁在此站工作了多久</p>
+          <p class="text-xs text-slate-500 mt-0.5" data-i18n="site_report.operator_table_hint">谁在此站工作了多久</p>
         </div>
         <div class="overflow-x-auto scrollbar-thin">
           <table class="w-full text-sm">
             <thead>
               <tr class="text-xs uppercase tracking-wider text-slate-500 border-b border-slate-200 bg-slate-50/50">
-                <th class="text-left font-medium px-6 py-3">播放员</th>
-                <th class="text-right font-medium px-6 py-3">工时</th>
-                <th class="text-right font-medium px-6 py-3">会话数</th>
-                <th class="text-left font-medium px-6 py-3">最后活动</th>
+                <th class="text-left font-medium px-6 py-3" data-i18n="site_report.operator_col">播放员</th>
+                <th class="text-right font-medium px-6 py-3" data-i18n="site_report.operator_dwell">工时</th>
+                <th class="text-right font-medium px-6 py-3" data-i18n="site_report.operator_sessions">会话数</th>
+                <th class="text-left font-medium px-6 py-3" data-i18n="site_report.operator_last">最后活动</th>
               </tr>
             </thead>
             <tbody id="site-operator-tbody" class="divide-y divide-slate-100"></tbody>
@@ -454,7 +458,7 @@
       <div class="w-12 h-12 mx-auto rounded-full bg-slate-100 grid place-items-center mb-3">
         <i data-lucide="inbox" class="w-6 h-6 text-slate-400"></i>
       </div>
-      <h3 class="text-sm font-semibold text-slate-900">所选时段无数据</h3>
+      <h3 class="text-sm font-semibold text-slate-900" data-i18n="empty.no_range_data">所选时段无数据</h3>
     </div>
 
   </div>
@@ -464,12 +468,12 @@
 
     <div class="flex items-center justify-between mb-6">
       <div>
-        <h2 class="text-lg font-semibold tracking-tight">播放员管理</h2>
-        <p class="text-xs text-slate-500 mt-0.5">添加播放员、生成专属链接、复制后发给员工使用</p>
+        <h2 class="text-lg font-semibold tracking-tight" data-i18n="operators.title">播放员管理</h2>
+        <p class="text-xs text-slate-500 mt-0.5" data-i18n="operators.subtitle">添加播放员、生成专属链接、复制后发给员工使用</p>
       </div>
       <button id="add-operator-btn" class="h-9 px-4 rounded-md bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium flex items-center gap-2 transition-colors">
         <i data-lucide="user-plus" class="w-4 h-4"></i>
-        新增播放员
+        <span data-i18n="operators.add">新增播放员</span>
       </button>
     </div>
 
@@ -481,21 +485,27 @@
             <i data-lucide="calculator" class="w-5 h-5"></i>
           </div>
           <div>
-            <h3 class="text-sm font-semibold text-slate-900">薪资计算</h3>
-            <p class="text-xs text-slate-500">输入时薪自动算工资</p>
+            <h3 class="text-sm font-semibold text-slate-900" data-i18n="operators.payroll_title">薪资计算</h3>
+            <p class="text-xs text-slate-500" data-i18n="operators.payroll_subtitle">输入时薪自动算工资</p>
           </div>
         </div>
-        <div class="flex items-center gap-2 ml-auto">
-          <label class="text-xs font-medium text-slate-700">时薪</label>
+        <div class="flex items-center gap-2 ml-auto flex-wrap">
+          <label class="text-xs font-medium text-slate-700" data-i18n="operators.payroll_currency_label">货币</label>
+          <select id="payroll-currency" class="h-9 px-3 rounded-md border border-slate-300 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+            <option value="CNY">人民币 (¥)</option>
+            <option value="USD">美元 ($)</option>
+            <option value="TWD">新台币 (NT$)</option>
+          </select>
+          <label class="text-xs font-medium text-slate-700 ml-2" data-i18n="operators.payroll_rate_label">时薪</label>
           <div class="relative">
-            <span class="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-400">¥</span>
-            <input id="payroll-rate" type="number" min="0" step="0.5" value="50" class="h-9 pl-7 pr-3 w-28 rounded-md border border-slate-300 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 tabular-nums">
+            <span id="payroll-rate-symbol" class="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-400">¥</span>
+            <input id="payroll-rate" type="number" min="0" step="0.5" value="50" class="h-9 pl-9 pr-3 w-28 rounded-md border border-slate-300 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 tabular-nums">
           </div>
-          <span class="text-xs text-slate-500">/ 小时</span>
+          <span class="text-xs text-slate-500" data-i18n="operators.payroll_per_hour">/ 小时</span>
         </div>
         <div class="text-right">
-          <div class="text-xs text-slate-500">应付总工资</div>
-          <div class="text-2xl font-bold tracking-tight text-brand-700 tabular-nums">¥<span id="payroll-total">0</span></div>
+          <div class="text-xs text-slate-500" data-i18n="operators.payroll_total">应付总工资</div>
+          <div class="text-2xl font-bold tracking-tight text-brand-700 tabular-nums"><span id="payroll-total">¥0.00</span></div>
         </div>
       </div>
     </div>
@@ -505,14 +515,14 @@
         <table class="w-full text-sm">
           <thead>
             <tr class="text-xs uppercase tracking-wider text-slate-500 border-b border-slate-200 bg-slate-50/50">
-              <th class="text-left font-medium px-6 py-3">播放员</th>
-              <th class="text-left font-medium px-6 py-3">手机/备注</th>
-              <th class="text-right font-medium px-6 py-3">累计工时</th>
-              <th class="text-right font-medium px-6 py-3">应付工资</th>
-              <th class="text-right font-medium px-6 py-3">会话数</th>
-              <th class="text-left font-medium px-6 py-3">最后活动</th>
-              <th class="text-left font-medium px-6 py-3">专属链接</th>
-              <th class="text-right font-medium px-6 py-3 w-24">操作</th>
+              <th class="text-left font-medium px-6 py-3" data-i18n="operators.col_player">播放员</th>
+              <th class="text-left font-medium px-6 py-3" data-i18n="operators.col_phone">手机/备注</th>
+              <th class="text-right font-medium px-6 py-3" data-i18n="operators.col_dwell">累计工时</th>
+              <th class="text-right font-medium px-6 py-3" data-i18n="operators.col_wage">应付工资</th>
+              <th class="text-right font-medium px-6 py-3" data-i18n="operators.col_sessions">会话数</th>
+              <th class="text-left font-medium px-6 py-3" data-i18n="operators.col_last_seen">最后活动</th>
+              <th class="text-left font-medium px-6 py-3" data-i18n="operators.col_link">专属链接</th>
+              <th class="text-right font-medium px-6 py-3 w-24" data-i18n="operators.col_actions">操作</th>
             </tr>
           </thead>
           <tbody id="operators-tbody" class="divide-y divide-slate-100"></tbody>
@@ -527,12 +537,12 @@
 
     <div class="flex items-center justify-between mb-6">
       <div>
-        <h2 class="text-lg font-semibold tracking-tight">网站管理</h2>
-        <p class="text-xs text-slate-500 mt-0.5">添加客户网站、配置自动轮播。新增站点立即生效</p>
+        <h2 class="text-lg font-semibold tracking-tight" data-i18n="sites.title">网站管理</h2>
+        <p class="text-xs text-slate-500 mt-0.5" data-i18n="sites.subtitle">添加客户网站、配置自动轮播。新增站点立即生效</p>
       </div>
       <button id="add-site-btn" class="h-9 px-4 rounded-md bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium flex items-center gap-2 transition-colors">
         <i data-lucide="plus" class="w-4 h-4"></i>
-        新增网站
+        <span data-i18n="sites.add">新增网站</span>
       </button>
     </div>
 
@@ -541,11 +551,11 @@
         <table class="w-full text-sm">
           <thead>
             <tr class="text-xs uppercase tracking-wider text-slate-500 border-b border-slate-200 bg-slate-50/50">
-              <th class="text-left font-medium px-6 py-3">名称</th>
-              <th class="text-left font-medium px-6 py-3">URL</th>
-              <th class="text-left font-medium px-6 py-3">备注</th>
-              <th class="text-left font-medium px-6 py-3">添加时间</th>
-              <th class="text-right font-medium px-6 py-3 w-24">操作</th>
+              <th class="text-left font-medium px-6 py-3" data-i18n="sites.col_name">名称</th>
+              <th class="text-left font-medium px-6 py-3" data-i18n="sites.col_url">URL</th>
+              <th class="text-left font-medium px-6 py-3" data-i18n="sites.col_note">备注</th>
+              <th class="text-left font-medium px-6 py-3" data-i18n="sites.col_added_at">添加时间</th>
+              <th class="text-right font-medium px-6 py-3 w-24" data-i18n="sites.col_actions">操作</th>
             </tr>
           </thead>
           <tbody id="sites-tbody" class="divide-y divide-slate-100"></tbody>
@@ -557,11 +567,11 @@
       <div class="flex gap-3">
         <i data-lucide="info" class="w-5 h-5 text-amber-700 flex-shrink-0 mt-0.5"></i>
         <div class="text-sm text-amber-900 space-y-2">
-          <p class="font-semibold">添加新网站后还需要做一件事</p>
-          <p>在新网站的 HTML 末尾插入这段脚本（贴在 <code class="bg-amber-100 px-1 rounded">&lt;/body&gt;</code> 之前）：</p>
+          <p class="font-semibold" data-i18n="sites.embed_title">添加新网站后还需要做一件事</p>
+          <p data-i18n-html="sites.embed_hint_html">在新网站的 HTML 末尾插入这段脚本（贴在 <code class="bg-amber-100 px-1 rounded">&lt;/body&gt;</code> 之前）：</p>
           <div class="bg-white border border-amber-300 rounded-md p-3 mt-2 flex items-center gap-2">
             <code id="snippet-code" class="text-xs font-mono text-slate-700 flex-1">&lt;script src="https://li2335100593-ui.github.io/3-02/carousel.js"&gt;&lt;/script&gt;</code>
-            <button id="snippet-copy-btn" class="text-xs px-2 py-1 rounded bg-amber-100 hover:bg-amber-200 text-amber-900 font-medium">复制</button>
+            <button id="snippet-copy-btn" class="text-xs px-2 py-1 rounded bg-amber-100 hover:bg-amber-200 text-amber-900 font-medium" data-i18n="sites.snippet_copy">复制</button>
           </div>
         </div>
       </div>
@@ -574,12 +584,12 @@
 
     <div class="flex items-center justify-between mb-6">
       <div>
-        <h2 class="text-lg font-semibold tracking-tight">账号管理</h2>
-        <p class="text-xs text-slate-500 mt-0.5">超级管理员专属。系统不开放注册，仅由你添加 / 删除账号</p>
+        <h2 class="text-lg font-semibold tracking-tight" data-i18n="accounts.title">账号管理</h2>
+        <p class="text-xs text-slate-500 mt-0.5" data-i18n="accounts.subtitle">超级管理员专属。系统不开放注册，仅由你添加 / 删除账号</p>
       </div>
       <button id="add-account-btn" class="h-9 px-4 rounded-md bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium flex items-center gap-2 transition-colors">
         <i data-lucide="user-plus" class="w-4 h-4"></i>
-        新增账号
+        <span data-i18n="accounts.add">新增账号</span>
       </button>
     </div>
 
@@ -588,13 +598,13 @@
         <table class="w-full text-sm">
           <thead>
             <tr class="text-xs uppercase tracking-wider text-slate-500 border-b border-slate-200 bg-slate-50/50">
-              <th class="text-left font-medium px-6 py-3">账号</th>
-              <th class="text-left font-medium px-6 py-3">邮箱</th>
-              <th class="text-left font-medium px-6 py-3">角色</th>
-              <th class="text-left font-medium px-6 py-3">状态</th>
-              <th class="text-left font-medium px-6 py-3">最后登录</th>
-              <th class="text-left font-medium px-6 py-3">创建时间</th>
-              <th class="text-right font-medium px-6 py-3">操作</th>
+              <th class="text-left font-medium px-6 py-3" data-i18n="accounts.col_account">账号</th>
+              <th class="text-left font-medium px-6 py-3" data-i18n="accounts.col_email">邮箱</th>
+              <th class="text-left font-medium px-6 py-3" data-i18n="accounts.col_role">角色</th>
+              <th class="text-left font-medium px-6 py-3" data-i18n="accounts.col_status">状态</th>
+              <th class="text-left font-medium px-6 py-3" data-i18n="accounts.col_last_login">最后登录</th>
+              <th class="text-left font-medium px-6 py-3" data-i18n="accounts.col_created">创建时间</th>
+              <th class="text-right font-medium px-6 py-3" data-i18n="accounts.col_actions">操作</th>
             </tr>
           </thead>
           <tbody id="accounts-tbody" class="divide-y divide-slate-100"></tbody>
@@ -606,7 +616,7 @@
   <div id="error-state" class="hidden mt-6 bg-rose-50 border border-rose-200 rounded-xl p-4 flex items-start gap-3">
     <i data-lucide="alert-circle" class="w-5 h-5 text-rose-600 flex-shrink-0 mt-0.5"></i>
     <div>
-      <h3 class="text-sm font-semibold text-rose-900">加载失败</h3>
+      <h3 class="text-sm font-semibold text-rose-900" data-i18n="error.load_failed">加载失败</h3>
       <p class="text-xs text-rose-700 mt-1" id="error-message"></p>
     </div>
   </div>
@@ -619,34 +629,34 @@
     <div class="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
       <h3 class="text-base font-semibold flex items-center gap-2">
         <i data-lucide="user-plus" class="w-4 h-4 text-brand-600"></i>
-        新增播放员
+        <span data-i18n="op_modal.title">新增播放员</span>
       </h3>
       <button class="modal-close text-slate-400 hover:text-slate-700"><i data-lucide="x" class="w-5 h-5"></i></button>
     </div>
     <div class="px-6 py-5 space-y-4">
       <div>
-        <label class="block text-xs font-medium text-slate-700 mb-1.5">播放员 ID <span class="text-rose-500">*</span></label>
-        <input id="op-code" type="text" class="w-full h-9 px-3 rounded-md border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" placeholder="例如 staff001">
-        <p class="text-xs text-slate-500 mt-1">只能含字母、数字、下划线、横线。每人独立，用于区分工时</p>
+        <label class="block text-xs font-medium text-slate-700 mb-1.5"><span data-i18n="op_modal.id_label">播放员 ID</span> <span class="text-rose-500">*</span></label>
+        <input id="op-code" type="text" class="w-full h-9 px-3 rounded-md border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" data-i18n-placeholder="op_modal.id_placeholder" placeholder="例如 staff001">
+        <p class="text-xs text-slate-500 mt-1" data-i18n="op_modal.id_hint">只能含字母、数字、下划线、横线。每人独立，用于区分工时</p>
       </div>
       <div>
-        <label class="block text-xs font-medium text-slate-700 mb-1.5">姓名</label>
-        <input id="op-name" type="text" class="w-full h-9 px-3 rounded-md border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" placeholder="王小明">
+        <label class="block text-xs font-medium text-slate-700 mb-1.5" data-i18n="op_modal.name_label">姓名</label>
+        <input id="op-name" type="text" class="w-full h-9 px-3 rounded-md border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" data-i18n-placeholder="op_modal.placeholder_name" placeholder="王小明">
       </div>
       <div>
-        <label class="block text-xs font-medium text-slate-700 mb-1.5">手机</label>
-        <input id="op-phone" type="text" class="w-full h-9 px-3 rounded-md border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" placeholder="可选">
+        <label class="block text-xs font-medium text-slate-700 mb-1.5" data-i18n="op_modal.phone_label">手机</label>
+        <input id="op-phone" type="text" class="w-full h-9 px-3 rounded-md border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" data-i18n-placeholder="op_modal.optional" placeholder="可选">
       </div>
       <div>
-        <label class="block text-xs font-medium text-slate-700 mb-1.5">备注</label>
-        <input id="op-note" type="text" class="w-full h-9 px-3 rounded-md border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" placeholder="可选">
+        <label class="block text-xs font-medium text-slate-700 mb-1.5" data-i18n="op_modal.note_label">备注</label>
+        <input id="op-note" type="text" class="w-full h-9 px-3 rounded-md border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" data-i18n-placeholder="op_modal.optional" placeholder="可选">
       </div>
     </div>
     <div class="px-6 py-4 bg-slate-50 border-t border-slate-200 flex items-center justify-end gap-2">
-      <button class="modal-close h-9 px-4 rounded-md border border-slate-300 hover:bg-white text-sm font-medium">取消</button>
+      <button class="modal-close h-9 px-4 rounded-md border border-slate-300 hover:bg-white text-sm font-medium" data-i18n="common.cancel">取消</button>
       <button id="op-submit" class="h-9 px-4 rounded-md bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium flex items-center gap-2">
         <i data-lucide="check" class="w-4 h-4"></i>
-        创建
+        <span data-i18n="common.create">创建</span>
       </button>
     </div>
   </div>
@@ -658,30 +668,30 @@
     <div class="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
       <h3 class="text-base font-semibold flex items-center gap-2">
         <i data-lucide="plus" class="w-4 h-4 text-brand-600"></i>
-        新增网站
+        <span data-i18n="site_modal.title">新增网站</span>
       </h3>
       <button class="modal-close text-slate-400 hover:text-slate-700"><i data-lucide="x" class="w-5 h-5"></i></button>
     </div>
     <div class="px-6 py-5 space-y-4">
       <div>
-        <label class="block text-xs font-medium text-slate-700 mb-1.5">站点名称 <span class="text-rose-500">*</span></label>
-        <input id="site-name" type="text" class="w-full h-9 px-3 rounded-md border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" placeholder="例如 客厅设计网">
+        <label class="block text-xs font-medium text-slate-700 mb-1.5"><span data-i18n="site_modal.name_label">站点名称</span> <span class="text-rose-500">*</span></label>
+        <input id="site-name" type="text" class="w-full h-9 px-3 rounded-md border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" data-i18n-placeholder="site_modal.name_placeholder" placeholder="例如 客厅设计网">
       </div>
       <div>
-        <label class="block text-xs font-medium text-slate-700 mb-1.5">URL <span class="text-rose-500">*</span></label>
+        <label class="block text-xs font-medium text-slate-700 mb-1.5"><span data-i18n="site_modal.url_label">URL</span> <span class="text-rose-500">*</span></label>
         <input id="site-url" type="url" class="w-full h-9 px-3 rounded-md border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" placeholder="https://example.com/">
-        <p class="text-xs text-slate-500 mt-1">必须含 https:// 或 http://</p>
+        <p class="text-xs text-slate-500 mt-1" data-i18n="site_modal.url_hint">必须含 https:// 或 http://</p>
       </div>
       <div>
-        <label class="block text-xs font-medium text-slate-700 mb-1.5">备注</label>
-        <input id="site-note" type="text" class="w-full h-9 px-3 rounded-md border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" placeholder="可选">
+        <label class="block text-xs font-medium text-slate-700 mb-1.5" data-i18n="op_modal.note_label">备注</label>
+        <input id="site-note" type="text" class="w-full h-9 px-3 rounded-md border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" data-i18n-placeholder="op_modal.optional" placeholder="可选">
       </div>
     </div>
     <div class="px-6 py-4 bg-slate-50 border-t border-slate-200 flex items-center justify-end gap-2">
-      <button class="modal-close h-9 px-4 rounded-md border border-slate-300 hover:bg-white text-sm font-medium">取消</button>
+      <button class="modal-close h-9 px-4 rounded-md border border-slate-300 hover:bg-white text-sm font-medium" data-i18n="common.cancel">取消</button>
       <button id="site-submit" class="h-9 px-4 rounded-md bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium flex items-center gap-2">
         <i data-lucide="check" class="w-4 h-4"></i>
-        添加
+        <span data-i18n="common.add">添加</span>
       </button>
     </div>
   </div>
@@ -693,37 +703,37 @@
     <div class="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
       <h3 class="text-base font-semibold flex items-center gap-2">
         <i data-lucide="user-plus" class="w-4 h-4 text-brand-600"></i>
-        新增账号
+        <span data-i18n="acc_modal.title">新增账号</span>
       </h3>
       <button class="modal-close text-slate-400 hover:text-slate-700"><i data-lucide="x" class="w-5 h-5"></i></button>
     </div>
     <div class="px-6 py-5 space-y-4">
       <div>
-        <label class="block text-xs font-medium text-slate-700 mb-1.5">用户名 <span class="text-rose-500">*</span></label>
-        <input id="acc-username" type="text" class="w-full h-9 px-3 rounded-md border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" placeholder="3-64 位，字母数字 . _ - @">
+        <label class="block text-xs font-medium text-slate-700 mb-1.5"><span data-i18n="acc_modal.username_label">用户名</span> <span class="text-rose-500">*</span></label>
+        <input id="acc-username" type="text" class="w-full h-9 px-3 rounded-md border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" data-i18n-placeholder="acc_modal.username_placeholder" placeholder="3-64 位，字母数字 . _ - @">
       </div>
       <div>
-        <label class="block text-xs font-medium text-slate-700 mb-1.5">邮箱</label>
-        <input id="acc-email" type="email" class="w-full h-9 px-3 rounded-md border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" placeholder="可选">
+        <label class="block text-xs font-medium text-slate-700 mb-1.5" data-i18n="acc_modal.email_label">邮箱</label>
+        <input id="acc-email" type="email" class="w-full h-9 px-3 rounded-md border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" data-i18n-placeholder="op_modal.optional" placeholder="可选">
       </div>
       <div>
-        <label class="block text-xs font-medium text-slate-700 mb-1.5">密码 <span class="text-rose-500">*</span></label>
-        <input id="acc-password" type="password" class="w-full h-9 px-3 rounded-md border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" placeholder="至少 8 位">
+        <label class="block text-xs font-medium text-slate-700 mb-1.5"><span data-i18n="acc_modal.password_label">密码</span> <span class="text-rose-500">*</span></label>
+        <input id="acc-password" type="password" class="w-full h-9 px-3 rounded-md border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" data-i18n-placeholder="acc_modal.password_placeholder" placeholder="至少 8 位">
       </div>
       <div>
-        <label class="block text-xs font-medium text-slate-700 mb-1.5">角色 <span class="text-rose-500">*</span></label>
+        <label class="block text-xs font-medium text-slate-700 mb-1.5"><span data-i18n="acc_modal.role_label">角色</span> <span class="text-rose-500">*</span></label>
         <select id="acc-role" class="w-full h-9 px-3 rounded-md border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 bg-white">
-          <option value="admin">管理员（读写所有报表 / 网站 / 员工）</option>
-          <option value="readonly">只读（只能看报表）</option>
-          <option value="super_admin">超级管理员（可管账号）</option>
+          <option value="admin" data-i18n="accounts.role_full.admin">管理员（读写所有报表 / 网站 / 员工）</option>
+          <option value="readonly" data-i18n="accounts.role_full.readonly">只读（只能看报表）</option>
+          <option value="super_admin" data-i18n="accounts.role_full.super_admin">超级管理员（可管账号）</option>
         </select>
       </div>
     </div>
     <div class="px-6 py-4 bg-slate-50 border-t border-slate-200 flex items-center justify-end gap-2">
-      <button class="modal-close h-9 px-4 rounded-md border border-slate-300 hover:bg-white text-sm font-medium">取消</button>
+      <button class="modal-close h-9 px-4 rounded-md border border-slate-300 hover:bg-white text-sm font-medium" data-i18n="common.cancel">取消</button>
       <button id="acc-submit" class="h-9 px-4 rounded-md bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium flex items-center gap-2">
         <i data-lucide="check" class="w-4 h-4"></i>
-        创建
+        <span data-i18n="common.create">创建</span>
       </button>
     </div>
   </div>
@@ -735,29 +745,29 @@
     <div class="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
       <h3 class="text-base font-semibold flex items-center gap-2">
         <i data-lucide="key" class="w-4 h-4 text-brand-600"></i>
-        修改密码
+        <span data-i18n="pwd_modal.title">修改密码</span>
       </h3>
       <button class="modal-close text-slate-400 hover:text-slate-700"><i data-lucide="x" class="w-5 h-5"></i></button>
     </div>
     <div class="px-6 py-5 space-y-4">
       <div>
-        <label class="block text-xs font-medium text-slate-700 mb-1.5">当前密码 <span class="text-rose-500">*</span></label>
+        <label class="block text-xs font-medium text-slate-700 mb-1.5"><span data-i18n="pwd_modal.current_label">当前密码</span> <span class="text-rose-500">*</span></label>
         <input id="pwd-current" type="password" class="w-full h-9 px-3 rounded-md border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
       </div>
       <div>
-        <label class="block text-xs font-medium text-slate-700 mb-1.5">新密码 <span class="text-rose-500">*</span></label>
-        <input id="pwd-new" type="password" class="w-full h-9 px-3 rounded-md border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" placeholder="至少 8 位">
+        <label class="block text-xs font-medium text-slate-700 mb-1.5"><span data-i18n="pwd_modal.new_label">新密码</span> <span class="text-rose-500">*</span></label>
+        <input id="pwd-new" type="password" class="w-full h-9 px-3 rounded-md border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" data-i18n-placeholder="acc_modal.password_placeholder" placeholder="至少 8 位">
       </div>
       <div>
-        <label class="block text-xs font-medium text-slate-700 mb-1.5">确认新密码 <span class="text-rose-500">*</span></label>
+        <label class="block text-xs font-medium text-slate-700 mb-1.5"><span data-i18n="pwd_modal.confirm_label">确认新密码</span> <span class="text-rose-500">*</span></label>
         <input id="pwd-confirm" type="password" class="w-full h-9 px-3 rounded-md border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
       </div>
     </div>
     <div class="px-6 py-4 bg-slate-50 border-t border-slate-200 flex items-center justify-end gap-2">
-      <button class="modal-close h-9 px-4 rounded-md border border-slate-300 hover:bg-white text-sm font-medium">取消</button>
+      <button class="modal-close h-9 px-4 rounded-md border border-slate-300 hover:bg-white text-sm font-medium" data-i18n="common.cancel">取消</button>
       <button id="pwd-submit" class="h-9 px-4 rounded-md bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium flex items-center gap-2">
         <i data-lucide="check" class="w-4 h-4"></i>
-        确认修改
+        <span data-i18n="common.confirm_change">确认修改</span>
       </button>
     </div>
   </div>
@@ -785,13 +795,615 @@ const state = {
   currentTab: 'report',
   cachedOperators: [],
   payrollRate: 50,
+  payrollCurrency: 'CNY', // 'CNY' | 'USD' | 'TWD'
   siteFrom: null,
   siteTo: null,
   selectedSiteUrl: null,
   user: null, // { id, username, email, role }
   authMode: 'login', // 'login' | 'bootstrap'
   todayRefreshTimer: null,
+  lang: 'zh-CN', // 'zh-CN' | 'zh-TW'
 };
+
+const PREF_LANG_KEY = 'carousel_pref_lang';
+const PREF_CURRENCY_KEY = 'carousel_pref_currency';
+
+// ===== Currency =====
+const CURRENCY_SYMBOLS = { CNY: '¥', USD: '$', TWD: 'NT$' };
+const CURRENCY_LABELS = {
+  CNY: { 'zh-CN': '人民币 (¥)', 'zh-TW': '人民幣 (¥)' },
+  USD: { 'zh-CN': '美元 ($)',   'zh-TW': '美元 ($)' },
+  TWD: { 'zh-CN': '新台币 (NT$)', 'zh-TW': '新台幣 (NT$)' },
+};
+function currencySymbol() { return CURRENCY_SYMBOLS[state.payrollCurrency] || '¥'; }
+function fmtMoney(amount) {
+  const sym = currencySymbol();
+  const formatted = (Number(amount) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return `${sym}${formatted}`;
+}
+
+// ===== i18n =====
+const I18N = {
+  'zh-CN': {
+    'app.title': '运营后台',
+    'app.subtitle': 'Carousel Operations Console',
+    'tab.report': '工时报表',
+    'tab.site_report': '站点报表',
+    'tab.operators': '播放员',
+    'tab.sites': '网站',
+    'tab.accounts': '账户',
+    'menu.change_password': '修改密码',
+    'menu.logout': '退出登录',
+    // Login overlay
+    'login.title': '登录',
+    'login.subtitle': '请使用管理员账号登录',
+    'login.bootstrap_title': '创建超级管理员',
+    'login.bootstrap_subtitle': '系统首次启动，请创建你的超级管理员账号',
+    'login.username_label': '用户名 / 邮箱',
+    'login.username_placeholder': 'username 或 email',
+    'login.email_label': '邮箱（选填）',
+    'login.password_label': '密码',
+    'login.confirm_label': '确认密码',
+    'login.submit_login': '登录',
+    'login.submit_bootstrap': '创建',
+    'login.bootstrap_notice': '系统首次启动 — 即将创建超级管理员。该账号永久拥有添加 / 删除其他账号的权限。完成后此页面变为登录页。',
+    'login.copyright': '© 运营后台 · 仅授权管理员可用',
+    'login.invalid_credentials': '请输入用户名和密码',
+    'login.password_too_short': '密码至少 8 位',
+    'login.password_mismatch': '两次密码不一致',
+    'login.username_required': '请输入用户名',
+    // Report tab
+    'report.title': '工时审计',
+    'report.subtitle': '按播放员维度的精确工时记录',
+    'report.realtime': '实时',
+    'report.today_snapshot': '今日快照',
+    'report.range_summary': '区间汇总',
+    'report.range_with_wow': '含周环比',
+    'report.refresh': '刷新',
+    'report.export_csv': '导出 CSV',
+    'report.online_now': '人在线',
+    'report.no_one_online': '当前无人在线',
+    // Stat cards
+    'stat.total_hours': '总工时',
+    'stat.active_operators': '活跃播放员',
+    'stat.total_sessions': '总会话',
+    'stat.identified_devices': '已识别设备',
+    'stat.today_hours': '今日工时',
+    'stat.today_active': '今日活跃',
+    'stat.today_sessions': '今日会话',
+    'stat.top_operator': '工时之王',
+    'stat.no_data': '暂无数据',
+    'stat.active_days': '活跃天数',
+    'stat.primary_device': '主用设备',
+    'stat.devices_identified': '台已识别',
+    // Operator list
+    'op.list_title': '播放员列表',
+    'op.list_hint': '点击任意一行查看详细工时与设备指纹',
+    'op.list_count': '位播放员',
+    'op.col_operator': '播放员',
+    'op.col_total_hours': '总工时',
+    'op.col_active_days': '活跃天数',
+    'op.col_sessions': '会话数',
+    'op.col_sites_visited': '访问站点',
+    'op.col_devices': '设备数',
+    'op.col_primary_device': '主用设备',
+    'op.col_last_seen': '最后活动',
+    'op.online': '在线',
+    'op.first_seen': '首次',
+    'op.back_to_list': '返回列表',
+    // Operator detail
+    'detail.daily_chart_title': '每日工时分布',
+    'detail.daily_chart_subtitle': '单位：小时（Asia/Shanghai 时区）',
+    'detail.url_chart_title': '站点工时分配',
+    'detail.url_chart_subtitle': '按域名聚合',
+    'detail.heatmap_title': '作息热力图',
+    'detail.heatmap_subtitle': '星期 × 小时 工时分布；颜色越深代表当时段工作越多',
+    'detail.heatmap_low': '少',
+    'detail.heatmap_high': '多',
+    'detail.heatmap_peak': '峰值',
+    'detail.url_table_title': '站点详情',
+    'detail.url_col_url': 'URL',
+    'detail.url_col_dwell': '工时',
+    'detail.url_col_visits': '访问次数',
+    'detail.url_col_sessions': '会话数',
+    'detail.url_col_last_visit': '最后访问',
+    'detail.session_table_title': '会话记录',
+    'detail.session_table_hint': '每次打开 scheduler 即一个会话；含设备指纹',
+    'detail.session_count': '个会话',
+    'detail.session_col_started': '开始时间 / 会话 ID',
+    'detail.session_col_dwell': '工时',
+    'detail.session_col_pages': '访问页面',
+    'detail.session_col_sites': '站点数',
+    'detail.session_col_device': '设备 / 浏览器',
+    'detail.session_col_resolution': '分辨率',
+    'detail.session_col_ip': 'IP',
+    'detail.session_col_tz': '时区',
+    'detail.session_col_clean': '完整结束',
+    'detail.no_sessions': '暂无会话',
+    'detail.session_no_data': '该站点暂无播放员数据',
+    'detail.fingerprint.browser': '浏览器',
+    'detail.fingerprint.os': '操作系统',
+    'detail.fingerprint.tz': '时区',
+    'detail.fingerprint.raw_ua': '原始 User-Agent',
+    'detail.fingerprint.timeline': '页面访问时间线',
+    'detail.timeline.normal': '正常切页',
+    'detail.timeline.incomplete': '未发出 leave',
+    'detail.timeline.heartbeats': '心跳',
+    'detail.events_total': '共 {n} 个原始事件 · session id',
+    // Empty / error
+    'empty.no_range_data': '所选时段无数据',
+    'empty.no_range_data_hint': '尝试扩大日期范围，或检查播放员是否开始工作。',
+    'error.load_failed': '加载失败',
+    'error.invalid_date_range': '日期范围无效',
+    // Site report
+    'site_report.title': '站点维度报表',
+    'site_report.subtitle': '从客户网站角度看曝光、播放员分布、设备情况',
+    'site_report.list_title': '网站列表',
+    'site_report.list_hint': '点击查看播放员明细',
+    'site_report.list_count': '个网站',
+    'site_report.col_name': '网站',
+    'site_report.col_hours': '总工时',
+    'site_report.col_visits': '访问次数',
+    'site_report.col_sessions': '会话数',
+    'site_report.col_operators': '播放员',
+    'site_report.col_devices': '设备数',
+    'site_report.col_primary_device': '主用设备',
+    'site_report.col_last_visit': '最后访问',
+    'site_report.stat_sites': '网站数',
+    'site_report.stat_total_hours': '总工时',
+    'site_report.stat_total_sessions': '总会话',
+    'site_report.stat_operator_count': '播放员次',
+    'site_report.daily_title': '每日工时',
+    'site_report.daily_subtitle': '该站点每日累计工作时长',
+    'site_report.operator_table_title': '播放员明细',
+    'site_report.operator_table_hint': '谁在此站工作了多久',
+    'site_report.operator_col': '播放员',
+    'site_report.operator_dwell': '工时',
+    'site_report.operator_sessions': '会话数',
+    'site_report.operator_last': '最后活动',
+    // Operators tab
+    'operators.title': '播放员管理',
+    'operators.subtitle': '添加播放员、生成专属链接、复制后发给员工使用',
+    'operators.add': '新增播放员',
+    'operators.payroll_title': '薪资计算',
+    'operators.payroll_subtitle': '输入时薪自动算工资',
+    'operators.payroll_rate_label': '时薪',
+    'operators.payroll_currency_label': '货币',
+    'operators.payroll_per_hour': '/ 小时',
+    'operators.payroll_total': '应付总工资',
+    'operators.col_player': '播放员',
+    'operators.col_phone': '手机/备注',
+    'operators.col_dwell': '累计工时',
+    'operators.col_wage': '应付工资',
+    'operators.col_sessions': '会话数',
+    'operators.col_last_seen': '最后活动',
+    'operators.col_link': '专属链接',
+    'operators.col_actions': '操作',
+    'operators.copy_link': '复制链接',
+    'operators.deactivate_confirm': '确定停用 {code} ?',
+    'operators.deactivated_toast': '已停用',
+    'operators.created_toast': '播放员已添加',
+    'operators.empty_title': '还没有添加播放员',
+    'operators.empty_hint': '点击右上角"新增播放员"开始添加',
+    // Add operator modal
+    'op_modal.title': '新增播放员',
+    'op_modal.id_label': '播放员 ID',
+    'op_modal.id_placeholder': '例如 staff001',
+    'op_modal.id_hint': '只能含字母、数字、下划线、横线。每人独立，用于区分工时',
+    'op_modal.name_label': '姓名',
+    'op_modal.phone_label': '手机',
+    'op_modal.note_label': '备注',
+    'op_modal.optional': '可选',
+    'op_modal.placeholder_name': '王小明',
+    'op_modal.id_invalid': 'ID 只能含字母数字横线下划线',
+    // Sites tab
+    'sites.title': '网站管理',
+    'sites.subtitle': '添加客户网站、配置自动轮播。新增站点立即生效',
+    'sites.add': '新增网站',
+    'sites.col_name': '名称',
+    'sites.col_url': 'URL',
+    'sites.col_note': '备注',
+    'sites.col_added_at': '添加时间',
+    'sites.col_actions': '操作',
+    'sites.empty_title': '还没有添加网站',
+    'sites.empty_hint': '点击右上角"新增网站"开始添加客户网站',
+    'sites.created_toast': '网站已添加',
+    'sites.removed_toast': '已移除',
+    'sites.delete_confirm': '确定移除这个网站？',
+    'sites.embed_title': '添加新网站后还需要做一件事',
+    'sites.embed_hint_html': '在新网站的 HTML 末尾插入这段脚本（贴在 <code class="bg-amber-100 px-1 rounded">&lt;/body&gt;</code> 之前）：',
+    'sites.snippet_copy': '复制',
+    'sites.snippet_copied': '脚本已复制',
+    // Add site modal
+    'site_modal.title': '新增网站',
+    'site_modal.name_label': '站点名称',
+    'site_modal.name_placeholder': '例如 客厅设计网',
+    'site_modal.url_label': 'URL',
+    'site_modal.url_placeholder': 'https://example.com/',
+    'site_modal.url_hint': '必须含 https:// 或 http://',
+    'site_modal.name_required': '请填写站点名称',
+    'site_modal.url_required': '请填写 URL',
+    // Accounts tab
+    'accounts.title': '账号管理',
+    'accounts.subtitle': '超级管理员专属。系统不开放注册，仅由你添加 / 删除账号',
+    'accounts.add': '新增账号',
+    'accounts.col_account': '账号',
+    'accounts.col_email': '邮箱',
+    'accounts.col_role': '角色',
+    'accounts.col_status': '状态',
+    'accounts.col_last_login': '最后登录',
+    'accounts.col_created': '创建时间',
+    'accounts.col_actions': '操作',
+    'accounts.role.super_admin': '超级管理员',
+    'accounts.role.admin': '管理员',
+    'accounts.role.readonly': '只读',
+    'accounts.role_full.super_admin': '超级管理员（可管账号）',
+    'accounts.role_full.admin': '管理员（读写所有报表 / 网站 / 员工）',
+    'accounts.role_full.readonly': '只读（只能看报表）',
+    'accounts.status_active': '启用',
+    'accounts.status_inactive': '停用',
+    'accounts.never_logged_in': '从未登录',
+    'accounts.you': '（你）',
+    'accounts.deactivate_confirm': '停用账号 {username}？',
+    'accounts.empty': '暂无账号',
+    'accounts.created_toast': '账号已创建',
+    // Add account modal
+    'acc_modal.title': '新增账号',
+    'acc_modal.username_label': '用户名',
+    'acc_modal.username_placeholder': '3-64 位，字母数字 . _ - @',
+    'acc_modal.email_label': '邮箱',
+    'acc_modal.password_label': '密码',
+    'acc_modal.password_placeholder': '至少 8 位',
+    'acc_modal.role_label': '角色',
+    // Change password modal
+    'pwd_modal.title': '修改密码',
+    'pwd_modal.current_label': '当前密码',
+    'pwd_modal.new_label': '新密码',
+    'pwd_modal.confirm_label': '确认新密码',
+    'pwd_modal.changed_toast': '密码已修改',
+    // Common
+    'common.cancel': '取消',
+    'common.confirm': '确认',
+    'common.create': '创建',
+    'common.add': '添加',
+    'common.save': '保存',
+    'common.confirm_change': '确认修改',
+    'common.delete': '删除',
+    'common.required': '必填',
+    'common.optional': '可选',
+    'common.loading': '加载中...',
+    'common.no_data': '暂无数据',
+    'common.unknown': '未知',
+    'common.copied': '已复制',
+    'common.session_expired': '您的登录已过期，请重新登录',
+    'common.logged_out': '已退出',
+    // Time relative
+    'time.just_now': '刚刚',
+    'time.minutes_ago': '{n}分钟前',
+    'time.hours_ago': '{n}小时前',
+    'time.days_ago': '{n}天前',
+    'time.minutes': '{n}分',
+    'time.hours': '{n}小时',
+    'time.hours_minutes': '{h}小时{m}分',
+    // Devices
+    'device.mobile': '手机',
+    'device.tablet': '平板',
+    'device.desktop': '电脑',
+    'device.unknown': '未知',
+    // Trend badges
+    'trend.flat': '持平',
+    'trend.new': '新',
+    // Weekdays
+    'weekday.0': '日',
+    'weekday.1': '一',
+    'weekday.2': '二',
+    'weekday.3': '三',
+    'weekday.4': '四',
+    'weekday.5': '五',
+    'weekday.6': '六',
+    'weekday.prefix': '周',
+  },
+  'zh-TW': {
+    'app.title': '運營後台',
+    'app.subtitle': 'Carousel Operations Console',
+    'tab.report': '工時報表',
+    'tab.site_report': '站點報表',
+    'tab.operators': '播放員',
+    'tab.sites': '網站',
+    'tab.accounts': '帳戶',
+    'menu.change_password': '修改密碼',
+    'menu.logout': '登出',
+    'login.title': '登入',
+    'login.subtitle': '請使用管理員帳號登入',
+    'login.bootstrap_title': '建立超級管理員',
+    'login.bootstrap_subtitle': '系統首次啟動，請建立你的超級管理員帳號',
+    'login.username_label': '使用者名稱 / 信箱',
+    'login.username_placeholder': 'username 或 email',
+    'login.email_label': '信箱（選填）',
+    'login.password_label': '密碼',
+    'login.confirm_label': '確認密碼',
+    'login.submit_login': '登入',
+    'login.submit_bootstrap': '建立',
+    'login.bootstrap_notice': '系統首次啟動 — 即將建立超級管理員。該帳號永久擁有新增 / 刪除其他帳號的權限。完成後此頁面變為登入頁。',
+    'login.copyright': '© 運營後台 · 僅授權管理員可用',
+    'login.invalid_credentials': '請輸入使用者名稱和密碼',
+    'login.password_too_short': '密碼至少 8 位',
+    'login.password_mismatch': '兩次密碼不一致',
+    'login.username_required': '請輸入使用者名稱',
+    'report.title': '工時稽核',
+    'report.subtitle': '按播放員維度的精確工時紀錄',
+    'report.realtime': '即時',
+    'report.today_snapshot': '今日快照',
+    'report.range_summary': '區間彙總',
+    'report.range_with_wow': '含週環比',
+    'report.refresh': '重新整理',
+    'report.export_csv': '匯出 CSV',
+    'report.online_now': '人在線',
+    'report.no_one_online': '目前無人在線',
+    'stat.total_hours': '總工時',
+    'stat.active_operators': '活躍播放員',
+    'stat.total_sessions': '總會話',
+    'stat.identified_devices': '已辨識裝置',
+    'stat.today_hours': '今日工時',
+    'stat.today_active': '今日活躍',
+    'stat.today_sessions': '今日會話',
+    'stat.top_operator': '工時之王',
+    'stat.no_data': '暫無資料',
+    'stat.active_days': '活躍天數',
+    'stat.primary_device': '主用裝置',
+    'stat.devices_identified': '台已辨識',
+    'op.list_title': '播放員列表',
+    'op.list_hint': '點擊任意一列查看詳細工時與裝置指紋',
+    'op.list_count': '位播放員',
+    'op.col_operator': '播放員',
+    'op.col_total_hours': '總工時',
+    'op.col_active_days': '活躍天數',
+    'op.col_sessions': '會話數',
+    'op.col_sites_visited': '訪問站點',
+    'op.col_devices': '裝置數',
+    'op.col_primary_device': '主用裝置',
+    'op.col_last_seen': '最後活動',
+    'op.online': '在線',
+    'op.first_seen': '首次',
+    'op.back_to_list': '返回列表',
+    'detail.daily_chart_title': '每日工時分佈',
+    'detail.daily_chart_subtitle': '單位：小時（Asia/Shanghai 時區）',
+    'detail.url_chart_title': '站點工時分配',
+    'detail.url_chart_subtitle': '按網域彙總',
+    'detail.heatmap_title': '作息熱力圖',
+    'detail.heatmap_subtitle': '星期 × 小時 工時分佈；顏色越深代表當時段工作越多',
+    'detail.heatmap_low': '少',
+    'detail.heatmap_high': '多',
+    'detail.heatmap_peak': '峰值',
+    'detail.url_table_title': '站點詳情',
+    'detail.url_col_url': 'URL',
+    'detail.url_col_dwell': '工時',
+    'detail.url_col_visits': '訪問次數',
+    'detail.url_col_sessions': '會話數',
+    'detail.url_col_last_visit': '最後訪問',
+    'detail.session_table_title': '會話紀錄',
+    'detail.session_table_hint': '每次開啟 scheduler 即一個會話；含裝置指紋',
+    'detail.session_count': '個會話',
+    'detail.session_col_started': '開始時間 / 會話 ID',
+    'detail.session_col_dwell': '工時',
+    'detail.session_col_pages': '訪問頁面',
+    'detail.session_col_sites': '站點數',
+    'detail.session_col_device': '裝置 / 瀏覽器',
+    'detail.session_col_resolution': '解析度',
+    'detail.session_col_ip': 'IP',
+    'detail.session_col_tz': '時區',
+    'detail.session_col_clean': '完整結束',
+    'detail.no_sessions': '暫無會話',
+    'detail.session_no_data': '該站點暫無播放員資料',
+    'detail.fingerprint.browser': '瀏覽器',
+    'detail.fingerprint.os': '作業系統',
+    'detail.fingerprint.tz': '時區',
+    'detail.fingerprint.raw_ua': '原始 User-Agent',
+    'detail.fingerprint.timeline': '頁面訪問時間線',
+    'detail.timeline.normal': '正常切頁',
+    'detail.timeline.incomplete': '未發出 leave',
+    'detail.timeline.heartbeats': '心跳',
+    'detail.events_total': '共 {n} 個原始事件 · session id',
+    'empty.no_range_data': '所選時段無資料',
+    'empty.no_range_data_hint': '嘗試擴大日期範圍，或檢查播放員是否開始工作。',
+    'error.load_failed': '載入失敗',
+    'error.invalid_date_range': '日期範圍無效',
+    'site_report.title': '站點維度報表',
+    'site_report.subtitle': '從客戶網站角度看曝光、播放員分佈、裝置情況',
+    'site_report.list_title': '網站列表',
+    'site_report.list_hint': '點擊查看播放員明細',
+    'site_report.list_count': '個網站',
+    'site_report.col_name': '網站',
+    'site_report.col_hours': '總工時',
+    'site_report.col_visits': '訪問次數',
+    'site_report.col_sessions': '會話數',
+    'site_report.col_operators': '播放員',
+    'site_report.col_devices': '裝置數',
+    'site_report.col_primary_device': '主用裝置',
+    'site_report.col_last_visit': '最後訪問',
+    'site_report.stat_sites': '網站數',
+    'site_report.stat_total_hours': '總工時',
+    'site_report.stat_total_sessions': '總會話',
+    'site_report.stat_operator_count': '播放員次',
+    'site_report.daily_title': '每日工時',
+    'site_report.daily_subtitle': '該站點每日累計工作時長',
+    'site_report.operator_table_title': '播放員明細',
+    'site_report.operator_table_hint': '誰在此站工作了多久',
+    'site_report.operator_col': '播放員',
+    'site_report.operator_dwell': '工時',
+    'site_report.operator_sessions': '會話數',
+    'site_report.operator_last': '最後活動',
+    'operators.title': '播放員管理',
+    'operators.subtitle': '新增播放員、產生專屬連結、複製後發給員工使用',
+    'operators.add': '新增播放員',
+    'operators.payroll_title': '薪資計算',
+    'operators.payroll_subtitle': '輸入時薪自動算工資',
+    'operators.payroll_rate_label': '時薪',
+    'operators.payroll_currency_label': '貨幣',
+    'operators.payroll_per_hour': '/ 小時',
+    'operators.payroll_total': '應付總工資',
+    'operators.col_player': '播放員',
+    'operators.col_phone': '手機/備註',
+    'operators.col_dwell': '累計工時',
+    'operators.col_wage': '應付工資',
+    'operators.col_sessions': '會話數',
+    'operators.col_last_seen': '最後活動',
+    'operators.col_link': '專屬連結',
+    'operators.col_actions': '操作',
+    'operators.copy_link': '複製連結',
+    'operators.deactivate_confirm': '確定停用 {code} ?',
+    'operators.deactivated_toast': '已停用',
+    'operators.created_toast': '播放員已新增',
+    'operators.empty_title': '尚未新增播放員',
+    'operators.empty_hint': '點擊右上角"新增播放員"開始新增',
+    'op_modal.title': '新增播放員',
+    'op_modal.id_label': '播放員 ID',
+    'op_modal.id_placeholder': '例如 staff001',
+    'op_modal.id_hint': '只能含字母、數字、底線、橫線。每人獨立，用於區分工時',
+    'op_modal.name_label': '姓名',
+    'op_modal.phone_label': '手機',
+    'op_modal.note_label': '備註',
+    'op_modal.optional': '選填',
+    'op_modal.placeholder_name': '王小明',
+    'op_modal.id_invalid': 'ID 只能含字母數字橫線底線',
+    'sites.title': '網站管理',
+    'sites.subtitle': '新增客戶網站、設定自動輪播。新增站點立即生效',
+    'sites.add': '新增網站',
+    'sites.col_name': '名稱',
+    'sites.col_url': 'URL',
+    'sites.col_note': '備註',
+    'sites.col_added_at': '新增時間',
+    'sites.col_actions': '操作',
+    'sites.empty_title': '尚未新增網站',
+    'sites.empty_hint': '點擊右上角"新增網站"開始新增客戶網站',
+    'sites.created_toast': '網站已新增',
+    'sites.removed_toast': '已移除',
+    'sites.delete_confirm': '確定移除這個網站？',
+    'sites.embed_title': '新增網站後還需要做一件事',
+    'sites.embed_hint_html': '在新網站的 HTML 末尾插入這段腳本（貼在 <code class="bg-amber-100 px-1 rounded">&lt;/body&gt;</code> 之前）：',
+    'sites.snippet_copy': '複製',
+    'sites.snippet_copied': '腳本已複製',
+    'site_modal.title': '新增網站',
+    'site_modal.name_label': '站點名稱',
+    'site_modal.name_placeholder': '例如 客廳設計網',
+    'site_modal.url_label': 'URL',
+    'site_modal.url_placeholder': 'https://example.com/',
+    'site_modal.url_hint': '必須含 https:// 或 http://',
+    'site_modal.name_required': '請填寫站點名稱',
+    'site_modal.url_required': '請填寫 URL',
+    'accounts.title': '帳號管理',
+    'accounts.subtitle': '超級管理員專屬。系統不開放註冊，僅由你新增 / 刪除帳號',
+    'accounts.add': '新增帳號',
+    'accounts.col_account': '帳號',
+    'accounts.col_email': '信箱',
+    'accounts.col_role': '角色',
+    'accounts.col_status': '狀態',
+    'accounts.col_last_login': '最後登入',
+    'accounts.col_created': '建立時間',
+    'accounts.col_actions': '操作',
+    'accounts.role.super_admin': '超級管理員',
+    'accounts.role.admin': '管理員',
+    'accounts.role.readonly': '唯讀',
+    'accounts.role_full.super_admin': '超級管理員（可管帳號）',
+    'accounts.role_full.admin': '管理員（讀寫所有報表 / 網站 / 員工）',
+    'accounts.role_full.readonly': '唯讀（只能看報表）',
+    'accounts.status_active': '啟用',
+    'accounts.status_inactive': '停用',
+    'accounts.never_logged_in': '從未登入',
+    'accounts.you': '（你）',
+    'accounts.deactivate_confirm': '停用帳號 {username}？',
+    'accounts.empty': '暫無帳號',
+    'accounts.created_toast': '帳號已建立',
+    'acc_modal.title': '新增帳號',
+    'acc_modal.username_label': '使用者名稱',
+    'acc_modal.username_placeholder': '3-64 位，字母數字 . _ - @',
+    'acc_modal.email_label': '信箱',
+    'acc_modal.password_label': '密碼',
+    'acc_modal.password_placeholder': '至少 8 位',
+    'acc_modal.role_label': '角色',
+    'pwd_modal.title': '修改密碼',
+    'pwd_modal.current_label': '目前密碼',
+    'pwd_modal.new_label': '新密碼',
+    'pwd_modal.confirm_label': '確認新密碼',
+    'pwd_modal.changed_toast': '密碼已修改',
+    'common.cancel': '取消',
+    'common.confirm': '確認',
+    'common.create': '建立',
+    'common.add': '新增',
+    'common.save': '儲存',
+    'common.confirm_change': '確認修改',
+    'common.delete': '刪除',
+    'common.required': '必填',
+    'common.optional': '選填',
+    'common.loading': '載入中...',
+    'common.no_data': '暫無資料',
+    'common.unknown': '未知',
+    'common.copied': '已複製',
+    'common.session_expired': '您的登入已過期，請重新登入',
+    'common.logged_out': '已登出',
+    'time.just_now': '剛剛',
+    'time.minutes_ago': '{n}分鐘前',
+    'time.hours_ago': '{n}小時前',
+    'time.days_ago': '{n}天前',
+    'time.minutes': '{n}分',
+    'time.hours': '{n}小時',
+    'time.hours_minutes': '{h}小時{m}分',
+    'device.mobile': '手機',
+    'device.tablet': '平板',
+    'device.desktop': '電腦',
+    'device.unknown': '未知',
+    'trend.flat': '持平',
+    'trend.new': '新',
+    'weekday.0': '日',
+    'weekday.1': '一',
+    'weekday.2': '二',
+    'weekday.3': '三',
+    'weekday.4': '四',
+    'weekday.5': '五',
+    'weekday.6': '六',
+    'weekday.prefix': '週',
+  }
+};
+
+function t(key, vars) {
+  const dict = I18N[state.lang] || I18N['zh-CN'];
+  let v = dict[key] || I18N['zh-CN'][key] || key;
+  if (vars) for (const k in vars) v = v.replace(`{${k}}`, vars[k]);
+  return v;
+}
+
+function applyI18n(root) {
+  (root || document).querySelectorAll('[data-i18n]').forEach(el => {
+    el.textContent = t(el.dataset.i18n);
+  });
+  (root || document).querySelectorAll('[data-i18n-html]').forEach(el => {
+    el.innerHTML = t(el.dataset.i18nHtml);
+  });
+  (root || document).querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+    el.placeholder = t(el.dataset.i18nPlaceholder);
+  });
+  (root || document).querySelectorAll('[data-i18n-title]').forEach(el => {
+    el.title = t(el.dataset.i18nTitle);
+  });
+}
+
+function setLang(lang) {
+  if (!I18N[lang]) return;
+  state.lang = lang;
+  document.documentElement.setAttribute('lang', lang);
+  try { localStorage.setItem(PREF_LANG_KEY, lang); } catch (e) {}
+  applyI18n();
+  // Re-render dynamic content for the new language
+  if (state.user) {
+    onLoggedIn(); // re-renders user menu + reloads current tab
+  }
+  // Update language switcher state
+  document.querySelectorAll('.lang-btn').forEach(b => {
+    b.classList.toggle('bg-brand-50', b.dataset.lang === lang);
+    b.classList.toggle('text-brand-700', b.dataset.lang === lang);
+    b.classList.toggle('text-slate-600', b.dataset.lang !== lang);
+  });
+}
 
 const ONLINE_THRESHOLD_MS = 5 * 60 * 1000; // last_seen within 5min = online
 
@@ -800,9 +1412,9 @@ function fmtSeconds(sec) {
   if (!sec || sec < 0) sec = 0;
   const h = Math.floor(sec / 3600);
   const m = Math.floor((sec % 3600) / 60);
-  if (h === 0) return `${m}分`;
-  if (m === 0) return `${h}小时`;
-  return `${h}小时${m}分`;
+  if (h === 0) return t('time.minutes', { n: m });
+  if (m === 0) return t('time.hours', { n: h });
+  return t('time.hours_minutes', { h, m });
 }
 function fmtHours(sec) { return Math.round((sec / 3600) * 100) / 100; }
 function fmtDateTime(ms) {
@@ -816,16 +1428,19 @@ function fmtRelative(ms) {
   const diff = Date.now() - Number(ms);
   if (diff < 0) return fmtDateTime(ms);
   const min = Math.floor(diff / 60000);
-  if (min < 1) return '刚刚';
-  if (min < 60) return `${min}分钟前`;
+  if (min < 1) return t('time.just_now');
+  if (min < 60) return t('time.minutes_ago', { n: min });
   const h = Math.floor(min / 60);
-  if (h < 24) return `${h}小时前`;
+  if (h < 24) return t('time.hours_ago', { n: h });
   const d = Math.floor(h / 24);
-  if (d < 30) return `${d}天前`;
+  if (d < 30) return t('time.days_ago', { n: d });
   return fmtDateTime(ms);
 }
 function deviceIcon(d) { return ({mobile:'smartphone',tablet:'tablet',desktop:'monitor'}[d]) || 'help-circle'; }
-function deviceLabel(d) { return ({mobile:'手机',tablet:'平板',desktop:'电脑'}[d]) || '未知'; }
+function deviceLabel(d) {
+  const key = ['mobile','tablet','desktop'].includes(d) ? `device.${d}` : 'device.unknown';
+  return t(key);
+}
 
 // Parse a User-Agent string into { browser, browser_version, os, os_version }.
 // Heuristic — covers the major browsers/OSes; falls back to "Unknown" silently.
@@ -923,8 +1538,8 @@ async function api(path, options = {}) {
   const res = await fetch(ANALYTICS_BASE + path, opts);
   if (res.status === 401) {
     clearToken();
-    showLoginOverlay('您的登录已过期，请重新登录');
-    throw new Error('未登录或会话已过期');
+    showLoginOverlay(t('common.session_expired'));
+    throw new Error(t('common.session_expired'));
   }
   const json = await res.json().catch(() => ({ ok: false, error: `HTTP ${res.status}` }));
   if (!json.ok) throw new Error(json.error || `HTTP ${res.status}`);
@@ -951,9 +1566,9 @@ function startOfTodayMs() {
 function endOfTodayMs() { return startOfTodayMs() + 86400000 - 1; }
 function trendBadge(curr, prev) {
   if (prev === 0 && curr === 0) return '';
-  if (prev === 0) return `<span class="text-xs px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 font-medium ml-1">新</span>`;
+  if (prev === 0) return `<span class="text-xs px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 font-medium ml-1">${t('trend.new')}</span>`;
   const pct = Math.round(((curr - prev) / prev) * 100);
-  if (pct === 0) return `<span class="text-xs px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 font-medium ml-1">持平</span>`;
+  if (pct === 0) return `<span class="text-xs px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 font-medium ml-1">${t('trend.flat')}</span>`;
   const up = pct > 0;
   const cls = up ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700';
   const arrow = up ? '↑' : '↓';
@@ -994,10 +1609,10 @@ function renderTopStats(data, prevData) {
   const prevDevices = ((prevData && prevData.operators) || []).reduce((a, op) => a + op.unique_devices, 0);
 
   const cards = [
-    { icon: 'clock', label: '总工时', value: currHours, suffix: '小时', tone: 'brand', prev: prevHours },
-    { icon: 'users', label: '活跃播放员', value: currOps, suffix: '人', tone: 'emerald', prev: prevOps },
-    { icon: 'mouse-pointer-click', label: '总会话', value: currSessions, suffix: '次', tone: 'amber', prev: prevSessions },
-    { icon: 'monitor-smartphone', label: '已识别设备', value: currDevices, suffix: '台', tone: 'sky', prev: prevDevices },
+    { icon: 'clock', label: t('stat.total_hours'), value: currHours, suffix: t('time.hours', { n: '' }).replace(/^\s*/, ''), tone: 'brand', prev: prevHours },
+    { icon: 'users', label: t('stat.active_operators'), value: currOps, suffix: state.lang === 'zh-TW' ? '人' : '人', tone: 'emerald', prev: prevOps },
+    { icon: 'mouse-pointer-click', label: t('stat.total_sessions'), value: currSessions, suffix: '次', tone: 'amber', prev: prevSessions },
+    { icon: 'monitor-smartphone', label: t('stat.identified_devices'), value: currDevices, suffix: '台', tone: 'sky', prev: prevDevices },
   ];
 
   $('#stats-grid').innerHTML = cards.map(c => statCard(c, tones, prevData ? trendBadge(c.value, c.prev) : '')).join('');
@@ -1012,10 +1627,10 @@ function renderTodaySnapshot(today) {
   const topOp = ops[0];
   const tones = { brand:'bg-brand-50 text-brand-700', emerald:'bg-emerald-50 text-emerald-700', amber:'bg-amber-50 text-amber-700', sky:'bg-sky-50 text-sky-700' };
   const cards = [
-    { icon: 'clock', label: '今日工时', value: totals.dwell_hours || 0, suffix: '小时', tone: 'brand' },
-    { icon: 'users', label: '今日活跃', value: totals.operators || 0, suffix: '人', tone: 'emerald' },
-    { icon: 'play', label: '今日会话', value: ops.reduce((a, op) => a + op.sessions, 0), suffix: '次', tone: 'amber' },
-    { icon: 'crown', label: '工时之王', value: topOp ? topOp.uid : '—', sub: topOp ? `${fmtHours(topOp.dwell_seconds)} h · ${deviceLabel(topOp.primary_device_type)}` : '暂无数据', tone: 'sky' },
+    { icon: 'clock', label: t('stat.today_hours'), value: totals.dwell_hours || 0, suffix: '小时', tone: 'brand' },
+    { icon: 'users', label: t('stat.today_active'), value: totals.operators || 0, suffix: '人', tone: 'emerald' },
+    { icon: 'play', label: t('stat.today_sessions'), value: ops.reduce((a, op) => a + op.sessions, 0), suffix: '次', tone: 'amber' },
+    { icon: 'crown', label: t('stat.top_operator'), value: topOp ? topOp.uid : '—', sub: topOp ? `${fmtHours(topOp.dwell_seconds)} h · ${deviceLabel(topOp.primary_device_type)}` : t('stat.no_data'), tone: 'sky' },
   ];
   $('#today-grid').innerHTML = cards.map(c => statCard(c, tones)).join('');
 
@@ -1023,8 +1638,8 @@ function renderTodaySnapshot(today) {
   const now = Date.now();
   const onlineOps = (state.cachedOperators || []).filter(op => op.last_seen && (now - op.last_seen) < ONLINE_THRESHOLD_MS);
   $('#online-now').innerHTML = onlineOps.length > 0
-    ? `<span class="inline-flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>${onlineOps.length} 人在线</span>`
-    : '当前无人在线';
+    ? `<span class="inline-flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>${onlineOps.length} ${t('report.online_now')}</span>`
+    : t('report.no_one_online');
 
   const todayDate = new Date();
   $('#today-label').textContent = `· ${todayDate.getFullYear()}-${String(todayDate.getMonth()+1).padStart(2,'0')}-${String(todayDate.getDate()).padStart(2,'0')}`;
@@ -1032,7 +1647,7 @@ function renderTodaySnapshot(today) {
 
 function renderOperatorList(data) {
   const ops = data.operators || [];
-  $('#list-count').textContent = `${ops.length} 位播放员`;
+  $('#list-count').textContent = `${ops.length} ${t('op.list_count')}`;
   if (ops.length === 0) {
     $('#list-view').classList.add('hidden');
     $('#empty-state').classList.remove('hidden');
@@ -1078,10 +1693,10 @@ function renderOperatorList(data) {
 function renderDetailStats(summary) {
   if (!summary) { $('#detail-stats-grid').innerHTML = ''; return; }
   const cards = [
-    { icon: 'clock', label: '总工时', value: fmtSeconds(summary.dwell_seconds), sub: `${fmtHours(summary.dwell_seconds)} h`, tone: 'brand' },
-    { icon: 'calendar-check-2', label: '活跃天数', value: summary.active_days, sub: '天', tone: 'emerald' },
-    { icon: 'mouse-pointer-click', label: '会话数', value: summary.sessions, sub: '次', tone: 'amber' },
-    { icon: deviceIcon(summary.primary_device_type), label: '主用设备', value: deviceLabel(summary.primary_device_type), sub: `${summary.unique_devices} 台已识别`, tone: 'sky' },
+    { icon: 'clock', label: t('stat.total_hours'), value: fmtSeconds(summary.dwell_seconds), sub: `${fmtHours(summary.dwell_seconds)} h`, tone: 'brand' },
+    { icon: 'calendar-check-2', label: t('stat.active_days'), value: summary.active_days, sub: '天', tone: 'emerald' },
+    { icon: 'mouse-pointer-click', label: t('op.col_sessions'), value: summary.sessions, sub: '次', tone: 'amber' },
+    { icon: deviceIcon(summary.primary_device_type), label: t('stat.primary_device'), value: deviceLabel(summary.primary_device_type), sub: `${summary.unique_devices} ${t('stat.devices_identified')}`, tone: 'sky' },
   ];
   const tones = { brand:'bg-brand-50 text-brand-700', emerald:'bg-emerald-50 text-emerald-700', amber:'bg-amber-50 text-amber-700', sky:'bg-sky-50 text-sky-700' };
   $('#detail-stats-grid').innerHTML = cards.map(c => `
@@ -1132,7 +1747,7 @@ function renderUrlChart(urls) {
 }
 
 function renderUrlTable(urls) {
-  if (!urls || urls.length === 0) { $('#url-tbody').innerHTML = '<tr><td colspan="5" class="px-6 py-8 text-center text-xs text-slate-400">暂无数据</td></tr>'; return; }
+  if (!urls || urls.length === 0) { $('#url-tbody').innerHTML = `<tr><td colspan="5" class="px-6 py-8 text-center text-xs text-slate-400">${t('common.no_data')}</td></tr>`; return; }
   $('#url-tbody').innerHTML = urls.map(u => {
     let host = u.url, path = '';
     try { const parsed = new URL(u.url); host = parsed.hostname; path = parsed.pathname === '/' ? '' : parsed.pathname; } catch (e) {}
@@ -1149,8 +1764,8 @@ function renderUrlTable(urls) {
 }
 
 function renderSessionTable(sessions) {
-  $('#session-count').textContent = `${(sessions || []).length} 个会话`;
-  if (!sessions || sessions.length === 0) { $('#session-tbody').innerHTML = '<tr><td colspan="9" class="px-6 py-8 text-center text-xs text-slate-400">暂无会话</td></tr>'; return; }
+  $('#session-count').textContent = `${(sessions || []).length} ${t('detail.session_count')}`;
+  if (!sessions || sessions.length === 0) { $('#session-tbody').innerHTML = `<tr><td colspan="9" class="px-6 py-8 text-center text-xs text-slate-400">${t('detail.no_sessions')}</td></tr>`; return; }
   $('#session-tbody').innerHTML = sessions.map((s, idx) => {
     const resolution = (s.screen_w && s.screen_h) ? `${s.screen_w} × ${s.screen_h}` : '—';
     const cleanIcon = s.clean_leaves > 0 ? '<i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-600"></i>' : '<i data-lucide="x-circle" class="w-4 h-4 text-slate-300"></i>';
@@ -1241,7 +1856,7 @@ function renderSessionDetailHtml(sessionData, eventsData) {
   let html = `
     <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-5">
       <div class="bg-white rounded-lg border border-slate-200 p-3">
-        <div class="text-xs text-slate-500 uppercase tracking-wider mb-1">浏览器</div>
+        <div class="text-xs text-slate-500 uppercase tracking-wider mb-1">${t('detail.fingerprint.browser')}</div>
         <div class="flex items-center gap-2">
           <i data-lucide="globe-2" class="w-4 h-4 text-brand-600"></i>
           <span class="font-semibold">${escapeHtml(ua.browser)}</span>
@@ -1249,7 +1864,7 @@ function renderSessionDetailHtml(sessionData, eventsData) {
         </div>
       </div>
       <div class="bg-white rounded-lg border border-slate-200 p-3">
-        <div class="text-xs text-slate-500 uppercase tracking-wider mb-1">操作系统</div>
+        <div class="text-xs text-slate-500 uppercase tracking-wider mb-1">${t('detail.fingerprint.os')}</div>
         <div class="flex items-center gap-2">
           <i data-lucide="${ua.os.toLowerCase().includes('ios') || ua.os.toLowerCase().includes('android') ? 'smartphone' : 'monitor'}" class="w-4 h-4 text-emerald-600"></i>
           <span class="font-semibold">${escapeHtml(ua.os)}</span>
@@ -1257,7 +1872,7 @@ function renderSessionDetailHtml(sessionData, eventsData) {
         </div>
       </div>
       <div class="bg-white rounded-lg border border-slate-200 p-3">
-        <div class="text-xs text-slate-500 uppercase tracking-wider mb-1">时区</div>
+        <div class="text-xs text-slate-500 uppercase tracking-wider mb-1">${t('detail.fingerprint.tz')}</div>
         <div class="flex items-center gap-2">
           <i data-lucide="globe" class="w-4 h-4 text-amber-600"></i>
           <span class="font-semibold">${escapeHtml(tzLabel(sessionData.tz_offset))}</span>
@@ -1270,7 +1885,7 @@ function renderSessionDetailHtml(sessionData, eventsData) {
   if (sessionData.ua) {
     html += `
       <div class="mb-5">
-        <div class="text-xs text-slate-500 uppercase tracking-wider mb-1.5 flex items-center gap-1.5"><i data-lucide="terminal" class="w-3.5 h-3.5"></i>原始 User-Agent</div>
+        <div class="text-xs text-slate-500 uppercase tracking-wider mb-1.5 flex items-center gap-1.5"><i data-lucide="terminal" class="w-3.5 h-3.5"></i>${t('detail.fingerprint.raw_ua')}</div>
         <div class="font-mono text-xs text-slate-700 bg-white border border-slate-200 rounded-md p-2.5 break-all">${escapeHtml(sessionData.ua)}</div>
       </div>
     `;
@@ -1280,7 +1895,7 @@ function renderSessionDetailHtml(sessionData, eventsData) {
   if (pages.length > 0) {
     html += `
       <div>
-        <div class="text-xs text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-1.5"><i data-lucide="git-branch" class="w-3.5 h-3.5"></i>页面访问时间线 (${pages.length})</div>
+        <div class="text-xs text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-1.5"><i data-lucide="git-branch" class="w-3.5 h-3.5"></i>${t('detail.fingerprint.timeline')} (${pages.length})</div>
         <div class="space-y-1.5">
     `;
     for (const p of pages) {
@@ -1288,8 +1903,8 @@ function renderSessionDetailHtml(sessionData, eventsData) {
       const endTime = p.ended_at || p.last_heartbeat_at;
       const endIso = p.ended_iso || p.last_heartbeat_iso;
       const reasonBadge = p.end_reason === 'normal'
-        ? '<span class="text-xs px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 font-medium">正常切页</span>'
-        : '<span class="text-xs px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 font-medium">未发出 leave</span>';
+        ? `<span class="text-xs px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 font-medium">${t('detail.timeline.normal')}</span>`
+        : `<span class="text-xs px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 font-medium">${t('detail.timeline.incomplete')}</span>`;
       html += `
         <div class="flex items-center gap-3 bg-white border border-slate-200 rounded-md px-3 py-2 text-sm">
           <div class="w-1.5 h-1.5 rounded-full ${p.end_reason === 'normal' ? 'bg-emerald-500' : 'bg-amber-500'}"></div>
@@ -1299,7 +1914,7 @@ function renderSessionDetailHtml(sessionData, eventsData) {
           </div>
           <div class="text-right">
             <div class="font-semibold tabular-nums">${fmtSeconds(p.dwell_seconds)}</div>
-            <div class="text-xs text-slate-500">${p.heartbeat_count} 心跳</div>
+            <div class="text-xs text-slate-500">${p.heartbeat_count} ${t('detail.timeline.heartbeats')}</div>
           </div>
           ${reasonBadge}
         </div>
@@ -1312,14 +1927,14 @@ function renderSessionDetailHtml(sessionData, eventsData) {
   html += `
     <div class="text-xs text-slate-400 mt-4 flex items-center gap-1">
       <i data-lucide="info" class="w-3 h-3"></i>
-      共 ${events.length} 个原始事件 · session id <span class="font-mono">${escapeHtml(sessionData.sid)}</span>
+      ${t('detail.events_total', { n: events.length })} <span class="font-mono">${escapeHtml(sessionData.sid)}</span>
     </div>
   `;
   return html;
 }
 
 async function loadList() {
-  const range = rangeFromInputs(); if (!range) return showError('日期范围无效');
+  const range = rangeFromInputs(); if (!range) return showError(t('error.invalid_date_range'));
   state.from = range.from; state.to = range.to; state.selectedUid = null;
   showLoading();
 
@@ -1371,7 +1986,8 @@ async function loadDetail() {
 
 // ===== Heatmap (weekday × hour) =====
 function renderHeatmap(hm) {
-  const weekdays = ['日','一','二','三','四','五','六'];
+  const weekdays = [t('weekday.0'), t('weekday.1'), t('weekday.2'), t('weekday.3'), t('weekday.4'), t('weekday.5'), t('weekday.6')];
+  const weekdayPrefix = t('weekday.prefix');
   const max = hm.max || 1;
   const matrix = hm.matrix || [];
 
@@ -1389,7 +2005,7 @@ function renderHeatmap(hm) {
   // rows
   for (const wIdx of order) {
     html += '<div class="flex gap-0.5 items-center mb-0.5">';
-    html += `<div class="w-7 text-[11px] text-slate-500 pr-1 text-right">周${weekdays[wIdx]}</div>`;
+    html += `<div class="w-7 text-[11px] text-slate-500 pr-1 text-right">${weekdayPrefix}${weekdays[wIdx]}</div>`;
     for (let h = 0; h < 24; h++) {
       const v = matrix[wIdx] ? matrix[wIdx][h] || 0 : 0;
       const intensity = max > 0 ? Math.min(v / max, 1) : 0;
@@ -1400,7 +2016,7 @@ function renderHeatmap(hm) {
       if (intensity > 0.45) bg = '#818cf8';
       if (intensity > 0.7)  bg = '#6366f1';
       if (intensity > 0.85) bg = '#4338ca';
-      const tooltip = `周${weekdays[wIdx]} ${String(h).padStart(2,'0')}:00 — ${fmtSeconds(v)}`;
+      const tooltip = `${weekdayPrefix}${weekdays[wIdx]} ${String(h).padStart(2,'0')}:00 — ${fmtSeconds(v)}`;
       html += `<div class="w-5 h-5 rounded-sm" style="background:${bg}" title="${escapeHtml(tooltip)}"></div>`;
     }
     html += '</div>';
@@ -1408,16 +2024,16 @@ function renderHeatmap(hm) {
 
   // legend
   html += '<div class="flex items-center gap-2 mt-3 pl-8 text-[11px] text-slate-500">';
-  html += '<span>少</span>';
+  html += `<span>${t('detail.heatmap_low')}</span>`;
   ['#f1f5f9','#e0e7ff','#a5b4fc','#818cf8','#6366f1','#4338ca'].forEach(c => {
     html += `<div class="w-4 h-4 rounded-sm" style="background:${c}"></div>`;
   });
-  html += '<span>多</span>';
-  if (max > 0) html += `<span class="ml-auto">峰值 ${fmtSeconds(max)}</span>`;
+  html += `<span>${t('detail.heatmap_high')}</span>`;
+  if (max > 0) html += `<span class="ml-auto">${t('detail.heatmap_peak')} ${fmtSeconds(max)}</span>`;
   html += '</div>';
   html += '</div>';
 
-  $('#heatmap-container').innerHTML = max > 0 ? html : '<div class="h-32 grid place-items-center text-xs text-slate-400">无数据</div>';
+  $('#heatmap-container').innerHTML = max > 0 ? html : `<div class="h-32 grid place-items-center text-xs text-slate-400">${t('common.no_data')}</div>`;
 }
 
 function showLoading() {
@@ -1477,8 +2093,8 @@ function renderOperatorsTable(operators) {
     $('#operators-tbody').innerHTML = `
       <tr><td colspan="8" class="px-6 py-12 text-center">
         <div class="w-12 h-12 mx-auto rounded-full bg-slate-100 grid place-items-center mb-3"><i data-lucide="users" class="w-6 h-6 text-slate-400"></i></div>
-        <p class="text-sm font-medium text-slate-900">还没有添加播放员</p>
-        <p class="text-xs text-slate-500 mt-1">点击右上角"新增播放员"开始添加</p>
+        <p class="text-sm font-medium text-slate-900">${t('operators.empty_title')}</p>
+        <p class="text-xs text-slate-500 mt-1">${t('operators.empty_hint')}</p>
       </td></tr>`;
     $('#payroll-total').textContent = '0.00';
     lucide.createIcons();
@@ -1501,7 +2117,7 @@ function renderOperatorsTable(operators) {
               ${online ? '<span class="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-500 border-2 border-white"></span>' : ''}
             </div>
             <div class="min-w-0">
-              <div class="font-medium text-slate-900 truncate flex items-center gap-1.5">${escapeHtml(op.name || op.operator_code)}${online ? '<span class="text-xs text-emerald-600 font-normal">在线</span>' : ''}</div>
+              <div class="font-medium text-slate-900 truncate flex items-center gap-1.5">${escapeHtml(op.name || op.operator_code)}${online ? `<span class="text-xs text-emerald-600 font-normal">${t('op.online')}</span>` : ''}</div>
               <div class="text-xs text-slate-500 font-mono">${escapeHtml(op.operator_code)}</div>
             </div>
           </div>
@@ -1512,13 +2128,13 @@ function renderOperatorsTable(operators) {
         </td>
         <td class="px-6 py-4 text-right"><div class="font-semibold">${fmtSeconds(op.total_dwell_seconds)}</div><div class="text-xs text-slate-500">${fmtHours(op.total_dwell_seconds)} h</div></td>
         <td class="px-6 py-4 text-right">
-          <div class="font-semibold text-brand-700 tabular-nums">¥${wage.toFixed(2)}</div>
+          <div class="font-semibold text-brand-700 tabular-nums">${fmtMoney(wage)}</div>
         </td>
         <td class="px-6 py-4 text-right tabular-nums">${op.total_sessions}</td>
         <td class="px-6 py-4 text-slate-600">${op.last_seen ? fmtRelative(op.last_seen) : '—'}</td>
         <td class="px-6 py-4">
           <button class="text-xs px-2.5 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 inline-flex items-center gap-1.5 copy-link-btn" data-link="${escapeHtml(link)}">
-            <i data-lucide="copy" class="w-3.5 h-3.5"></i>复制链接
+            <i data-lucide="copy" class="w-3.5 h-3.5"></i>${t('operators.copy_link')}
           </button>
         </td>
         <td class="px-6 py-4 text-right">
@@ -1531,16 +2147,16 @@ function renderOperatorsTable(operators) {
   }).join('');
 
   const totalWage = operators.reduce((acc, op) => acc + (op.total_dwell_seconds / 3600) * rate, 0);
-  $('#payroll-total').textContent = totalWage.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  $('#payroll-total').textContent = fmtMoney(totalWage);
 
   $$('.copy-link-btn').forEach(btn => btn.addEventListener('click', () => {
-    navigator.clipboard.writeText(btn.dataset.link).then(() => showToast('链接已复制'));
+    navigator.clipboard.writeText(btn.dataset.link).then(() => showToast(t('common.copied')));
   }));
   $$('.delete-op-btn').forEach(btn => btn.addEventListener('click', async () => {
-    if (!confirm(`确定停用 ${btn.dataset.code} ?`)) return;
+    if (!confirm(t('operators.deactivate_confirm', { code: btn.dataset.code }))) return;
     try {
       await api(`/api/operators?operator_code=${encodeURIComponent(btn.dataset.code)}`, { method: 'DELETE' });
-      showToast('已停用'); loadOperators();
+      showToast(t('operators.deactivated_toast')); loadOperators();
     } catch (err) { showToast(err.message, 'error'); }
   }));
   lucide.createIcons();
@@ -1548,8 +2164,8 @@ function renderOperatorsTable(operators) {
 
 async function submitOperator() {
   const code = $('#op-code').value.trim();
-  if (!code) return showToast('请填写播放员 ID', 'error');
-  if (!/^[a-zA-Z0-9_\-]+$/.test(code)) return showToast('ID 只能含字母数字横线下划线', 'error');
+  if (!code) return showToast(t('op_modal.id_invalid'), 'error');
+  if (!/^[a-zA-Z0-9_\-]+$/.test(code)) return showToast(t('op_modal.id_invalid'), 'error');
   const body = {
     operator_code: code,
     name: $('#op-name').value.trim(),
@@ -1558,7 +2174,7 @@ async function submitOperator() {
   };
   try {
     await api('/api/operators', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
-    showToast('播放员已添加');
+    showToast(t('operators.created_toast'));
     closeModal('modal-operator');
     ['op-code','op-name','op-phone','op-note'].forEach(id => $('#' + id).value = '');
     loadOperators();
@@ -1603,16 +2219,16 @@ function renderSiteTopStats(data) {
   const totalSessions = sites.reduce((a, s) => a + s.sessions, 0);
   const totalOps = sites.reduce((a, s) => a + s.unique_operators, 0);
   const cards = [
-    { icon: 'globe', label: '网站数', value: totals.sites || 0, suffix: '个', tone: 'brand' },
-    { icon: 'clock', label: '总工时', value: totals.dwell_hours || 0, suffix: '小时', tone: 'emerald' },
-    { icon: 'mouse-pointer-click', label: '总会话', value: totalSessions, suffix: '次', tone: 'amber' },
-    { icon: 'users', label: '播放员次', value: totalOps, suffix: '人次', tone: 'sky' },
+    { icon: 'globe', label: t('site_report.stat_sites'), value: totals.sites || 0, suffix: '个', tone: 'brand' },
+    { icon: 'clock', label: t('site_report.stat_total_hours'), value: totals.dwell_hours || 0, suffix: '小时', tone: 'emerald' },
+    { icon: 'mouse-pointer-click', label: t('site_report.stat_total_sessions'), value: totalSessions, suffix: '次', tone: 'amber' },
+    { icon: 'users', label: t('site_report.stat_operator_count'), value: totalOps, suffix: '人次', tone: 'sky' },
   ];
   $('#site-stats-grid').innerHTML = cards.map(c => statCard(c, tones)).join('');
 }
 
 function renderSiteListTable(sites) {
-  $('#site-list-count').textContent = `${sites.length} 个网站`;
+  $('#site-list-count').textContent = `${sites.length} ${t('site_report.list_count')}`;
   if (sites.length === 0) {
     $('#site-list-view').classList.add('hidden');
     $('#site-empty').classList.remove('hidden');
@@ -1673,10 +2289,10 @@ function renderSiteDetailStats(summary) {
   if (!summary) { $('#site-detail-stats').innerHTML = ''; return; }
   const tones = { brand:'bg-brand-50 text-brand-700', emerald:'bg-emerald-50 text-emerald-700', amber:'bg-amber-50 text-amber-700', sky:'bg-sky-50 text-sky-700' };
   const cards = [
-    { icon: 'clock', label: '总工时', value: fmtSeconds(summary.dwell_seconds), sub: `${fmtHours(summary.dwell_seconds)} h`, tone: 'brand' },
-    { icon: 'users', label: '播放员', value: summary.unique_operators, sub: '人参与', tone: 'emerald' },
-    { icon: 'mouse-pointer-click', label: '会话数', value: summary.sessions, sub: '次', tone: 'amber' },
-    { icon: deviceIcon(summary.primary_device_type), label: '主用设备', value: deviceLabel(summary.primary_device_type), sub: `${summary.unique_devices} 台`, tone: 'sky' },
+    { icon: 'clock', label: t('stat.total_hours'), value: fmtSeconds(summary.dwell_seconds), sub: `${fmtHours(summary.dwell_seconds)} h`, tone: 'brand' },
+    { icon: 'users', label: t('site_report.col_operators'), value: summary.unique_operators, sub: '人参与', tone: 'emerald' },
+    { icon: 'mouse-pointer-click', label: t('op.col_sessions'), value: summary.sessions, sub: '次', tone: 'amber' },
+    { icon: deviceIcon(summary.primary_device_type), label: t('stat.primary_device'), value: deviceLabel(summary.primary_device_type), sub: `${summary.unique_devices} 台`, tone: 'sky' },
   ];
   $('#site-detail-stats').innerHTML = cards.map(c => statCard(c, tones)).join('');
 }
@@ -1698,7 +2314,7 @@ function renderSiteDailyChart(daily) {
 
 function renderSiteOperatorTable(byOp) {
   if (!byOp || byOp.length === 0) {
-    $('#site-operator-tbody').innerHTML = '<tr><td colspan="4" class="px-6 py-8 text-center text-xs text-slate-400">该站点暂无播放员数据</td></tr>';
+    $('#site-operator-tbody').innerHTML = `<tr><td colspan="4" class="px-6 py-8 text-center text-xs text-slate-400">${t('detail.session_no_data')}</td></tr>`;
     return;
   }
   $('#site-operator-tbody').innerHTML = byOp.map(o => `
@@ -1731,8 +2347,8 @@ function renderSitesTable(sites) {
     $('#sites-tbody').innerHTML = `
       <tr><td colspan="5" class="px-6 py-12 text-center">
         <div class="w-12 h-12 mx-auto rounded-full bg-slate-100 grid place-items-center mb-3"><i data-lucide="globe" class="w-6 h-6 text-slate-400"></i></div>
-        <p class="text-sm font-medium text-slate-900">还没有添加网站</p>
-        <p class="text-xs text-slate-500 mt-1">点击右上角"新增网站"开始添加客户网站</p>
+        <p class="text-sm font-medium text-slate-900">${t('sites.empty_title')}</p>
+        <p class="text-xs text-slate-500 mt-1">${t('sites.empty_hint')}</p>
       </td></tr>`;
     lucide.createIcons();
     return;
@@ -1755,10 +2371,10 @@ function renderSitesTable(sites) {
   }).join('');
 
   $$('.delete-site-btn').forEach(btn => btn.addEventListener('click', async () => {
-    if (!confirm('确定移除这个网站？')) return;
+    if (!confirm(t('sites.delete_confirm'))) return;
     try {
       await api(`/api/sites?id=${btn.dataset.id}`, { method: 'DELETE' });
-      showToast('已移除'); loadSites();
+      showToast(t('sites.removed_toast')); loadSites();
     } catch (err) { showToast(err.message, 'error'); }
   }));
   lucide.createIcons();
@@ -1768,11 +2384,11 @@ async function submitSite() {
   const name = $('#site-name').value.trim();
   const url = $('#site-url').value.trim();
   const note = $('#site-note').value.trim();
-  if (!name) return showToast('请填写站点名称', 'error');
-  if (!url) return showToast('请填写 URL', 'error');
+  if (!name) return showToast(t('site_modal.name_required'), 'error');
+  if (!url) return showToast(t('site_modal.url_required'), 'error');
   try {
     await api('/api/sites', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name, url, note }) });
-    showToast('网站已添加');
+    showToast(t('sites.created_toast'));
     closeModal('modal-site');
     ['site-name','site-url','site-note'].forEach(id => $('#' + id).value = '');
     loadSites();
@@ -1796,18 +2412,18 @@ function hideLoginError() { $('#login-error').classList.add('hidden'); }
 function setAuthMode(mode) {
   state.authMode = mode;
   if (mode === 'bootstrap') {
-    $('#login-title').textContent = '创建超级管理员';
-    $('#login-subtitle').textContent = '系统首次启动，请创建你的超级管理员账号';
+    $('#login-title').textContent = t('login.bootstrap_title');
+    $('#login-subtitle').textContent = t('login.bootstrap_subtitle');
     $('#login-email-row').classList.remove('hidden');
     $('#login-confirm-row').classList.remove('hidden');
-    $('#login-submit-label').textContent = '创建';
+    $('#login-submit-label').textContent = t('login.submit_bootstrap');
     $('#bootstrap-notice').classList.remove('hidden');
   } else {
-    $('#login-title').textContent = '登录';
-    $('#login-subtitle').textContent = '请使用管理员账号登录';
+    $('#login-title').textContent = t('login.title');
+    $('#login-subtitle').textContent = t('login.subtitle');
     $('#login-email-row').classList.add('hidden');
     $('#login-confirm-row').classList.add('hidden');
-    $('#login-submit-label').textContent = '登录';
+    $('#login-submit-label').textContent = t('login.submit_login');
     $('#bootstrap-notice').classList.add('hidden');
   }
   lucide.createIcons();
@@ -1849,9 +2465,9 @@ async function submitLogin() {
       const email = $('#login-email').value.trim();
       const password = $('#login-password').value;
       const confirm = $('#login-confirm').value;
-      if (!username) throw new Error('请输入用户名');
-      if (password.length < 8) throw new Error('密码至少 8 位');
-      if (password !== confirm) throw new Error('两次密码不一致');
+      if (!username) throw new Error(t('login.username_required'));
+      if (password.length < 8) throw new Error(t('login.password_too_short'));
+      if (password !== confirm) throw new Error(t('login.password_mismatch'));
 
       const bootstrapRes = await fetch(ANALYTICS_BASE + '/api/auth/bootstrap', {
         method: 'POST',
@@ -1866,7 +2482,7 @@ async function submitLogin() {
     } else {
       const username = $('#login-username').value.trim();
       const password = $('#login-password').value;
-      if (!username || !password) throw new Error('请输入用户名和密码');
+      if (!username || !password) throw new Error(t('login.invalid_credentials'));
       await doLogin(username, password);
     }
   } catch (err) {
@@ -1944,7 +2560,7 @@ function logout() {
   if (state.todayRefreshTimer) { clearInterval(state.todayRefreshTimer); state.todayRefreshTimer = null; }
   $('#user-menu-dropdown').classList.add('hidden');
   setAuthMode('login');
-  showLoginOverlay('已退出');
+  showLoginOverlay(t('common.logged_out'));
 }
 
 // ===================== TAB: ACCOUNTS =====================
@@ -1959,12 +2575,11 @@ async function loadAccounts() {
 
 function renderAccountsTable(users) {
   if (users.length === 0) {
-    $('#accounts-tbody').innerHTML = '<tr><td colspan="7" class="px-6 py-12 text-center text-xs text-slate-400">暂无账号</td></tr>';
+    $('#accounts-tbody').innerHTML = `<tr><td colspan="7" class="px-6 py-12 text-center text-xs text-slate-400">${t('accounts.empty')}</td></tr>`;
     return;
   }
   const myId = state.user && state.user.id;
   const roleClass = { super_admin: 'bg-rose-50 text-rose-700', admin: 'bg-brand-50 text-brand-700', readonly: 'bg-slate-100 text-slate-700' };
-  const roleLabel = { super_admin: '超级管理员', admin: '管理员', readonly: '只读' };
   $('#accounts-tbody').innerHTML = users.map(u => {
     const isMe = u.id === myId;
     return `
@@ -1973,21 +2588,21 @@ function renderAccountsTable(users) {
           <div class="flex items-center gap-3">
             <div class="w-8 h-8 rounded-full bg-gradient-to-br from-brand-500 to-brand-700 text-white text-xs font-semibold grid place-items-center flex-shrink-0">${escapeHtml((u.username || '?').slice(0, 2).toUpperCase())}</div>
             <div class="min-w-0">
-              <div class="font-medium text-slate-900 truncate flex items-center gap-1.5">${escapeHtml(u.username)}${isMe ? '<span class="text-xs text-brand-600 font-normal">（你）</span>' : ''}</div>
+              <div class="font-medium text-slate-900 truncate flex items-center gap-1.5">${escapeHtml(u.username)}${isMe ? `<span class="text-xs text-brand-600 font-normal">${t('accounts.you')}</span>` : ''}</div>
               <div class="text-xs text-slate-500 font-mono">id ${u.id}</div>
             </div>
           </div>
         </td>
         <td class="px-6 py-4 text-slate-600">${escapeHtml(u.email || '—')}</td>
         <td class="px-6 py-4">
-          <span class="inline-flex items-center text-xs px-2 py-1 rounded-md ${roleClass[u.role] || 'bg-slate-100 text-slate-700'} font-medium">${escapeHtml(roleLabel[u.role] || u.role)}</span>
+          <span class="inline-flex items-center text-xs px-2 py-1 rounded-md ${roleClass[u.role] || 'bg-slate-100 text-slate-700'} font-medium">${escapeHtml(t('accounts.role.' + u.role))}</span>
         </td>
         <td class="px-6 py-4">
           ${u.is_active
-            ? '<span class="inline-flex items-center gap-1.5 text-xs text-emerald-700"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>启用</span>'
-            : '<span class="inline-flex items-center gap-1.5 text-xs text-slate-500"><span class="w-1.5 h-1.5 rounded-full bg-slate-400"></span>停用</span>'}
+            ? `<span class="inline-flex items-center gap-1.5 text-xs text-emerald-700"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>${t('accounts.status_active')}</span>`
+            : `<span class="inline-flex items-center gap-1.5 text-xs text-slate-500"><span class="w-1.5 h-1.5 rounded-full bg-slate-400"></span>${t('accounts.status_inactive')}</span>`}
         </td>
-        <td class="px-6 py-4 text-slate-600">${u.last_login ? fmtRelative(u.last_login) : '从未登录'}</td>
+        <td class="px-6 py-4 text-slate-600">${u.last_login ? fmtRelative(u.last_login) : t('accounts.never_logged_in')}</td>
         <td class="px-6 py-4 text-slate-600">${fmtDateTime(u.created_at)}</td>
         <td class="px-6 py-4 text-right">
           ${isMe ? '<span class="text-xs text-slate-400">—</span>'
@@ -1998,10 +2613,10 @@ function renderAccountsTable(users) {
   }).join('');
 
   $$('.delete-account-btn').forEach(btn => btn.addEventListener('click', async () => {
-    if (!confirm(`停用账号 ${btn.dataset.username}？`)) return;
+    if (!confirm(t('accounts.deactivate_confirm', { username: btn.dataset.username }))) return;
     try {
       await api(`/api/admin/users?id=${btn.dataset.id}`, { method: 'DELETE' });
-      showToast('已停用'); loadAccounts();
+      showToast(t('operators.deactivated_toast')); loadAccounts();
     } catch (err) { showToast(err.message, 'error'); }
   }));
   lucide.createIcons();
@@ -2012,15 +2627,15 @@ async function submitNewAccount() {
   const email = $('#acc-email').value.trim();
   const password = $('#acc-password').value;
   const role = $('#acc-role').value;
-  if (!/^[a-zA-Z0-9._@\-]{3,64}$/.test(username)) return showToast('用户名 3-64 位，仅字母数字 . _ - @', 'error');
-  if (password.length < 8) return showToast('密码至少 8 位', 'error');
+  if (!/^[a-zA-Z0-9._@\-]{3,64}$/.test(username)) return showToast(t('acc_modal.username_placeholder'), 'error');
+  if (password.length < 8) return showToast(t('login.password_too_short'), 'error');
   try {
     await api('/api/admin/users', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ username, email, password, role }),
     });
-    showToast('账号已创建');
+    showToast(t('accounts.created_toast'));
     closeModal('modal-account');
     ['acc-username','acc-email','acc-password'].forEach(id => $('#' + id).value = '');
     $('#acc-role').value = 'admin';
@@ -2032,15 +2647,15 @@ async function submitChangePassword() {
   const current = $('#pwd-current').value;
   const next = $('#pwd-new').value;
   const confirm = $('#pwd-confirm').value;
-  if (next.length < 8) return showToast('新密码至少 8 位', 'error');
-  if (next !== confirm) return showToast('两次密码不一致', 'error');
+  if (next.length < 8) return showToast(t('login.password_too_short'), 'error');
+  if (next !== confirm) return showToast(t('login.password_mismatch'), 'error');
   try {
     await api('/api/auth/change-password', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ current_password: current, new_password: next }),
     });
-    showToast('密码已修改');
+    showToast(t('pwd_modal.changed_toast'));
     closeModal('modal-password');
     ['pwd-current','pwd-new','pwd-confirm'].forEach(id => $('#' + id).value = '');
   } catch (err) { showToast(err.message, 'error'); }
@@ -2048,6 +2663,15 @@ async function submitChangePassword() {
 
 // ===================== Boot =====================
 function init() {
+  // Load user preferences (lang + currency) before any rendering
+  try {
+    const savedLang = localStorage.getItem(PREF_LANG_KEY);
+    if (savedLang && I18N[savedLang]) state.lang = savedLang;
+    const savedCurrency = localStorage.getItem(PREF_CURRENCY_KEY);
+    if (savedCurrency && CURRENCY_SYMBOLS[savedCurrency]) state.payrollCurrency = savedCurrency;
+  } catch (e) {}
+  document.documentElement.setAttribute('lang', state.lang);
+
   const { from, to } = defaultRange();
   $('#from-date').value = ymd(from);
   $('#to-date').value = ymd(to);
@@ -2056,6 +2680,24 @@ function init() {
 
   // Tabs
   $$('.tab-btn').forEach(btn => btn.addEventListener('click', () => switchTab(btn.dataset.tab)));
+
+  // Language switcher
+  $$('.lang-btn').forEach(btn => btn.addEventListener('click', () => setLang(btn.dataset.lang)));
+
+  // Currency selector
+  const currencyEl = $('#payroll-currency');
+  if (currencyEl) {
+    currencyEl.value = state.payrollCurrency;
+    $('#payroll-rate-symbol').textContent = currencySymbol();
+    currencyEl.addEventListener('change', () => {
+      state.payrollCurrency = currencyEl.value;
+      try { localStorage.setItem(PREF_CURRENCY_KEY, state.payrollCurrency); } catch (e) {}
+      $('#payroll-rate-symbol').textContent = currencySymbol();
+      // re-render operators table with new currency
+      if (state.cachedOperators.length > 0) renderOperatorsTable(state.cachedOperators);
+      else $('#payroll-total').textContent = fmtMoney(0);
+    });
+  }
 
   // Report tab
   $('#refresh-btn').addEventListener('click', loadList);
@@ -2083,7 +2725,7 @@ function init() {
   $('#add-site-btn').addEventListener('click', () => openModal('modal-site'));
   $('#site-submit').addEventListener('click', submitSite);
   $('#snippet-copy-btn').addEventListener('click', () => {
-    navigator.clipboard.writeText($('#snippet-code').textContent).then(() => showToast('脚本已复制'));
+    navigator.clipboard.writeText($('#snippet-code').textContent).then(() => showToast(t('sites.snippet_copied')));
   });
 
   // Accounts tab
@@ -2117,6 +2759,16 @@ function init() {
     const modal = e.target.closest('[id^="modal-"]');
     if (modal) closeModal(modal.id);
   }));
+
+  // Apply translations for the current/saved language
+  applyI18n();
+  $$('.lang-btn').forEach(b => {
+    b.classList.toggle('bg-brand-50', b.dataset.lang === state.lang);
+    b.classList.toggle('text-brand-700', b.dataset.lang === state.lang);
+    b.classList.toggle('text-slate-600', b.dataset.lang !== state.lang);
+  });
+  // Sync the auth-mode-controlled labels to current language
+  setAuthMode(state.authMode);
 
   lucide.createIcons();
   // Auth-gated boot: only loads data after login.
