@@ -852,7 +852,17 @@ async function getOperatorSessions(env, from, to, uid) {
         SELECT screen_h FROM exposure_events e6
         WHERE e6.sid = exposure_events.sid AND e6.screen_h IS NOT NULL
         LIMIT 1
-      ) AS screen_h
+      ) AS screen_h,
+      (
+        SELECT ua FROM exposure_events e7
+        WHERE e7.sid = exposure_events.sid AND e7.ua IS NOT NULL AND e7.ua <> ''
+        LIMIT 1
+      ) AS ua,
+      (
+        SELECT tz_offset FROM exposure_events e8
+        WHERE e8.sid = exposure_events.sid AND e8.tz_offset IS NOT NULL
+        LIMIT 1
+      ) AS tz_offset
     FROM exposure_events
     WHERE received_at >= ? AND received_at <= ?
       AND uid = ?
@@ -878,7 +888,79 @@ async function getOperatorSessions(env, from, to, uid) {
     ip: r.ip || null,
     screen_w: r.screen_w == null ? null : Number(r.screen_w),
     screen_h: r.screen_h == null ? null : Number(r.screen_h),
+    ua: r.ua || null,
+    tz_offset: r.tz_offset == null ? null : Number(r.tz_offset),
   }));
+}
+
+// ===== Session-level event timeline =====
+// Returns every page_enter/heartbeat/page_leave for one sid in chronological order.
+// Used to render a per-session expandable timeline in the audit report.
+async function handleSessionEvents(req, env, headers) {
+  const url = new URL(req.url);
+  const sid = url.searchParams.get("sid");
+  if (!sid) return json({ ok: false, error: "sid is required" }, 400, headers);
+
+  const result = await env.DB.prepare(
+    `SELECT id, event_type, url, page_index, ip, ua, device_type,
+            screen_w, screen_h, tz_offset, client_ts, received_at
+     FROM exposure_events
+     WHERE sid = ?
+     ORDER BY received_at ASC, id ASC
+     LIMIT 1000`
+  ).bind(sid).all();
+
+  const events = (result.results || []).map((r) => ({
+    id: Number(r.id),
+    event_type: r.event_type,
+    url: r.url,
+    page_index: r.page_index == null ? null : Number(r.page_index),
+    ip: r.ip || null,
+    ua: r.ua || null,
+    device_type: r.device_type || null,
+    screen_w: r.screen_w == null ? null : Number(r.screen_w),
+    screen_h: r.screen_h == null ? null : Number(r.screen_h),
+    tz_offset: r.tz_offset == null ? null : Number(r.tz_offset),
+    client_ts: r.client_ts == null ? null : Number(r.client_ts),
+    received_at: Number(r.received_at),
+    received_iso: toIsoOrNull(r.received_at),
+  }));
+
+  // Compute per-page time blocks: group consecutive enter+heartbeats per url
+  const pageBlocks = [];
+  let block = null;
+  for (const ev of events) {
+    if (ev.event_type === 'page_enter' || (ev.event_type !== 'heartbeat' && ev.event_type !== 'page_leave')) {
+      if (block) pageBlocks.push(block);
+      block = {
+        url: ev.url,
+        started_at: ev.received_at,
+        last_heartbeat_at: ev.received_at,
+        heartbeat_count: 0,
+        ended_at: null,
+        end_reason: null,
+      };
+    } else if (ev.event_type === 'heartbeat' && block && ev.url === block.url) {
+      block.heartbeat_count += 1;
+      block.last_heartbeat_at = ev.received_at;
+    } else if (ev.event_type === 'page_leave' && block && ev.url === block.url) {
+      block.ended_at = ev.received_at;
+      block.end_reason = 'normal';
+    }
+  }
+  if (block) pageBlocks.push(block);
+
+  for (const b of pageBlocks) {
+    b.dwell_seconds = b.heartbeat_count * HEARTBEAT_INTERVAL_SEC;
+    b.started_iso = toIsoOrNull(b.started_at);
+    b.ended_iso = toIsoOrNull(b.ended_at);
+    b.last_heartbeat_iso = toIsoOrNull(b.last_heartbeat_at);
+    if (!b.end_reason) {
+      b.end_reason = b.ended_at ? 'normal' : 'incomplete';
+    }
+  }
+
+  return json({ ok: true, sid, events, pages: pageBlocks }, 200, headers);
 }
 
 async function handleOperatorReport(req, env, headers) {
@@ -1297,6 +1379,7 @@ export default {
 
       if (url.pathname === "/api/site-report" && req.method === "GET") return await handleSiteReport(req, env, headers);
       if (url.pathname === "/api/operator-heatmap" && req.method === "GET") return await handleOperatorHeatmap(req, env, headers);
+      if (url.pathname === "/api/session-events" && req.method === "GET") return await handleSessionEvents(req, env, headers);
 
       if (url.pathname === "/api/operators" && req.method === "GET") return await handleOperatorsList(req, env, headers);
       if (url.pathname === "/api/operators" && req.method === "POST") return await handleOperatorsAdd(req, env, headers);
