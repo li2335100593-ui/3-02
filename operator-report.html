@@ -46,6 +46,62 @@
 </head>
 <body class="bg-slate-50 text-slate-900 antialiased">
 
+<!-- ============== Login / Bootstrap overlay ============== -->
+<div id="login-overlay" class="fixed inset-0 z-50 bg-gradient-to-br from-slate-900 via-brand-900 to-indigo-950 grid place-items-center p-4">
+  <div class="w-full max-w-md">
+    <div class="text-center mb-8">
+      <div class="inline-flex items-center gap-3 mb-3">
+        <div class="w-11 h-11 rounded-xl bg-white/10 backdrop-blur grid place-items-center text-white border border-white/20">
+          <i data-lucide="layout-dashboard" class="w-6 h-6"></i>
+        </div>
+        <div class="text-left">
+          <h1 class="text-xl font-semibold tracking-tight text-white">运营后台</h1>
+          <p class="text-xs text-slate-300">Carousel Operations Console</p>
+        </div>
+      </div>
+    </div>
+    <div class="bg-white rounded-2xl shadow-2xl overflow-hidden">
+      <div class="px-7 py-6">
+        <h2 id="login-title" class="text-base font-semibold text-slate-900">登录</h2>
+        <p id="login-subtitle" class="text-xs text-slate-500 mt-1">请使用管理员账号登录</p>
+      </div>
+      <div class="px-7 pb-6 space-y-4">
+        <div>
+          <label class="block text-xs font-medium text-slate-700 mb-1.5">用户名 / 邮箱</label>
+          <input id="login-username" type="text" autocomplete="username" class="w-full h-10 px-3 rounded-md border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500" placeholder="username 或 email">
+        </div>
+        <div id="login-email-row" class="hidden">
+          <label class="block text-xs font-medium text-slate-700 mb-1.5">邮箱（选填）</label>
+          <input id="login-email" type="email" autocomplete="email" class="w-full h-10 px-3 rounded-md border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500" placeholder="li2335100593@gmail.com">
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-slate-700 mb-1.5">密码</label>
+          <input id="login-password" type="password" autocomplete="current-password" class="w-full h-10 px-3 rounded-md border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500" placeholder="">
+        </div>
+        <div id="login-confirm-row" class="hidden">
+          <label class="block text-xs font-medium text-slate-700 mb-1.5">确认密码</label>
+          <input id="login-confirm" type="password" autocomplete="new-password" class="w-full h-10 px-3 rounded-md border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500">
+        </div>
+        <div id="login-error" class="hidden text-xs px-3 py-2 rounded-md bg-rose-50 border border-rose-200 text-rose-700 flex items-start gap-1.5">
+          <i data-lucide="alert-circle" class="w-3.5 h-3.5 flex-shrink-0 mt-0.5"></i>
+          <span id="login-error-msg"></span>
+        </div>
+        <button id="login-submit" class="w-full h-10 rounded-md bg-brand-600 hover:bg-brand-700 text-white text-sm font-semibold flex items-center justify-center gap-2 transition-colors disabled:opacity-50">
+          <i data-lucide="log-in" class="w-4 h-4"></i>
+          <span id="login-submit-label">登录</span>
+        </button>
+      </div>
+      <div id="bootstrap-notice" class="hidden px-7 py-3 bg-amber-50 border-t border-amber-200">
+        <div class="text-xs text-amber-900 flex items-start gap-1.5">
+          <i data-lucide="info" class="w-3.5 h-3.5 flex-shrink-0 mt-0.5"></i>
+          <span>系统首次启动 — 即将创建超级管理员。该账号永久拥有添加 / 删除其他账号的权限。完成后此页面变为登录页。</span>
+        </div>
+      </div>
+    </div>
+    <p class="text-center text-xs text-slate-400 mt-6">© 运营后台 · 仅授权管理员可用</p>
+  </div>
+</div>
+
 <header class="bg-white border-b border-slate-200">
   <div class="max-w-[1400px] mx-auto px-6 py-4 flex items-center gap-6">
     <div class="flex items-center gap-3">
@@ -74,7 +130,34 @@
         <i data-lucide="globe" class="w-4 h-4"></i>
         网站
       </button>
+      <button id="tab-accounts-btn" class="tab-btn flex items-center gap-2 hidden" data-tab="accounts">
+        <i data-lucide="shield" class="w-4 h-4"></i>
+        账户
+      </button>
     </nav>
+    <div class="ml-auto flex items-center gap-3">
+      <div id="user-menu" class="relative">
+        <button id="user-menu-btn" class="flex items-center gap-2 px-3 py-1.5 rounded-md hover:bg-slate-100 text-sm">
+          <div class="w-7 h-7 rounded-full bg-gradient-to-br from-brand-500 to-brand-700 text-white text-xs font-semibold grid place-items-center" id="user-menu-avatar">?</div>
+          <span class="font-medium text-slate-700" id="user-menu-name">—</span>
+          <i data-lucide="chevron-down" class="w-3.5 h-3.5 text-slate-400"></i>
+        </button>
+        <div id="user-menu-dropdown" class="hidden absolute right-0 top-full mt-1 w-56 bg-white border border-slate-200 rounded-lg shadow-lg overflow-hidden z-30">
+          <div class="px-4 py-3 border-b border-slate-100">
+            <div class="text-sm font-medium text-slate-900" id="user-menu-name-full">—</div>
+            <div class="text-xs text-slate-500" id="user-menu-role">—</div>
+          </div>
+          <button id="change-password-btn" class="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2">
+            <i data-lucide="key" class="w-4 h-4 text-slate-500"></i>
+            修改密码
+          </button>
+          <button id="logout-btn" class="w-full text-left px-4 py-2 text-sm text-rose-600 hover:bg-rose-50 flex items-center gap-2">
+            <i data-lucide="log-out" class="w-4 h-4"></i>
+            退出登录
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </header>
 
@@ -486,6 +569,40 @@
 
   </div>
 
+  <!-- ========== TAB: ACCOUNTS (super_admin) ========== -->
+  <div id="tab-accounts" class="tab-pane hidden">
+
+    <div class="flex items-center justify-between mb-6">
+      <div>
+        <h2 class="text-lg font-semibold tracking-tight">账号管理</h2>
+        <p class="text-xs text-slate-500 mt-0.5">超级管理员专属。系统不开放注册，仅由你添加 / 删除账号</p>
+      </div>
+      <button id="add-account-btn" class="h-9 px-4 rounded-md bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium flex items-center gap-2 transition-colors">
+        <i data-lucide="user-plus" class="w-4 h-4"></i>
+        新增账号
+      </button>
+    </div>
+
+    <div class="bg-white rounded-xl shadow-card border border-slate-200">
+      <div class="overflow-x-auto scrollbar-thin">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="text-xs uppercase tracking-wider text-slate-500 border-b border-slate-200 bg-slate-50/50">
+              <th class="text-left font-medium px-6 py-3">账号</th>
+              <th class="text-left font-medium px-6 py-3">邮箱</th>
+              <th class="text-left font-medium px-6 py-3">角色</th>
+              <th class="text-left font-medium px-6 py-3">状态</th>
+              <th class="text-left font-medium px-6 py-3">最后登录</th>
+              <th class="text-left font-medium px-6 py-3">创建时间</th>
+              <th class="text-right font-medium px-6 py-3">操作</th>
+            </tr>
+          </thead>
+          <tbody id="accounts-tbody" class="divide-y divide-slate-100"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
   <div id="error-state" class="hidden mt-6 bg-rose-50 border border-rose-200 rounded-xl p-4 flex items-start gap-3">
     <i data-lucide="alert-circle" class="w-5 h-5 text-rose-600 flex-shrink-0 mt-0.5"></i>
     <div>
@@ -570,6 +687,82 @@
   </div>
 </div>
 
+<!-- ============== Modal: Add Account ============== -->
+<div id="modal-account" class="hidden fixed inset-0 bg-slate-900/50 z-50 grid place-items-center p-4">
+  <div class="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden">
+    <div class="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
+      <h3 class="text-base font-semibold flex items-center gap-2">
+        <i data-lucide="user-plus" class="w-4 h-4 text-brand-600"></i>
+        新增账号
+      </h3>
+      <button class="modal-close text-slate-400 hover:text-slate-700"><i data-lucide="x" class="w-5 h-5"></i></button>
+    </div>
+    <div class="px-6 py-5 space-y-4">
+      <div>
+        <label class="block text-xs font-medium text-slate-700 mb-1.5">用户名 <span class="text-rose-500">*</span></label>
+        <input id="acc-username" type="text" class="w-full h-9 px-3 rounded-md border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" placeholder="3-64 位，字母数字 . _ - @">
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-slate-700 mb-1.5">邮箱</label>
+        <input id="acc-email" type="email" class="w-full h-9 px-3 rounded-md border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" placeholder="可选">
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-slate-700 mb-1.5">密码 <span class="text-rose-500">*</span></label>
+        <input id="acc-password" type="password" class="w-full h-9 px-3 rounded-md border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" placeholder="至少 8 位">
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-slate-700 mb-1.5">角色 <span class="text-rose-500">*</span></label>
+        <select id="acc-role" class="w-full h-9 px-3 rounded-md border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 bg-white">
+          <option value="admin">管理员（读写所有报表 / 网站 / 员工）</option>
+          <option value="readonly">只读（只能看报表）</option>
+          <option value="super_admin">超级管理员（可管账号）</option>
+        </select>
+      </div>
+    </div>
+    <div class="px-6 py-4 bg-slate-50 border-t border-slate-200 flex items-center justify-end gap-2">
+      <button class="modal-close h-9 px-4 rounded-md border border-slate-300 hover:bg-white text-sm font-medium">取消</button>
+      <button id="acc-submit" class="h-9 px-4 rounded-md bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium flex items-center gap-2">
+        <i data-lucide="check" class="w-4 h-4"></i>
+        创建
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ============== Modal: Change Password ============== -->
+<div id="modal-password" class="hidden fixed inset-0 bg-slate-900/50 z-50 grid place-items-center p-4">
+  <div class="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden">
+    <div class="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
+      <h3 class="text-base font-semibold flex items-center gap-2">
+        <i data-lucide="key" class="w-4 h-4 text-brand-600"></i>
+        修改密码
+      </h3>
+      <button class="modal-close text-slate-400 hover:text-slate-700"><i data-lucide="x" class="w-5 h-5"></i></button>
+    </div>
+    <div class="px-6 py-5 space-y-4">
+      <div>
+        <label class="block text-xs font-medium text-slate-700 mb-1.5">当前密码 <span class="text-rose-500">*</span></label>
+        <input id="pwd-current" type="password" class="w-full h-9 px-3 rounded-md border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-slate-700 mb-1.5">新密码 <span class="text-rose-500">*</span></label>
+        <input id="pwd-new" type="password" class="w-full h-9 px-3 rounded-md border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" placeholder="至少 8 位">
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-slate-700 mb-1.5">确认新密码 <span class="text-rose-500">*</span></label>
+        <input id="pwd-confirm" type="password" class="w-full h-9 px-3 rounded-md border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+      </div>
+    </div>
+    <div class="px-6 py-4 bg-slate-50 border-t border-slate-200 flex items-center justify-end gap-2">
+      <button class="modal-close h-9 px-4 rounded-md border border-slate-300 hover:bg-white text-sm font-medium">取消</button>
+      <button id="pwd-submit" class="h-9 px-4 rounded-md bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium flex items-center gap-2">
+        <i data-lucide="check" class="w-4 h-4"></i>
+        确认修改
+      </button>
+    </div>
+  </div>
+</div>
+
 <!-- ============== Toast ============== -->
 <div id="toast" class="hidden fixed top-6 right-6 z-50 bg-slate-900 text-white text-sm px-4 py-2.5 rounded-md shadow-2xl flex items-center gap-2 toast-enter">
   <i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-400" id="toast-icon"></i>
@@ -592,10 +785,12 @@ const state = {
   currentTab: 'report',
   cachedOperators: [],
   payrollRate: 50,
-  // site report tab state
   siteFrom: null,
   siteTo: null,
   selectedSiteUrl: null,
+  user: null, // { id, username, email, role }
+  authMode: 'login', // 'login' | 'bootstrap'
+  todayRefreshTimer: null,
 };
 
 const ONLINE_THRESHOLD_MS = 5 * 60 * 1000; // last_seen within 5min = online
@@ -712,9 +907,26 @@ function showToast(msg, type='success') {
 function showError(msg) { $('#error-message').textContent = msg; $('#error-state').classList.remove('hidden'); }
 function hideError() { $('#error-state').classList.add('hidden'); }
 
+const TOKEN_KEY = 'carousel_auth_token';
+const USER_KEY = 'carousel_auth_user';
+
+function getToken() { try { return localStorage.getItem(TOKEN_KEY); } catch (e) { return null; } }
+function setToken(t) { try { localStorage.setItem(TOKEN_KEY, t); } catch (e) {} }
+function clearToken() { try { localStorage.removeItem(TOKEN_KEY); localStorage.removeItem(USER_KEY); } catch (e) {} }
+function getCachedUser() { try { return JSON.parse(localStorage.getItem(USER_KEY) || 'null'); } catch (e) { return null; } }
+
 async function api(path, options = {}) {
-  const res = await fetch(ANALYTICS_BASE + path, options);
-  const json = await res.json();
+  const opts = { ...options };
+  opts.headers = { ...(opts.headers || {}) };
+  const tok = getToken();
+  if (tok) opts.headers['authorization'] = `Bearer ${tok}`;
+  const res = await fetch(ANALYTICS_BASE + path, opts);
+  if (res.status === 401) {
+    clearToken();
+    showLoginOverlay('您的登录已过期，请重新登录');
+    throw new Error('未登录或会话已过期');
+  }
+  const json = await res.json().catch(() => ({ ok: false, error: `HTTP ${res.status}` }));
   if (!json.ok) throw new Error(json.error || `HTTP ${res.status}`);
   return json;
 }
@@ -729,6 +941,7 @@ function switchTab(tab) {
   if (tab === 'site-report') loadSiteList();
   if (tab === 'operators') loadOperators();
   if (tab === 'sites') loadSites();
+  if (tab === 'accounts') loadAccounts();
 }
 
 // ===== Date helpers for snapshot/trend =====
@@ -1570,6 +1783,269 @@ async function submitSite() {
 function openModal(id) { $('#' + id).classList.remove('hidden'); lucide.createIcons(); }
 function closeModal(id) { $('#' + id).classList.add('hidden'); }
 
+// ===================== Auth =====================
+function showLoginOverlay(msg) {
+  $('#login-overlay').classList.remove('hidden');
+  if (msg) showLoginError(msg); else hideLoginError();
+  if (state.todayRefreshTimer) { clearInterval(state.todayRefreshTimer); state.todayRefreshTimer = null; }
+}
+function hideLoginOverlay() { $('#login-overlay').classList.add('hidden'); hideLoginError(); }
+function showLoginError(m) { $('#login-error-msg').textContent = m; $('#login-error').classList.remove('hidden'); lucide.createIcons(); }
+function hideLoginError() { $('#login-error').classList.add('hidden'); }
+
+function setAuthMode(mode) {
+  state.authMode = mode;
+  if (mode === 'bootstrap') {
+    $('#login-title').textContent = '创建超级管理员';
+    $('#login-subtitle').textContent = '系统首次启动，请创建你的超级管理员账号';
+    $('#login-email-row').classList.remove('hidden');
+    $('#login-confirm-row').classList.remove('hidden');
+    $('#login-submit-label').textContent = '创建';
+    $('#bootstrap-notice').classList.remove('hidden');
+  } else {
+    $('#login-title').textContent = '登录';
+    $('#login-subtitle').textContent = '请使用管理员账号登录';
+    $('#login-email-row').classList.add('hidden');
+    $('#login-confirm-row').classList.add('hidden');
+    $('#login-submit-label').textContent = '登录';
+    $('#bootstrap-notice').classList.add('hidden');
+  }
+  lucide.createIcons();
+}
+
+async function checkAuthAndBoot() {
+  const tok = getToken();
+  if (tok) {
+    try {
+      const me = await api('/api/auth/me');
+      state.user = me.user;
+      try { localStorage.setItem(USER_KEY, JSON.stringify(me.user)); } catch (e) {}
+      hideLoginOverlay();
+      onLoggedIn();
+      return;
+    } catch (e) { /* fall through to login */ }
+  }
+  // Not authed → check bootstrap status
+  try {
+    const r = await fetch(ANALYTICS_BASE + '/api/auth/bootstrap');
+    const j = await r.json();
+    setAuthMode(j.needs_bootstrap ? 'bootstrap' : 'login');
+  } catch (e) {
+    setAuthMode('login');
+  }
+  showLoginOverlay();
+}
+
+async function submitLogin() {
+  hideLoginError();
+  const submitBtn = $('#login-submit');
+  const originalLabel = $('#login-submit-label').textContent;
+  submitBtn.disabled = true;
+  $('#login-submit-label').textContent = '处理中...';
+
+  try {
+    if (state.authMode === 'bootstrap') {
+      const username = $('#login-username').value.trim();
+      const email = $('#login-email').value.trim();
+      const password = $('#login-password').value;
+      const confirm = $('#login-confirm').value;
+      if (!username) throw new Error('请输入用户名');
+      if (password.length < 8) throw new Error('密码至少 8 位');
+      if (password !== confirm) throw new Error('两次密码不一致');
+
+      const bootstrapRes = await fetch(ANALYTICS_BASE + '/api/auth/bootstrap', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ username, email, password }),
+      });
+      const bootstrapJson = await bootstrapRes.json();
+      if (!bootstrapJson.ok) throw new Error(bootstrapJson.error || '创建失败');
+
+      // Now log in immediately with the just-created credentials
+      await doLogin(username, password);
+    } else {
+      const username = $('#login-username').value.trim();
+      const password = $('#login-password').value;
+      if (!username || !password) throw new Error('请输入用户名和密码');
+      await doLogin(username, password);
+    }
+  } catch (err) {
+    showLoginError(err.message || '登录失败');
+  } finally {
+    submitBtn.disabled = false;
+    $('#login-submit-label').textContent = originalLabel;
+  }
+}
+
+async function doLogin(username, password) {
+  const res = await fetch(ANALYTICS_BASE + '/api/auth/login', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ username, password }),
+  });
+  const j = await res.json();
+  if (!j.ok) throw new Error(j.error || '登录失败');
+  setToken(j.token);
+  try { localStorage.setItem(USER_KEY, JSON.stringify(j.user)); } catch (e) {}
+  state.user = j.user;
+  $('#login-password').value = '';
+  $('#login-confirm') && ($('#login-confirm').value = '');
+  hideLoginOverlay();
+  onLoggedIn();
+}
+
+function onLoggedIn() {
+  // Render user menu
+  const u = state.user;
+  if (!u) return;
+  $('#user-menu-avatar').textContent = (u.username || '?').slice(0, 2).toUpperCase();
+  $('#user-menu-name').textContent = u.username;
+  $('#user-menu-name-full').textContent = u.username + (u.email ? ` · ${u.email}` : '');
+  const roleLabel = { super_admin: '超级管理员', admin: '管理员', readonly: '只读' }[u.role] || u.role;
+  $('#user-menu-role').textContent = roleLabel;
+
+  // Show accounts tab only for super_admin
+  if (u.role === 'super_admin') $('#tab-accounts-btn').classList.remove('hidden');
+  else $('#tab-accounts-btn').classList.add('hidden');
+
+  // Boot the report
+  loadList();
+  startAutoRefresh();
+}
+
+function startAutoRefresh() {
+  if (state.todayRefreshTimer) clearInterval(state.todayRefreshTimer);
+  state.todayRefreshTimer = setInterval(() => {
+    if (state.currentTab === 'report' && !state.selectedUid) {
+      refreshTodaySnapshot();
+    }
+  }, 30000);
+}
+
+async function refreshTodaySnapshot() {
+  try {
+    const todayFrom = startOfTodayMs();
+    const todayTo = Date.now();
+    const [today, opsList] = await Promise.all([
+      api(`/api/operator-report?from=${todayFrom}&to=${todayTo}`).catch(() => null),
+      api('/api/operators').catch(() => null),
+    ]);
+    if (today) {
+      if (opsList) state.cachedOperators = opsList.operators || [];
+      renderTodaySnapshot(today);
+      lucide.createIcons();
+    }
+  } catch (e) { /* silent */ }
+}
+
+function logout() {
+  clearToken();
+  state.user = null;
+  if (state.todayRefreshTimer) { clearInterval(state.todayRefreshTimer); state.todayRefreshTimer = null; }
+  $('#user-menu-dropdown').classList.add('hidden');
+  setAuthMode('login');
+  showLoginOverlay('已退出');
+}
+
+// ===================== TAB: ACCOUNTS =====================
+async function loadAccounts() {
+  $('#accounts-tbody').innerHTML = '<tr><td colspan="7" class="px-6 py-12 text-center text-xs text-slate-400">加载中...</td></tr>';
+  try {
+    const json = await api('/api/admin/users');
+    renderAccountsTable(json.users || []);
+    hideError();
+  } catch (err) { showError(err.message); }
+}
+
+function renderAccountsTable(users) {
+  if (users.length === 0) {
+    $('#accounts-tbody').innerHTML = '<tr><td colspan="7" class="px-6 py-12 text-center text-xs text-slate-400">暂无账号</td></tr>';
+    return;
+  }
+  const myId = state.user && state.user.id;
+  const roleClass = { super_admin: 'bg-rose-50 text-rose-700', admin: 'bg-brand-50 text-brand-700', readonly: 'bg-slate-100 text-slate-700' };
+  const roleLabel = { super_admin: '超级管理员', admin: '管理员', readonly: '只读' };
+  $('#accounts-tbody').innerHTML = users.map(u => {
+    const isMe = u.id === myId;
+    return `
+      <tr class="hover:bg-slate-50 transition-colors">
+        <td class="px-6 py-4">
+          <div class="flex items-center gap-3">
+            <div class="w-8 h-8 rounded-full bg-gradient-to-br from-brand-500 to-brand-700 text-white text-xs font-semibold grid place-items-center flex-shrink-0">${escapeHtml((u.username || '?').slice(0, 2).toUpperCase())}</div>
+            <div class="min-w-0">
+              <div class="font-medium text-slate-900 truncate flex items-center gap-1.5">${escapeHtml(u.username)}${isMe ? '<span class="text-xs text-brand-600 font-normal">（你）</span>' : ''}</div>
+              <div class="text-xs text-slate-500 font-mono">id ${u.id}</div>
+            </div>
+          </div>
+        </td>
+        <td class="px-6 py-4 text-slate-600">${escapeHtml(u.email || '—')}</td>
+        <td class="px-6 py-4">
+          <span class="inline-flex items-center text-xs px-2 py-1 rounded-md ${roleClass[u.role] || 'bg-slate-100 text-slate-700'} font-medium">${escapeHtml(roleLabel[u.role] || u.role)}</span>
+        </td>
+        <td class="px-6 py-4">
+          ${u.is_active
+            ? '<span class="inline-flex items-center gap-1.5 text-xs text-emerald-700"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>启用</span>'
+            : '<span class="inline-flex items-center gap-1.5 text-xs text-slate-500"><span class="w-1.5 h-1.5 rounded-full bg-slate-400"></span>停用</span>'}
+        </td>
+        <td class="px-6 py-4 text-slate-600">${u.last_login ? fmtRelative(u.last_login) : '从未登录'}</td>
+        <td class="px-6 py-4 text-slate-600">${fmtDateTime(u.created_at)}</td>
+        <td class="px-6 py-4 text-right">
+          ${isMe ? '<span class="text-xs text-slate-400">—</span>'
+                 : `<button class="text-xs px-2 py-1 rounded text-rose-600 hover:bg-rose-50 delete-account-btn" data-id="${u.id}" data-username="${escapeHtml(u.username)}"><i data-lucide="trash-2" class="w-4 h-4"></i></button>`}
+        </td>
+      </tr>
+    `;
+  }).join('');
+
+  $$('.delete-account-btn').forEach(btn => btn.addEventListener('click', async () => {
+    if (!confirm(`停用账号 ${btn.dataset.username}？`)) return;
+    try {
+      await api(`/api/admin/users?id=${btn.dataset.id}`, { method: 'DELETE' });
+      showToast('已停用'); loadAccounts();
+    } catch (err) { showToast(err.message, 'error'); }
+  }));
+  lucide.createIcons();
+}
+
+async function submitNewAccount() {
+  const username = $('#acc-username').value.trim();
+  const email = $('#acc-email').value.trim();
+  const password = $('#acc-password').value;
+  const role = $('#acc-role').value;
+  if (!/^[a-zA-Z0-9._@\-]{3,64}$/.test(username)) return showToast('用户名 3-64 位，仅字母数字 . _ - @', 'error');
+  if (password.length < 8) return showToast('密码至少 8 位', 'error');
+  try {
+    await api('/api/admin/users', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ username, email, password, role }),
+    });
+    showToast('账号已创建');
+    closeModal('modal-account');
+    ['acc-username','acc-email','acc-password'].forEach(id => $('#' + id).value = '');
+    $('#acc-role').value = 'admin';
+    loadAccounts();
+  } catch (err) { showToast(err.message, 'error'); }
+}
+
+async function submitChangePassword() {
+  const current = $('#pwd-current').value;
+  const next = $('#pwd-new').value;
+  const confirm = $('#pwd-confirm').value;
+  if (next.length < 8) return showToast('新密码至少 8 位', 'error');
+  if (next !== confirm) return showToast('两次密码不一致', 'error');
+  try {
+    await api('/api/auth/change-password', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ current_password: current, new_password: next }),
+    });
+    showToast('密码已修改');
+    closeModal('modal-password');
+    ['pwd-current','pwd-new','pwd-confirm'].forEach(id => $('#' + id).value = '');
+  } catch (err) { showToast(err.message, 'error'); }
+}
+
 // ===================== Boot =====================
 function init() {
   const { from, to } = defaultRange();
@@ -1610,6 +2086,32 @@ function init() {
     navigator.clipboard.writeText($('#snippet-code').textContent).then(() => showToast('脚本已复制'));
   });
 
+  // Accounts tab
+  $('#add-account-btn').addEventListener('click', () => openModal('modal-account'));
+  $('#acc-submit').addEventListener('click', submitNewAccount);
+
+  // User menu / auth
+  $('#user-menu-btn').addEventListener('click', (e) => {
+    e.stopPropagation();
+    $('#user-menu-dropdown').classList.toggle('hidden');
+  });
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('#user-menu')) $('#user-menu-dropdown').classList.add('hidden');
+  });
+  $('#change-password-btn').addEventListener('click', () => {
+    $('#user-menu-dropdown').classList.add('hidden');
+    openModal('modal-password');
+  });
+  $('#logout-btn').addEventListener('click', logout);
+  $('#pwd-submit').addEventListener('click', submitChangePassword);
+
+  // Login overlay
+  $('#login-submit').addEventListener('click', submitLogin);
+  ['login-username','login-email','login-password','login-confirm'].forEach(id => {
+    const el = $('#' + id);
+    if (el) el.addEventListener('keydown', (e) => { if (e.key === 'Enter') submitLogin(); });
+  });
+
   // Modal close handlers
   $$('.modal-close').forEach(btn => btn.addEventListener('click', (e) => {
     const modal = e.target.closest('[id^="modal-"]');
@@ -1617,7 +2119,8 @@ function init() {
   }));
 
   lucide.createIcons();
-  loadList();
+  // Auth-gated boot: only loads data after login.
+  checkAuthAndBoot();
 }
 
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
