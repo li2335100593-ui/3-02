@@ -22,11 +22,12 @@ function csv(text, status = 200, extraHeaders = {}) {
 function corsHeaders(origin = "*") {
   // Analytics + report endpoints are intentionally domain-agnostic: this system
   // is embedded on arbitrary customer sites and reports are loaded from any
-  // admin host. Endpoints write-only or auth-stamped server-side.
+  // admin host. Endpoints are write-only or use Bearer auth, never cookies,
+  // so wildcard origin + explicit Authorization header is safe.
   return {
     "access-control-allow-origin": origin && origin !== "null" ? origin : "*",
-    "access-control-allow-methods": "GET,POST,OPTIONS",
-    "access-control-allow-headers": "content-type,x-internal-token",
+    "access-control-allow-methods": "GET,POST,DELETE,OPTIONS",
+    "access-control-allow-headers": "content-type,authorization,x-internal-token",
     "access-control-max-age": "86400",
     "vary": "origin",
   };
