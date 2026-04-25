@@ -32,7 +32,7 @@ README.md           6.4 KB    中文集成指南
 
 **2. 客户页面集成（每个域名加一行）**
 ```html
-<script src="https://your-cdn.com/carousel.js"></script>
+<script src="https://li2335100593-ui.github.io/3-02/carousel.js"></script>
 ```
 
 **3. 用户打开 scheduler.html 开始自动轮播**

@@ -13,7 +13,7 @@
 在每个需要参与轮播的页面的 `<head>` 或 `<body>` 末尾加入以下代码：
 
 ```html
-<script src="https://your-cdn.com/carousel.js"></script>
+<script src="https://li2335100593-ui.github.io/3-02/carousel.js"></script>
 ```
 
 ### 步骤 3: 配置并打开入口页
@@ -66,7 +66,7 @@
   <!-- 页面内容 -->
   
   <!-- 在页面底部加入 carousel.js -->
-  <script src="https://your-cdn.com/carousel.js"></script>
+  <script src="https://li2335100593-ui.github.io/3-02/carousel.js"></script>
 </body>
 </html>
 ```
