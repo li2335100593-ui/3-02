@@ -931,6 +931,176 @@ async function handleOperatorReport(req, env, headers) {
   );
 }
 
+// ===== Sites management =====
+async function handleSitesList(req, env, headers) {
+  const url = new URL(req.url);
+  const includeInactive = url.searchParams.get("all") === "1";
+  const where = includeInactive ? "" : "WHERE is_active = 1";
+  const result = await env.DB.prepare(
+    `SELECT id, name, url, note, is_active, created_at, updated_at
+     FROM sites ${where}
+     ORDER BY created_at DESC, id DESC`
+  ).all();
+  return json(
+    {
+      ok: true,
+      sites: (result.results || []).map((r) => ({
+        id: Number(r.id),
+        name: r.name,
+        url: r.url,
+        note: r.note || "",
+        is_active: Number(r.is_active) === 1,
+        created_at: Number(r.created_at),
+        updated_at: Number(r.updated_at),
+      })),
+    },
+    200,
+    headers
+  );
+}
+
+async function handleSitesAdd(req, env, headers) {
+  let body;
+  try { body = await req.json(); } catch { return json({ ok: false, error: "Invalid JSON body" }, 400, headers); }
+
+  const name = String(body.name || "").trim();
+  const siteUrl = normalizeUrl(body.url);
+  const note = String(body.note || "").trim() || null;
+
+  if (!name) return json({ ok: false, error: "name is required" }, 400, headers);
+  if (!siteUrl) return json({ ok: false, error: "url is required" }, 400, headers);
+  try {
+    const u = new URL(siteUrl);
+    if (u.protocol !== "http:" && u.protocol !== "https:") {
+      return json({ ok: false, error: "url must be http or https" }, 400, headers);
+    }
+  } catch {
+    return json({ ok: false, error: "url is malformed" }, 400, headers);
+  }
+
+  const now = Date.now();
+  const insertRes = await env.DB.prepare(
+    `INSERT INTO sites (name, url, note, is_active, created_at, updated_at)
+     VALUES (?, ?, ?, 1, ?, ?)
+     ON CONFLICT(url) DO UPDATE SET
+       name = excluded.name,
+       note = excluded.note,
+       is_active = 1,
+       updated_at = excluded.updated_at`
+  )
+    .bind(name, siteUrl, note, now, now)
+    .run();
+
+  return json({ ok: true, id: insertRes?.meta?.last_row_id ?? null }, 200, headers);
+}
+
+async function handleSitesDelete(req, env, headers) {
+  const url = new URL(req.url);
+  const id = url.searchParams.get("id");
+  const targetUrl = normalizeUrl(url.searchParams.get("url"));
+  const hard = url.searchParams.get("hard") === "1";
+
+  if (!id && !targetUrl) {
+    return json({ ok: false, error: "either id or url is required" }, 400, headers);
+  }
+
+  const where = id ? "id = ?" : "url = ?";
+  const param = id || targetUrl;
+
+  if (hard) {
+    await env.DB.prepare(`DELETE FROM sites WHERE ${where}`).bind(param).run();
+  } else {
+    await env.DB.prepare(`UPDATE sites SET is_active = 0, updated_at = ? WHERE ${where}`)
+      .bind(Date.now(), param)
+      .run();
+  }
+  return json({ ok: true }, 200, headers);
+}
+
+// ===== Operator management =====
+async function handleOperatorsList(req, env, headers) {
+  const url = new URL(req.url);
+  const includeInactive = url.searchParams.get("all") === "1";
+  const where = includeInactive ? "" : "WHERE is_active = 1";
+
+  const result = await env.DB.prepare(
+    `SELECT
+       o.id, o.operator_code, o.name, o.phone, o.note, o.is_active, o.created_at,
+       (SELECT MAX(received_at) FROM exposure_events WHERE uid = o.operator_code) AS last_seen,
+       (SELECT COUNT(DISTINCT sid) FROM exposure_events WHERE uid = o.operator_code) AS total_sessions,
+       (SELECT SUM(CASE WHEN event_type = 'heartbeat' THEN 1 ELSE 0 END) FROM exposure_events WHERE uid = o.operator_code) AS total_heartbeats
+     FROM operators o
+     ${where}
+     ORDER BY o.created_at DESC, o.id DESC`
+  ).all();
+
+  return json(
+    {
+      ok: true,
+      operators: (result.results || []).map((r) => ({
+        id: Number(r.id),
+        operator_code: r.operator_code,
+        name: r.name || "",
+        phone: r.phone || "",
+        note: r.note || "",
+        is_active: Number(r.is_active) === 1,
+        created_at: Number(r.created_at),
+        last_seen: r.last_seen ? Number(r.last_seen) : null,
+        last_seen_iso: toIsoOrNull(r.last_seen),
+        total_sessions: Number(r.total_sessions || 0),
+        total_dwell_seconds: Number(r.total_heartbeats || 0) * HEARTBEAT_INTERVAL_SEC,
+      })),
+    },
+    200,
+    headers
+  );
+}
+
+async function handleOperatorsAdd(req, env, headers) {
+  let body;
+  try { body = await req.json(); } catch { return json({ ok: false, error: "Invalid JSON body" }, 400, headers); }
+
+  const code = String(body.operator_code || "").trim();
+  const name = String(body.name || "").trim() || null;
+  const phone = String(body.phone || "").trim() || null;
+  const note = String(body.note || "").trim() || null;
+
+  if (!code) return json({ ok: false, error: "operator_code is required" }, 400, headers);
+  if (!/^[a-zA-Z0-9_\-]+$/.test(code)) {
+    return json({ ok: false, error: "operator_code can only contain letters, digits, _ and -" }, 400, headers);
+  }
+
+  const now = Date.now();
+  await env.DB.prepare(
+    `INSERT INTO operators (operator_code, name, phone, note, is_active, created_at)
+     VALUES (?, ?, ?, ?, 1, ?)
+     ON CONFLICT(operator_code) DO UPDATE SET
+       name = excluded.name,
+       phone = excluded.phone,
+       note = excluded.note,
+       is_active = 1`
+  )
+    .bind(code, name, phone, note, now)
+    .run();
+
+  return json({ ok: true, operator_code: code }, 200, headers);
+}
+
+async function handleOperatorsDelete(req, env, headers) {
+  const url = new URL(req.url);
+  const code = url.searchParams.get("operator_code");
+  const hard = url.searchParams.get("hard") === "1";
+
+  if (!code) return json({ ok: false, error: "operator_code is required" }, 400, headers);
+
+  if (hard) {
+    await env.DB.prepare(`DELETE FROM operators WHERE operator_code = ?`).bind(code).run();
+  } else {
+    await env.DB.prepare(`UPDATE operators SET is_active = 0 WHERE operator_code = ?`).bind(code).run();
+  }
+  return json({ ok: true }, 200, headers);
+}
+
 export default {
   async fetch(req, env) {
     const origin = req.headers.get("origin") || "*";
@@ -947,6 +1117,14 @@ export default {
       if (url.pathname === "/api/report" && req.method === "GET") return await handleReport(req, env, headers);
       if (url.pathname === "/api/report.csv" && req.method === "GET") return await handleCsv(req, env, headers);
       if (url.pathname === "/api/operator-report" && req.method === "GET") return await handleOperatorReport(req, env, headers);
+
+      if (url.pathname === "/api/sites" && req.method === "GET") return await handleSitesList(req, env, headers);
+      if (url.pathname === "/api/sites" && req.method === "POST") return await handleSitesAdd(req, env, headers);
+      if (url.pathname === "/api/sites" && req.method === "DELETE") return await handleSitesDelete(req, env, headers);
+
+      if (url.pathname === "/api/operators" && req.method === "GET") return await handleOperatorsList(req, env, headers);
+      if (url.pathname === "/api/operators" && req.method === "POST") return await handleOperatorsAdd(req, env, headers);
+      if (url.pathname === "/api/operators" && req.method === "DELETE") return await handleOperatorsDelete(req, env, headers);
 
       return json({ ok: false, error: "Not Found" }, 404, headers);
     } catch (err) {
