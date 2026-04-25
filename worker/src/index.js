@@ -1356,6 +1356,336 @@ async function handleOperatorsDelete(req, env, headers) {
   return json({ ok: true }, 200, headers);
 }
 
+// =============================================================
+// Auth: PBKDF2 password hashing + HMAC-SHA256 signed tokens
+// =============================================================
+//
+// Design notes:
+// - PBKDF2 with 100k iterations of SHA-256 (OWASP's 2023 floor for SHA-256).
+// - Token = base64url(header).base64url(payload).base64url(hmac).
+//   Standard JWT shape; we self-issue, never accept third-party tokens.
+// - Token TTL: 7 days. localStorage on client; idempotent re-login refreshes.
+// - Constant-time compare on hash + signature to mitigate timing attacks.
+// - Login endpoint runs a dummy hash on miss to keep timing flat regardless
+//   of whether the username exists. Always returns the same generic error.
+// - AUTH_SECRET MUST be set as a wrangler secret. We refuse to issue/verify
+//   tokens if it's missing — fail closed, never silently accept.
+
+const TOKEN_TTL_SECONDS = 7 * 24 * 3600;
+const PBKDF2_ITERATIONS = 100000;
+
+function b64urlEncodeBytes(bytes) {
+  let str = "";
+  for (let i = 0; i < bytes.length; i++) str += String.fromCharCode(bytes[i]);
+  return btoa(str).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+function b64urlEncodeStr(str) {
+  return btoa(unescape(encodeURIComponent(str)))
+    .replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+function b64urlDecodeStr(s) {
+  const padded = s.replace(/-/g, "+").replace(/_/g, "/") + "===".slice((s.length + 3) % 4);
+  return decodeURIComponent(escape(atob(padded)));
+}
+
+function constantTimeEqual(a, b) {
+  if (typeof a !== "string" || typeof b !== "string") return false;
+  if (a.length !== b.length) return false;
+  let acc = 0;
+  for (let i = 0; i < a.length; i++) acc |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return acc === 0;
+}
+
+async function hashPasswordPbkdf2(password, salt) {
+  const enc = new TextEncoder();
+  const keyMat = await crypto.subtle.importKey(
+    "raw", enc.encode(password), { name: "PBKDF2" }, false, ["deriveBits"]
+  );
+  const bits = await crypto.subtle.deriveBits(
+    { name: "PBKDF2", salt: enc.encode(salt), iterations: PBKDF2_ITERATIONS, hash: "SHA-256" },
+    keyMat,
+    256
+  );
+  return b64urlEncodeBytes(new Uint8Array(bits));
+}
+
+function generateSalt() {
+  const buf = new Uint8Array(16);
+  crypto.getRandomValues(buf);
+  return b64urlEncodeBytes(buf);
+}
+
+async function hmacSign(message, secret) {
+  const enc = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    "raw", enc.encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]
+  );
+  const sig = await crypto.subtle.sign("HMAC", key, enc.encode(message));
+  return b64urlEncodeBytes(new Uint8Array(sig));
+}
+
+async function signAuthToken(payload, secret) {
+  const header = b64urlEncodeStr(JSON.stringify({ alg: "HS256", typ: "JWT" }));
+  const body = b64urlEncodeStr(JSON.stringify(payload));
+  const sig = await hmacSign(`${header}.${body}`, secret);
+  return `${header}.${body}.${sig}`;
+}
+
+async function verifyAuthToken(token, secret) {
+  if (!token || typeof token !== "string") return null;
+  const parts = token.split(".");
+  if (parts.length !== 3) return null;
+  const [header, body, sig] = parts;
+  const expected = await hmacSign(`${header}.${body}`, secret);
+  if (!constantTimeEqual(expected, sig)) return null;
+  try {
+    const payload = JSON.parse(b64urlDecodeStr(body));
+    if (typeof payload !== "object" || !payload) return null;
+    if (payload.exp && payload.exp < Math.floor(Date.now() / 1000)) return null;
+    return payload;
+  } catch { return null; }
+}
+
+async function getAuthedUser(req, env) {
+  if (!env.AUTH_SECRET) return null;
+  const auth = req.headers.get("authorization") || "";
+  if (!auth.toLowerCase().startsWith("bearer ")) return null;
+  const token = auth.slice(7).trim();
+  return await verifyAuthToken(token, env.AUTH_SECRET);
+}
+
+function unauthorized(headers, msg = "unauthorized") {
+  return json({ ok: false, error: msg }, 401, headers);
+}
+function forbidden(headers) {
+  return json({ ok: false, error: "forbidden" }, 403, headers);
+}
+
+// ===== Auth endpoints =====
+async function handleLogin(req, env, headers) {
+  let body;
+  try { body = await req.json(); } catch { return json({ ok: false, error: "invalid request" }, 400, headers); }
+  const ident = String(body.username || body.email || "").trim();
+  const password = String(body.password || "");
+  if (!ident || !password) {
+    // Even on early reject, do some work to keep timing somewhat consistent.
+    await hashPasswordPbkdf2(password || "x", "dummysalt");
+    return json({ ok: false, error: "invalid credentials" }, 401, headers);
+  }
+  if (!env.AUTH_SECRET) {
+    return json({ ok: false, error: "server auth not configured" }, 500, headers);
+  }
+
+  const row = await env.DB.prepare(
+    `SELECT id, username, email, role, password_hash, salt, is_active
+     FROM users
+     WHERE (username = ? OR email = ?)
+     LIMIT 1`
+  ).bind(ident, ident).first();
+
+  if (!row || Number(row.is_active) !== 1) {
+    // Dummy work to flatten timing between user-not-found and bad-password.
+    await hashPasswordPbkdf2(password, "dummysalt");
+    return json({ ok: false, error: "invalid credentials" }, 401, headers);
+  }
+
+  const computed = await hashPasswordPbkdf2(password, row.salt);
+  if (!constantTimeEqual(computed, row.password_hash)) {
+    return json({ ok: false, error: "invalid credentials" }, 401, headers);
+  }
+
+  const now = Date.now();
+  const exp = Math.floor(now / 1000) + TOKEN_TTL_SECONDS;
+  const token = await signAuthToken(
+    { sub: row.id, u: row.username, r: row.role, exp },
+    env.AUTH_SECRET
+  );
+
+  await env.DB.prepare(`UPDATE users SET last_login = ? WHERE id = ?`).bind(now, row.id).run();
+
+  return json(
+    {
+      ok: true,
+      token,
+      expires_at: exp * 1000,
+      user: { id: row.id, username: row.username, email: row.email || null, role: row.role },
+    },
+    200,
+    headers
+  );
+}
+
+async function handleAuthMe(req, env, headers, user) {
+  // Refresh user info from DB so role/active changes propagate without re-login
+  const row = await env.DB.prepare(
+    `SELECT id, username, email, role, is_active, last_login, created_at
+     FROM users WHERE id = ?`
+  ).bind(user.sub).first();
+  if (!row || Number(row.is_active) !== 1) return unauthorized(headers, "session invalid");
+  return json(
+    {
+      ok: true,
+      user: {
+        id: Number(row.id),
+        username: row.username,
+        email: row.email || null,
+        role: row.role,
+        last_login: row.last_login ? Number(row.last_login) : null,
+        created_at: Number(row.created_at),
+      },
+    },
+    200,
+    headers
+  );
+}
+
+async function handleChangeOwnPassword(req, env, headers, user) {
+  let body;
+  try { body = await req.json(); } catch { return json({ ok: false, error: "invalid request" }, 400, headers); }
+  const current = String(body.current_password || "");
+  const next = String(body.new_password || "");
+  if (next.length < 8) return json({ ok: false, error: "新密码至少 8 位" }, 400, headers);
+
+  const row = await env.DB.prepare(
+    `SELECT id, password_hash, salt FROM users WHERE id = ? AND is_active = 1`
+  ).bind(user.sub).first();
+  if (!row) return unauthorized(headers, "session invalid");
+
+  const computed = await hashPasswordPbkdf2(current, row.salt);
+  if (!constantTimeEqual(computed, row.password_hash)) {
+    return json({ ok: false, error: "当前密码错误" }, 401, headers);
+  }
+
+  const newSalt = generateSalt();
+  const newHash = await hashPasswordPbkdf2(next, newSalt);
+  await env.DB.prepare(`UPDATE users SET password_hash = ?, salt = ? WHERE id = ?`)
+    .bind(newHash, newSalt, row.id).run();
+  return json({ ok: true }, 200, headers);
+}
+
+// ===== User management (super_admin only) =====
+async function handleListUsers(req, env, headers) {
+  const result = await env.DB.prepare(
+    `SELECT id, username, email, role, is_active, last_login, created_at
+     FROM users ORDER BY created_at DESC, id DESC`
+  ).all();
+  return json(
+    {
+      ok: true,
+      users: (result.results || []).map((r) => ({
+        id: Number(r.id),
+        username: r.username,
+        email: r.email || null,
+        role: r.role,
+        is_active: Number(r.is_active) === 1,
+        last_login: r.last_login ? Number(r.last_login) : null,
+        last_login_iso: toIsoOrNull(r.last_login),
+        created_at: Number(r.created_at),
+      })),
+    },
+    200,
+    headers
+  );
+}
+
+async function handleCreateUser(req, env, headers) {
+  let body;
+  try { body = await req.json(); } catch { return json({ ok: false, error: "invalid request" }, 400, headers); }
+  const username = String(body.username || "").trim();
+  const email = String(body.email || "").trim() || null;
+  const password = String(body.password || "");
+  const role = String(body.role || "admin").trim();
+
+  if (!/^[a-zA-Z0-9._@\-]{3,64}$/.test(username)) {
+    return json({ ok: false, error: "用户名 3-64 位，仅字母数字 . _ - @" }, 400, headers);
+  }
+  if (password.length < 8) return json({ ok: false, error: "密码至少 8 位" }, 400, headers);
+  if (!["super_admin", "admin", "readonly"].includes(role)) {
+    return json({ ok: false, error: "role 必须是 super_admin / admin / readonly" }, 400, headers);
+  }
+
+  const salt = generateSalt();
+  const hash = await hashPasswordPbkdf2(password, salt);
+  const now = Date.now();
+
+  try {
+    await env.DB.prepare(
+      `INSERT INTO users (username, email, password_hash, salt, role, is_active, created_at)
+       VALUES (?, ?, ?, ?, ?, 1, ?)`
+    ).bind(username, email, hash, salt, role, now).run();
+  } catch (e) {
+    return json({ ok: false, error: "用户名已存在" }, 409, headers);
+  }
+  return json({ ok: true, username }, 200, headers);
+}
+
+async function handleDeleteUser(req, env, headers, currentUser) {
+  const url = new URL(req.url);
+  const id = Number(url.searchParams.get("id") || 0);
+  if (!id) return json({ ok: false, error: "id 必填" }, 400, headers);
+  if (id === currentUser.sub) return json({ ok: false, error: "不能停用自己" }, 400, headers);
+
+  await env.DB.prepare(`UPDATE users SET is_active = 0 WHERE id = ?`).bind(id).run();
+  return json({ ok: true }, 200, headers);
+}
+
+// One-shot super-admin bootstrap. Only callable when users table is empty.
+// After the first super_admin exists this endpoint returns 403 forever.
+// Lets the operator set their own password in the browser (HTTPS body) so
+// the plaintext never appears in any shell/log.
+async function handleAuthBootstrap(req, env, headers) {
+  const existing = await env.DB.prepare(`SELECT COUNT(*) AS n FROM users WHERE is_active = 1`).first();
+  if (Number(existing?.n || 0) > 0) {
+    return json({ ok: false, error: "bootstrap closed: super_admin already exists" }, 403, headers);
+  }
+  if (!env.AUTH_SECRET) {
+    return json({ ok: false, error: "server auth not configured" }, 500, headers);
+  }
+  let body;
+  try { body = await req.json(); } catch { return json({ ok: false, error: "invalid request" }, 400, headers); }
+  const username = String(body.username || "").trim();
+  const email = String(body.email || "").trim() || null;
+  const password = String(body.password || "");
+
+  if (!/^[a-zA-Z0-9._@\-]{3,64}$/.test(username)) {
+    return json({ ok: false, error: "用户名 3-64 位，仅字母数字 . _ - @" }, 400, headers);
+  }
+  if (password.length < 8) return json({ ok: false, error: "密码至少 8 位" }, 400, headers);
+
+  const salt = generateSalt();
+  const hash = await hashPasswordPbkdf2(password, salt);
+  const now = Date.now();
+
+  await env.DB.prepare(
+    `INSERT INTO users (username, email, password_hash, salt, role, is_active, created_at)
+     VALUES (?, ?, ?, ?, 'super_admin', 1, ?)`
+  ).bind(username, email, hash, salt, now).run();
+
+  return json({ ok: true, username, role: "super_admin" }, 200, headers);
+}
+
+async function handleAuthBootstrapStatus(req, env, headers) {
+  const existing = await env.DB.prepare(`SELECT COUNT(*) AS n FROM users WHERE is_active = 1`).first();
+  return json({ ok: true, needs_bootstrap: Number(existing?.n || 0) === 0 }, 200, headers);
+}
+
+async function handleResetUserPassword(req, env, headers) {
+  let body;
+  try { body = await req.json(); } catch { return json({ ok: false, error: "invalid request" }, 400, headers); }
+  const id = Number(body.id || 0);
+  const newPwd = String(body.new_password || "");
+  if (!id) return json({ ok: false, error: "id 必填" }, 400, headers);
+  if (newPwd.length < 8) return json({ ok: false, error: "密码至少 8 位" }, 400, headers);
+
+  const salt = generateSalt();
+  const hash = await hashPasswordPbkdf2(newPwd, salt);
+  await env.DB.prepare(`UPDATE users SET password_hash = ?, salt = ? WHERE id = ?`)
+    .bind(hash, salt, id).run();
+  return json({ ok: true }, 200, headers);
+}
+
 export default {
   async fetch(req, env) {
     const origin = req.headers.get("origin") || "*";
@@ -1364,26 +1694,101 @@ export default {
     if (req.method === "OPTIONS") return new Response(null, { status: 204, headers });
 
     const url = new URL(req.url);
+    const user = await getAuthedUser(req, env);
+    const requireAuth = () => user ? null : unauthorized(headers);
+    const requireSuper = () => {
+      if (!user) return unauthorized(headers);
+      if (user.r !== "super_admin") return forbidden(headers);
+      return null;
+    };
+
     try {
+      // ---- Public: health, ingestion, sites read for scheduler ----
       if (url.pathname === "/health") return json({ ok: true, now: Date.now() }, 200, headers);
       if (url.pathname === "/api/exposure" && req.method === "POST") return await handleExposure(req, env, headers);
       if (url.pathname === "/api/config/urls" && req.method === "POST") return await handleConfigUrls(req, env, headers);
-
-      if (url.pathname === "/api/report" && req.method === "GET") return await handleReport(req, env, headers);
-      if (url.pathname === "/api/report.csv" && req.method === "GET") return await handleCsv(req, env, headers);
-      if (url.pathname === "/api/operator-report" && req.method === "GET") return await handleOperatorReport(req, env, headers);
-
       if (url.pathname === "/api/sites" && req.method === "GET") return await handleSitesList(req, env, headers);
-      if (url.pathname === "/api/sites" && req.method === "POST") return await handleSitesAdd(req, env, headers);
-      if (url.pathname === "/api/sites" && req.method === "DELETE") return await handleSitesDelete(req, env, headers);
 
-      if (url.pathname === "/api/site-report" && req.method === "GET") return await handleSiteReport(req, env, headers);
-      if (url.pathname === "/api/operator-heatmap" && req.method === "GET") return await handleOperatorHeatmap(req, env, headers);
-      if (url.pathname === "/api/session-events" && req.method === "GET") return await handleSessionEvents(req, env, headers);
+      // ---- Auth ----
+      if (url.pathname === "/api/auth/bootstrap" && req.method === "GET") return await handleAuthBootstrapStatus(req, env, headers);
+      if (url.pathname === "/api/auth/bootstrap" && req.method === "POST") return await handleAuthBootstrap(req, env, headers);
+      if (url.pathname === "/api/auth/login" && req.method === "POST") return await handleLogin(req, env, headers);
+      if (url.pathname === "/api/auth/me" && req.method === "GET") {
+        const denied = requireAuth(); if (denied) return denied;
+        return await handleAuthMe(req, env, headers, user);
+      }
+      if (url.pathname === "/api/auth/change-password" && req.method === "POST") {
+        const denied = requireAuth(); if (denied) return denied;
+        return await handleChangeOwnPassword(req, env, headers, user);
+      }
 
-      if (url.pathname === "/api/operators" && req.method === "GET") return await handleOperatorsList(req, env, headers);
-      if (url.pathname === "/api/operators" && req.method === "POST") return await handleOperatorsAdd(req, env, headers);
-      if (url.pathname === "/api/operators" && req.method === "DELETE") return await handleOperatorsDelete(req, env, headers);
+      // ---- Reports (auth required) ----
+      if (url.pathname === "/api/report" && req.method === "GET") {
+        const denied = requireAuth(); if (denied) return denied;
+        return await handleReport(req, env, headers);
+      }
+      if (url.pathname === "/api/report.csv" && req.method === "GET") {
+        const denied = requireAuth(); if (denied) return denied;
+        return await handleCsv(req, env, headers);
+      }
+      if (url.pathname === "/api/operator-report" && req.method === "GET") {
+        const denied = requireAuth(); if (denied) return denied;
+        return await handleOperatorReport(req, env, headers);
+      }
+      if (url.pathname === "/api/site-report" && req.method === "GET") {
+        const denied = requireAuth(); if (denied) return denied;
+        return await handleSiteReport(req, env, headers);
+      }
+      if (url.pathname === "/api/operator-heatmap" && req.method === "GET") {
+        const denied = requireAuth(); if (denied) return denied;
+        return await handleOperatorHeatmap(req, env, headers);
+      }
+      if (url.pathname === "/api/session-events" && req.method === "GET") {
+        const denied = requireAuth(); if (denied) return denied;
+        return await handleSessionEvents(req, env, headers);
+      }
+
+      // ---- Sites write (auth) ----
+      if (url.pathname === "/api/sites" && req.method === "POST") {
+        const denied = requireAuth(); if (denied) return denied;
+        return await handleSitesAdd(req, env, headers);
+      }
+      if (url.pathname === "/api/sites" && req.method === "DELETE") {
+        const denied = requireAuth(); if (denied) return denied;
+        return await handleSitesDelete(req, env, headers);
+      }
+
+      // ---- Operators (auth) ----
+      if (url.pathname === "/api/operators" && req.method === "GET") {
+        const denied = requireAuth(); if (denied) return denied;
+        return await handleOperatorsList(req, env, headers);
+      }
+      if (url.pathname === "/api/operators" && req.method === "POST") {
+        const denied = requireAuth(); if (denied) return denied;
+        return await handleOperatorsAdd(req, env, headers);
+      }
+      if (url.pathname === "/api/operators" && req.method === "DELETE") {
+        const denied = requireAuth(); if (denied) return denied;
+        return await handleOperatorsDelete(req, env, headers);
+      }
+
+      // ---- User management (super_admin only) ----
+      if (url.pathname === "/api/admin/users" && req.method === "GET") {
+        const denied = requireSuper(); if (denied) return denied;
+        return await handleListUsers(req, env, headers);
+      }
+      if (url.pathname === "/api/admin/users" && req.method === "POST") {
+        const denied = requireSuper(); if (denied) return denied;
+        return await handleCreateUser(req, env, headers);
+      }
+      if (url.pathname === "/api/admin/users" && req.method === "DELETE") {
+        const denied = requireSuper(); if (denied) return denied;
+        return await handleDeleteUser(req, env, headers, user);
+      }
+      if (url.pathname === "/api/admin/users/reset-password" && req.method === "POST") {
+        const denied = requireSuper(); if (denied) return denied;
+        return await handleResetUserPassword(req, env, headers);
+      }
 
       return json({ ok: false, error: "Not Found" }, 404, headers);
     } catch (err) {
