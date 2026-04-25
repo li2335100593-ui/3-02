@@ -852,7 +852,17 @@ async function getOperatorSessions(env, from, to, uid) {
         SELECT screen_h FROM exposure_events e6
         WHERE e6.sid = exposure_events.sid AND e6.screen_h IS NOT NULL
         LIMIT 1
-      ) AS screen_h
+      ) AS screen_h,
+      (
+        SELECT ua FROM exposure_events e7
+        WHERE e7.sid = exposure_events.sid AND e7.ua IS NOT NULL AND e7.ua <> ''
+        LIMIT 1
+      ) AS ua,
+      (
+        SELECT tz_offset FROM exposure_events e8
+        WHERE e8.sid = exposure_events.sid AND e8.tz_offset IS NOT NULL
+        LIMIT 1
+      ) AS tz_offset
     FROM exposure_events
     WHERE received_at >= ? AND received_at <= ?
       AND uid = ?
@@ -878,7 +888,79 @@ async function getOperatorSessions(env, from, to, uid) {
     ip: r.ip || null,
     screen_w: r.screen_w == null ? null : Number(r.screen_w),
     screen_h: r.screen_h == null ? null : Number(r.screen_h),
+    ua: r.ua || null,
+    tz_offset: r.tz_offset == null ? null : Number(r.tz_offset),
   }));
+}
+
+// ===== Session-level event timeline =====
+// Returns every page_enter/heartbeat/page_leave for one sid in chronological order.
+// Used to render a per-session expandable timeline in the audit report.
+async function handleSessionEvents(req, env, headers) {
+  const url = new URL(req.url);
+  const sid = url.searchParams.get("sid");
+  if (!sid) return json({ ok: false, error: "sid is required" }, 400, headers);
+
+  const result = await env.DB.prepare(
+    `SELECT id, event_type, url, page_index, ip, ua, device_type,
+            screen_w, screen_h, tz_offset, client_ts, received_at
+     FROM exposure_events
+     WHERE sid = ?
+     ORDER BY received_at ASC, id ASC
+     LIMIT 1000`
+  ).bind(sid).all();
+
+  const events = (result.results || []).map((r) => ({
+    id: Number(r.id),
+    event_type: r.event_type,
+    url: r.url,
+    page_index: r.page_index == null ? null : Number(r.page_index),
+    ip: r.ip || null,
+    ua: r.ua || null,
+    device_type: r.device_type || null,
+    screen_w: r.screen_w == null ? null : Number(r.screen_w),
+    screen_h: r.screen_h == null ? null : Number(r.screen_h),
+    tz_offset: r.tz_offset == null ? null : Number(r.tz_offset),
+    client_ts: r.client_ts == null ? null : Number(r.client_ts),
+    received_at: Number(r.received_at),
+    received_iso: toIsoOrNull(r.received_at),
+  }));
+
+  // Compute per-page time blocks: group consecutive enter+heartbeats per url
+  const pageBlocks = [];
+  let block = null;
+  for (const ev of events) {
+    if (ev.event_type === 'page_enter' || (ev.event_type !== 'heartbeat' && ev.event_type !== 'page_leave')) {
+      if (block) pageBlocks.push(block);
+      block = {
+        url: ev.url,
+        started_at: ev.received_at,
+        last_heartbeat_at: ev.received_at,
+        heartbeat_count: 0,
+        ended_at: null,
+        end_reason: null,
+      };
+    } else if (ev.event_type === 'heartbeat' && block && ev.url === block.url) {
+      block.heartbeat_count += 1;
+      block.last_heartbeat_at = ev.received_at;
+    } else if (ev.event_type === 'page_leave' && block && ev.url === block.url) {
+      block.ended_at = ev.received_at;
+      block.end_reason = 'normal';
+    }
+  }
+  if (block) pageBlocks.push(block);
+
+  for (const b of pageBlocks) {
+    b.dwell_seconds = b.heartbeat_count * HEARTBEAT_INTERVAL_SEC;
+    b.started_iso = toIsoOrNull(b.started_at);
+    b.ended_iso = toIsoOrNull(b.ended_at);
+    b.last_heartbeat_iso = toIsoOrNull(b.last_heartbeat_at);
+    if (!b.end_reason) {
+      b.end_reason = b.ended_at ? 'normal' : 'incomplete';
+    }
+  }
+
+  return json({ ok: true, sid, events, pages: pageBlocks }, 200, headers);
 }
 
 async function handleOperatorReport(req, env, headers) {
@@ -931,6 +1013,349 @@ async function handleOperatorReport(req, env, headers) {
   );
 }
 
+// ===== Site-centric report (operator breakdown per URL) =====
+async function getSiteSummaries(env, from, to) {
+  const result = await env.DB.prepare(
+    `SELECT
+      url,
+      SUM(CASE WHEN event_type = 'heartbeat' THEN 1 ELSE 0 END) * ${HEARTBEAT_INTERVAL_SEC} AS dwell_seconds,
+      SUM(CASE WHEN event_type = 'page_enter' OR event_type IS NULL THEN 1 ELSE 0 END) AS visits,
+      COUNT(DISTINCT sid) AS sessions,
+      COUNT(DISTINCT uid) AS unique_operators,
+      COUNT(DISTINCT vid) AS unique_devices,
+      COUNT(DISTINCT date(received_at / 1000, 'unixepoch', '+8 hours')) AS active_days,
+      MAX(received_at) AS last_seen,
+      (
+        SELECT device_type FROM exposure_events e2
+        WHERE e2.url = exposure_events.url
+          AND e2.received_at >= ? AND e2.received_at <= ?
+          AND e2.device_type IS NOT NULL
+        GROUP BY device_type
+        ORDER BY COUNT(*) DESC
+        LIMIT 1
+      ) AS primary_device_type
+    FROM exposure_events
+    WHERE received_at >= ? AND received_at <= ?
+    GROUP BY url
+    ORDER BY dwell_seconds DESC, url ASC`
+  )
+    .bind(from, to, from, to)
+    .all();
+  return (result.results || []).map((r) => ({
+    url: r.url,
+    dwell_seconds: Number(r.dwell_seconds || 0),
+    visits: Number(r.visits || 0),
+    sessions: Number(r.sessions || 0),
+    unique_operators: Number(r.unique_operators || 0),
+    unique_devices: Number(r.unique_devices || 0),
+    active_days: Number(r.active_days || 0),
+    last_seen: Number(r.last_seen || 0),
+    last_seen_iso: toIsoOrNull(r.last_seen),
+    primary_device_type: r.primary_device_type || "unknown",
+  }));
+}
+
+async function getSiteOperatorBreakdown(env, from, to, siteUrl) {
+  const result = await env.DB.prepare(
+    `SELECT
+      uid,
+      SUM(CASE WHEN event_type = 'heartbeat' THEN 1 ELSE 0 END) * ${HEARTBEAT_INTERVAL_SEC} AS dwell_seconds,
+      COUNT(DISTINCT sid) AS sessions,
+      MAX(received_at) AS last_seen
+    FROM exposure_events
+    WHERE received_at >= ? AND received_at <= ?
+      AND url = ?
+      AND uid IS NOT NULL AND uid <> ''
+    GROUP BY uid
+    ORDER BY dwell_seconds DESC, uid ASC`
+  )
+    .bind(from, to, siteUrl)
+    .all();
+  return (result.results || []).map((r) => ({
+    uid: r.uid,
+    dwell_seconds: Number(r.dwell_seconds || 0),
+    sessions: Number(r.sessions || 0),
+    last_seen: Number(r.last_seen || 0),
+    last_seen_iso: toIsoOrNull(r.last_seen),
+  }));
+}
+
+async function getSiteDailyDwell(env, from, to, siteUrl) {
+  const result = await env.DB.prepare(
+    `SELECT
+      date(received_at / 1000, 'unixepoch', '+8 hours') AS day,
+      SUM(CASE WHEN event_type = 'heartbeat' THEN 1 ELSE 0 END) * ${HEARTBEAT_INTERVAL_SEC} AS dwell_seconds,
+      COUNT(DISTINCT sid) AS sessions,
+      COUNT(DISTINCT uid) AS operators
+    FROM exposure_events
+    WHERE received_at >= ? AND received_at <= ? AND url = ?
+    GROUP BY day
+    ORDER BY day ASC`
+  )
+    .bind(from, to, siteUrl)
+    .all();
+  return (result.results || []).map((r) => ({
+    day: r.day,
+    dwell_seconds: Number(r.dwell_seconds || 0),
+    sessions: Number(r.sessions || 0),
+    operators: Number(r.operators || 0),
+  }));
+}
+
+async function handleSiteReport(req, env, headers) {
+  const url = new URL(req.url);
+  const range = parseReportRange(url);
+  if (range.error) return json({ ok: false, error: range.error }, 400, headers);
+
+  const targetUrl = normalizeUrl(url.searchParams.get("url"));
+
+  if (!targetUrl) {
+    const sites = await getSiteSummaries(env, range.from, range.to);
+    const totalDwell = sites.reduce((acc, s) => acc + s.dwell_seconds, 0);
+    return json(
+      {
+        ok: true,
+        range: { from: range.from, to: range.to },
+        sites,
+        totals: {
+          sites: sites.length,
+          dwell_seconds: totalDwell,
+          dwell_hours: Math.round((totalDwell / 3600) * 100) / 100,
+        },
+      },
+      200,
+      headers
+    );
+  }
+
+  const [summary, byOperator, daily] = await Promise.all([
+    getSiteSummaries(env, range.from, range.to).then((list) => list.find((s) => s.url === targetUrl) || null),
+    getSiteOperatorBreakdown(env, range.from, range.to, targetUrl),
+    getSiteDailyDwell(env, range.from, range.to, targetUrl),
+  ]);
+
+  return json(
+    {
+      ok: true,
+      range: { from: range.from, to: range.to },
+      url: targetUrl,
+      summary,
+      by_operator: byOperator,
+      daily,
+    },
+    200,
+    headers
+  );
+}
+
+// ===== Operator hour×weekday heatmap =====
+// Returns a 7×24 matrix of dwell_seconds (rows = weekday 0-6, cols = hour 0-23).
+// Uses Asia/Shanghai timezone via SQLite's built-in timezone shift.
+async function handleOperatorHeatmap(req, env, headers) {
+  const url = new URL(req.url);
+  const range = parseReportRange(url);
+  if (range.error) return json({ ok: false, error: range.error }, 400, headers);
+
+  const uid = url.searchParams.get("uid");
+  if (!uid) return json({ ok: false, error: "uid is required" }, 400, headers);
+
+  const result = await env.DB.prepare(
+    `SELECT
+      CAST(strftime('%w', received_at / 1000, 'unixepoch', '+8 hours') AS INTEGER) AS weekday,
+      CAST(strftime('%H', received_at / 1000, 'unixepoch', '+8 hours') AS INTEGER) AS hour,
+      SUM(CASE WHEN event_type = 'heartbeat' THEN 1 ELSE 0 END) * ${HEARTBEAT_INTERVAL_SEC} AS dwell_seconds
+    FROM exposure_events
+    WHERE received_at >= ? AND received_at <= ? AND uid = ?
+    GROUP BY weekday, hour
+    ORDER BY weekday, hour`
+  )
+    .bind(range.from, range.to, uid)
+    .all();
+
+  const matrix = Array.from({ length: 7 }, () => Array(24).fill(0));
+  let maxVal = 0;
+  for (const r of result.results || []) {
+    const w = Number(r.weekday);
+    const h = Number(r.hour);
+    const v = Number(r.dwell_seconds || 0);
+    if (w >= 0 && w < 7 && h >= 0 && h < 24) {
+      matrix[w][h] = v;
+      if (v > maxVal) maxVal = v;
+    }
+  }
+  return json({ ok: true, range: { from: range.from, to: range.to }, uid, matrix, max: maxVal }, 200, headers);
+}
+
+// ===== Sites management =====
+async function handleSitesList(req, env, headers) {
+  const url = new URL(req.url);
+  const includeInactive = url.searchParams.get("all") === "1";
+  const where = includeInactive ? "" : "WHERE is_active = 1";
+  const result = await env.DB.prepare(
+    `SELECT id, name, url, note, is_active, created_at, updated_at
+     FROM sites ${where}
+     ORDER BY created_at DESC, id DESC`
+  ).all();
+  return json(
+    {
+      ok: true,
+      sites: (result.results || []).map((r) => ({
+        id: Number(r.id),
+        name: r.name,
+        url: r.url,
+        note: r.note || "",
+        is_active: Number(r.is_active) === 1,
+        created_at: Number(r.created_at),
+        updated_at: Number(r.updated_at),
+      })),
+    },
+    200,
+    headers
+  );
+}
+
+async function handleSitesAdd(req, env, headers) {
+  let body;
+  try { body = await req.json(); } catch { return json({ ok: false, error: "Invalid JSON body" }, 400, headers); }
+
+  const name = String(body.name || "").trim();
+  const siteUrl = normalizeUrl(body.url);
+  const note = String(body.note || "").trim() || null;
+
+  if (!name) return json({ ok: false, error: "name is required" }, 400, headers);
+  if (!siteUrl) return json({ ok: false, error: "url is required" }, 400, headers);
+  try {
+    const u = new URL(siteUrl);
+    if (u.protocol !== "http:" && u.protocol !== "https:") {
+      return json({ ok: false, error: "url must be http or https" }, 400, headers);
+    }
+  } catch {
+    return json({ ok: false, error: "url is malformed" }, 400, headers);
+  }
+
+  const now = Date.now();
+  const insertRes = await env.DB.prepare(
+    `INSERT INTO sites (name, url, note, is_active, created_at, updated_at)
+     VALUES (?, ?, ?, 1, ?, ?)
+     ON CONFLICT(url) DO UPDATE SET
+       name = excluded.name,
+       note = excluded.note,
+       is_active = 1,
+       updated_at = excluded.updated_at`
+  )
+    .bind(name, siteUrl, note, now, now)
+    .run();
+
+  return json({ ok: true, id: insertRes?.meta?.last_row_id ?? null }, 200, headers);
+}
+
+async function handleSitesDelete(req, env, headers) {
+  const url = new URL(req.url);
+  const id = url.searchParams.get("id");
+  const targetUrl = normalizeUrl(url.searchParams.get("url"));
+  const hard = url.searchParams.get("hard") === "1";
+
+  if (!id && !targetUrl) {
+    return json({ ok: false, error: "either id or url is required" }, 400, headers);
+  }
+
+  const where = id ? "id = ?" : "url = ?";
+  const param = id || targetUrl;
+
+  if (hard) {
+    await env.DB.prepare(`DELETE FROM sites WHERE ${where}`).bind(param).run();
+  } else {
+    await env.DB.prepare(`UPDATE sites SET is_active = 0, updated_at = ? WHERE ${where}`)
+      .bind(Date.now(), param)
+      .run();
+  }
+  return json({ ok: true }, 200, headers);
+}
+
+// ===== Operator management =====
+async function handleOperatorsList(req, env, headers) {
+  const url = new URL(req.url);
+  const includeInactive = url.searchParams.get("all") === "1";
+  const where = includeInactive ? "" : "WHERE is_active = 1";
+
+  const result = await env.DB.prepare(
+    `SELECT
+       o.id, o.operator_code, o.name, o.phone, o.note, o.is_active, o.created_at,
+       (SELECT MAX(received_at) FROM exposure_events WHERE uid = o.operator_code) AS last_seen,
+       (SELECT COUNT(DISTINCT sid) FROM exposure_events WHERE uid = o.operator_code) AS total_sessions,
+       (SELECT SUM(CASE WHEN event_type = 'heartbeat' THEN 1 ELSE 0 END) FROM exposure_events WHERE uid = o.operator_code) AS total_heartbeats
+     FROM operators o
+     ${where}
+     ORDER BY o.created_at DESC, o.id DESC`
+  ).all();
+
+  return json(
+    {
+      ok: true,
+      operators: (result.results || []).map((r) => ({
+        id: Number(r.id),
+        operator_code: r.operator_code,
+        name: r.name || "",
+        phone: r.phone || "",
+        note: r.note || "",
+        is_active: Number(r.is_active) === 1,
+        created_at: Number(r.created_at),
+        last_seen: r.last_seen ? Number(r.last_seen) : null,
+        last_seen_iso: toIsoOrNull(r.last_seen),
+        total_sessions: Number(r.total_sessions || 0),
+        total_dwell_seconds: Number(r.total_heartbeats || 0) * HEARTBEAT_INTERVAL_SEC,
+      })),
+    },
+    200,
+    headers
+  );
+}
+
+async function handleOperatorsAdd(req, env, headers) {
+  let body;
+  try { body = await req.json(); } catch { return json({ ok: false, error: "Invalid JSON body" }, 400, headers); }
+
+  const code = String(body.operator_code || "").trim();
+  const name = String(body.name || "").trim() || null;
+  const phone = String(body.phone || "").trim() || null;
+  const note = String(body.note || "").trim() || null;
+
+  if (!code) return json({ ok: false, error: "operator_code is required" }, 400, headers);
+  if (!/^[a-zA-Z0-9_\-]+$/.test(code)) {
+    return json({ ok: false, error: "operator_code can only contain letters, digits, _ and -" }, 400, headers);
+  }
+
+  const now = Date.now();
+  await env.DB.prepare(
+    `INSERT INTO operators (operator_code, name, phone, note, is_active, created_at)
+     VALUES (?, ?, ?, ?, 1, ?)
+     ON CONFLICT(operator_code) DO UPDATE SET
+       name = excluded.name,
+       phone = excluded.phone,
+       note = excluded.note,
+       is_active = 1`
+  )
+    .bind(code, name, phone, note, now)
+    .run();
+
+  return json({ ok: true, operator_code: code }, 200, headers);
+}
+
+async function handleOperatorsDelete(req, env, headers) {
+  const url = new URL(req.url);
+  const code = url.searchParams.get("operator_code");
+  const hard = url.searchParams.get("hard") === "1";
+
+  if (!code) return json({ ok: false, error: "operator_code is required" }, 400, headers);
+
+  if (hard) {
+    await env.DB.prepare(`DELETE FROM operators WHERE operator_code = ?`).bind(code).run();
+  } else {
+    await env.DB.prepare(`UPDATE operators SET is_active = 0 WHERE operator_code = ?`).bind(code).run();
+  }
+  return json({ ok: true }, 200, headers);
+}
+
 export default {
   async fetch(req, env) {
     const origin = req.headers.get("origin") || "*";
@@ -947,6 +1372,18 @@ export default {
       if (url.pathname === "/api/report" && req.method === "GET") return await handleReport(req, env, headers);
       if (url.pathname === "/api/report.csv" && req.method === "GET") return await handleCsv(req, env, headers);
       if (url.pathname === "/api/operator-report" && req.method === "GET") return await handleOperatorReport(req, env, headers);
+
+      if (url.pathname === "/api/sites" && req.method === "GET") return await handleSitesList(req, env, headers);
+      if (url.pathname === "/api/sites" && req.method === "POST") return await handleSitesAdd(req, env, headers);
+      if (url.pathname === "/api/sites" && req.method === "DELETE") return await handleSitesDelete(req, env, headers);
+
+      if (url.pathname === "/api/site-report" && req.method === "GET") return await handleSiteReport(req, env, headers);
+      if (url.pathname === "/api/operator-heatmap" && req.method === "GET") return await handleOperatorHeatmap(req, env, headers);
+      if (url.pathname === "/api/session-events" && req.method === "GET") return await handleSessionEvents(req, env, headers);
+
+      if (url.pathname === "/api/operators" && req.method === "GET") return await handleOperatorsList(req, env, headers);
+      if (url.pathname === "/api/operators" && req.method === "POST") return await handleOperatorsAdd(req, env, headers);
+      if (url.pathname === "/api/operators" && req.method === "DELETE") return await handleOperatorsDelete(req, env, headers);
 
       return json({ ok: false, error: "Not Found" }, 404, headers);
     } catch (err) {

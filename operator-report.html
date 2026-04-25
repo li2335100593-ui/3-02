@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>播放员工时审计报表 — Operator Audit</title>
+  <title>运营后台 — Carousel Operations</title>
   <link rel="preconnect" href="https://cdn.jsdelivr.net">
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/lucide@latest"></script>
@@ -15,6 +15,12 @@
     .scrollbar-thin::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
     .skeleton { background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 37%, #f1f5f9 63%); background-size: 400% 100%; animation: skel 1.4s ease infinite; }
     @keyframes skel { 0%{background-position:100% 50%} 100%{background-position:0 50%} }
+    .tab-btn { position: relative; padding: 14px 4px; font-size: 14px; font-weight: 500; color: #64748b; transition: color 0.15s; }
+    .tab-btn:hover { color: #334155; }
+    .tab-btn.active { color: #4338ca; }
+    .tab-btn.active::after { content: ''; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; background: #4f46e5; }
+    .toast-enter { animation: toast-in 0.2s ease-out; }
+    @keyframes toast-in { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: none; } }
   </style>
   <script>
     tailwind.config = {
@@ -44,173 +50,443 @@
   <div class="max-w-[1400px] mx-auto px-6 py-4 flex items-center gap-6">
     <div class="flex items-center gap-3">
       <div class="w-9 h-9 rounded-lg bg-brand-600 grid place-items-center text-white">
-        <i data-lucide="activity" class="w-5 h-5"></i>
+        <i data-lucide="layout-dashboard" class="w-5 h-5"></i>
       </div>
       <div>
-        <h1 class="text-base font-semibold tracking-tight">播放员工时审计</h1>
-        <p class="text-xs text-slate-500">Operator Audit Report</p>
+        <h1 class="text-base font-semibold tracking-tight">运营后台</h1>
+        <p class="text-xs text-slate-500">Carousel Operations Console</p>
       </div>
     </div>
-    <div class="ml-auto flex items-center gap-3">
-      <div class="flex items-center gap-2 text-sm">
-        <i data-lucide="calendar-range" class="w-4 h-4 text-slate-400"></i>
-        <input id="from-date" type="date" class="h-9 px-3 rounded-md border border-slate-300 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500">
-        <span class="text-slate-400">→</span>
-        <input id="to-date" type="date" class="h-9 px-3 rounded-md border border-slate-300 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500">
-      </div>
-      <button id="refresh-btn" class="h-9 px-4 rounded-md bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium flex items-center gap-2 transition-colors">
-        <i data-lucide="refresh-cw" class="w-4 h-4"></i>
-        刷新
+    <nav class="ml-8 flex items-center gap-6">
+      <button class="tab-btn active flex items-center gap-2" data-tab="report">
+        <i data-lucide="bar-chart-3" class="w-4 h-4"></i>
+        工时报表
       </button>
-      <button id="export-btn" class="h-9 px-4 rounded-md border border-slate-300 hover:bg-slate-50 text-sm font-medium flex items-center gap-2 transition-colors">
-        <i data-lucide="download" class="w-4 h-4"></i>
-        导出 CSV
+      <button class="tab-btn flex items-center gap-2" data-tab="site-report">
+        <i data-lucide="trending-up" class="w-4 h-4"></i>
+        站点报表
       </button>
-    </div>
+      <button class="tab-btn flex items-center gap-2" data-tab="operators">
+        <i data-lucide="users" class="w-4 h-4"></i>
+        播放员
+      </button>
+      <button class="tab-btn flex items-center gap-2" data-tab="sites">
+        <i data-lucide="globe" class="w-4 h-4"></i>
+        网站
+      </button>
+    </nav>
   </div>
 </header>
 
 <main class="max-w-[1400px] mx-auto px-6 py-6">
 
-  <!-- Stats overview -->
-  <div id="stats-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-    <!-- populated by JS -->
+  <!-- ========== TAB: REPORT ========== -->
+  <div id="tab-report" class="tab-pane">
+
+    <div class="flex items-center justify-between mb-6">
+      <div>
+        <h2 class="text-lg font-semibold tracking-tight">工时审计</h2>
+        <p class="text-xs text-slate-500 mt-0.5">按播放员维度的精确工时记录</p>
+      </div>
+      <div class="flex items-center gap-3">
+        <div class="flex items-center gap-2 text-sm">
+          <i data-lucide="calendar-range" class="w-4 h-4 text-slate-400"></i>
+          <input id="from-date" type="date" class="h-9 px-3 rounded-md border border-slate-300 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500">
+          <span class="text-slate-400">→</span>
+          <input id="to-date" type="date" class="h-9 px-3 rounded-md border border-slate-300 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500">
+        </div>
+        <button id="refresh-btn" class="h-9 px-4 rounded-md bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium flex items-center gap-2 transition-colors">
+          <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+          刷新
+        </button>
+        <button id="export-btn" class="h-9 px-4 rounded-md border border-slate-300 hover:bg-slate-50 text-sm font-medium flex items-center gap-2 transition-colors">
+          <i data-lucide="download" class="w-4 h-4"></i>
+          导出 CSV
+        </button>
+      </div>
+    </div>
+
+    <!-- 今日快照 -->
+    <div class="mb-6">
+      <div class="flex items-center justify-between mb-3">
+        <div class="flex items-center gap-2">
+          <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-medium">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+            实时
+          </span>
+          <h3 class="text-sm font-semibold text-slate-700">今日快照</h3>
+          <span class="text-xs text-slate-400" id="today-label">—</span>
+        </div>
+        <div id="online-now" class="text-xs text-slate-500"></div>
+      </div>
+      <div id="today-grid" class="grid grid-cols-2 md:grid-cols-4 gap-4"></div>
+    </div>
+
+    <!-- 累计统计（含周环比） -->
+    <div class="mb-3 flex items-center gap-2">
+      <h3 class="text-sm font-semibold text-slate-700">区间汇总</h3>
+      <span class="text-xs text-slate-400">含周环比</span>
+    </div>
+    <div id="stats-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6"></div>
+
+    <div id="list-view" class="space-y-6">
+      <div class="bg-white rounded-xl shadow-card border border-slate-200">
+        <div class="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
+          <div>
+            <h2 class="text-sm font-semibold flex items-center gap-2">
+              <i data-lucide="users" class="w-4 h-4 text-slate-500"></i>
+              播放员列表
+            </h2>
+            <p class="text-xs text-slate-500 mt-0.5">点击任意一行查看详细工时与设备指纹</p>
+          </div>
+          <div class="text-xs text-slate-500" id="list-count">—</div>
+        </div>
+        <div class="overflow-x-auto scrollbar-thin">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="text-xs uppercase tracking-wider text-slate-500 border-b border-slate-200 bg-slate-50/50">
+                <th class="text-left font-medium px-6 py-3">播放员</th>
+                <th class="text-right font-medium px-6 py-3">总工时</th>
+                <th class="text-right font-medium px-6 py-3">活跃天数</th>
+                <th class="text-right font-medium px-6 py-3">会话数</th>
+                <th class="text-right font-medium px-6 py-3">访问站点</th>
+                <th class="text-right font-medium px-6 py-3">设备数</th>
+                <th class="text-left font-medium px-6 py-3">主用设备</th>
+                <th class="text-left font-medium px-6 py-3">最后活动</th>
+                <th class="px-2 py-3"></th>
+              </tr>
+            </thead>
+            <tbody id="operator-tbody" class="divide-y divide-slate-100"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div id="detail-view" class="hidden space-y-6">
+      <div class="flex items-center justify-between">
+        <button id="back-btn" class="text-sm text-slate-600 hover:text-slate-900 flex items-center gap-1.5 -ml-1">
+          <i data-lucide="arrow-left" class="w-4 h-4"></i>
+          返回列表
+        </button>
+        <div id="detail-uid-badge" class="text-sm font-medium px-3 py-1.5 rounded-md bg-brand-50 text-brand-700 border border-brand-100"></div>
+      </div>
+
+      <div id="detail-stats-grid" class="grid grid-cols-2 md:grid-cols-4 gap-4"></div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div class="lg:col-span-2 bg-white rounded-xl shadow-card border border-slate-200 p-6">
+          <h3 class="text-sm font-semibold mb-1 flex items-center gap-2">
+            <i data-lucide="line-chart" class="w-4 h-4 text-slate-500"></i>
+            每日工时分布
+          </h3>
+          <p class="text-xs text-slate-500 mb-4">单位：小时（Asia/Shanghai 时区）</p>
+          <div class="h-72"><canvas id="daily-chart"></canvas></div>
+        </div>
+        <div class="bg-white rounded-xl shadow-card border border-slate-200 p-6">
+          <h3 class="text-sm font-semibold mb-1 flex items-center gap-2">
+            <i data-lucide="pie-chart" class="w-4 h-4 text-slate-500"></i>
+            站点工时分配
+          </h3>
+          <p class="text-xs text-slate-500 mb-4">按域名聚合</p>
+          <div class="h-72"><canvas id="url-chart"></canvas></div>
+        </div>
+      </div>
+
+      <div class="bg-white rounded-xl shadow-card border border-slate-200 p-6">
+        <h3 class="text-sm font-semibold mb-1 flex items-center gap-2">
+          <i data-lucide="grid-3x3" class="w-4 h-4 text-slate-500"></i>
+          作息热力图
+        </h3>
+        <p class="text-xs text-slate-500 mb-4">星期 × 小时 工时分布；颜色越深代表当时段工作越多</p>
+        <div id="heatmap-container" class="overflow-x-auto"></div>
+      </div>
+
+      <div class="bg-white rounded-xl shadow-card border border-slate-200">
+        <div class="px-6 py-4 border-b border-slate-200">
+          <h3 class="text-sm font-semibold flex items-center gap-2">
+            <i data-lucide="globe" class="w-4 h-4 text-slate-500"></i>
+            站点详情
+          </h3>
+        </div>
+        <div class="overflow-x-auto scrollbar-thin">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="text-xs uppercase tracking-wider text-slate-500 border-b border-slate-200 bg-slate-50/50">
+                <th class="text-left font-medium px-6 py-3">URL</th>
+                <th class="text-right font-medium px-6 py-3">工时</th>
+                <th class="text-right font-medium px-6 py-3">访问次数</th>
+                <th class="text-right font-medium px-6 py-3">会话数</th>
+                <th class="text-left font-medium px-6 py-3">最后访问</th>
+              </tr>
+            </thead>
+            <tbody id="url-tbody" class="divide-y divide-slate-100"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="bg-white rounded-xl shadow-card border border-slate-200">
+        <div class="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
+          <div>
+            <h3 class="text-sm font-semibold flex items-center gap-2">
+              <i data-lucide="list" class="w-4 h-4 text-slate-500"></i>
+              会话记录
+            </h3>
+            <p class="text-xs text-slate-500 mt-0.5">每次打开 scheduler 即一个会话；含设备指纹</p>
+          </div>
+          <div class="text-xs text-slate-500" id="session-count">—</div>
+        </div>
+        <div class="overflow-x-auto scrollbar-thin">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="text-xs uppercase tracking-wider text-slate-500 border-b border-slate-200 bg-slate-50/50">
+                <th class="text-left font-medium px-6 py-3">开始时间 / 会话 ID</th>
+                <th class="text-right font-medium px-6 py-3">工时</th>
+                <th class="text-right font-medium px-6 py-3">访问页面</th>
+                <th class="text-right font-medium px-6 py-3">站点数</th>
+                <th class="text-left font-medium px-6 py-3">设备 / 浏览器</th>
+                <th class="text-left font-medium px-6 py-3">分辨率</th>
+                <th class="text-left font-medium px-6 py-3">IP</th>
+                <th class="text-left font-medium px-6 py-3">时区</th>
+                <th class="text-left font-medium px-6 py-3">完整结束</th>
+              </tr>
+            </thead>
+            <tbody id="session-tbody" class="divide-y divide-slate-100"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div id="empty-state" class="hidden bg-white rounded-xl shadow-card border border-slate-200 p-16 text-center">
+      <div class="w-12 h-12 mx-auto rounded-full bg-slate-100 grid place-items-center mb-3">
+        <i data-lucide="inbox" class="w-6 h-6 text-slate-400"></i>
+      </div>
+      <h3 class="text-sm font-semibold text-slate-900">所选时段无数据</h3>
+      <p class="text-xs text-slate-500 mt-1">尝试扩大日期范围，或检查播放员是否开始工作。</p>
+    </div>
+
   </div>
 
-  <!-- Operator list view (default) -->
-  <div id="list-view" class="space-y-6">
-    <div class="bg-white rounded-xl shadow-card border border-slate-200">
-      <div class="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
-        <div>
-          <h2 class="text-sm font-semibold flex items-center gap-2">
-            <i data-lucide="users" class="w-4 h-4 text-slate-500"></i>
-            播放员列表
-          </h2>
-          <p class="text-xs text-slate-500 mt-0.5">点击任意一行查看详细工时与设备指纹</p>
-        </div>
-        <div class="text-xs text-slate-500" id="list-count">—</div>
+  <!-- ========== TAB: SITE REPORT ========== -->
+  <div id="tab-site-report" class="tab-pane hidden">
+
+    <div class="flex items-center justify-between mb-6">
+      <div>
+        <h2 class="text-lg font-semibold tracking-tight">站点维度报表</h2>
+        <p class="text-xs text-slate-500 mt-0.5">从客户网站角度看曝光、播放员分布、设备情况</p>
       </div>
+      <div class="flex items-center gap-3">
+        <div class="flex items-center gap-2 text-sm">
+          <i data-lucide="calendar-range" class="w-4 h-4 text-slate-400"></i>
+          <input id="site-from-date" type="date" class="h-9 px-3 rounded-md border border-slate-300 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+          <span class="text-slate-400">→</span>
+          <input id="site-to-date" type="date" class="h-9 px-3 rounded-md border border-slate-300 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+        </div>
+        <button id="site-refresh-btn" class="h-9 px-4 rounded-md bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium flex items-center gap-2">
+          <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+          刷新
+        </button>
+      </div>
+    </div>
+
+    <div id="site-stats-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6"></div>
+
+    <div id="site-list-view" class="space-y-6">
+      <div class="bg-white rounded-xl shadow-card border border-slate-200">
+        <div class="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
+          <div>
+            <h2 class="text-sm font-semibold flex items-center gap-2">
+              <i data-lucide="globe" class="w-4 h-4 text-slate-500"></i>
+              网站列表
+            </h2>
+            <p class="text-xs text-slate-500 mt-0.5">点击查看播放员明细</p>
+          </div>
+          <div class="text-xs text-slate-500" id="site-list-count">—</div>
+        </div>
+        <div class="overflow-x-auto scrollbar-thin">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="text-xs uppercase tracking-wider text-slate-500 border-b border-slate-200 bg-slate-50/50">
+                <th class="text-left font-medium px-6 py-3">网站</th>
+                <th class="text-right font-medium px-6 py-3">总工时</th>
+                <th class="text-right font-medium px-6 py-3">访问次数</th>
+                <th class="text-right font-medium px-6 py-3">会话数</th>
+                <th class="text-right font-medium px-6 py-3">播放员</th>
+                <th class="text-right font-medium px-6 py-3">设备数</th>
+                <th class="text-left font-medium px-6 py-3">主用设备</th>
+                <th class="text-left font-medium px-6 py-3">最后访问</th>
+                <th class="px-2 py-3"></th>
+              </tr>
+            </thead>
+            <tbody id="site-tbody" class="divide-y divide-slate-100"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div id="site-detail-view" class="hidden space-y-6">
+      <div class="flex items-center justify-between">
+        <button id="site-back-btn" class="text-sm text-slate-600 hover:text-slate-900 flex items-center gap-1.5 -ml-1">
+          <i data-lucide="arrow-left" class="w-4 h-4"></i>
+          返回列表
+        </button>
+        <div id="site-detail-url-badge" class="text-sm font-medium px-3 py-1.5 rounded-md bg-brand-50 text-brand-700 border border-brand-100"></div>
+      </div>
+
+      <div id="site-detail-stats" class="grid grid-cols-2 md:grid-cols-4 gap-4"></div>
+
+      <div class="bg-white rounded-xl shadow-card border border-slate-200 p-6">
+        <h3 class="text-sm font-semibold mb-1 flex items-center gap-2">
+          <i data-lucide="line-chart" class="w-4 h-4 text-slate-500"></i>
+          每日工时
+        </h3>
+        <p class="text-xs text-slate-500 mb-4">该站点每日累计工作时长</p>
+        <div class="h-72"><canvas id="site-daily-chart"></canvas></div>
+      </div>
+
+      <div class="bg-white rounded-xl shadow-card border border-slate-200">
+        <div class="px-6 py-4 border-b border-slate-200">
+          <h3 class="text-sm font-semibold flex items-center gap-2">
+            <i data-lucide="users" class="w-4 h-4 text-slate-500"></i>
+            播放员明细
+          </h3>
+          <p class="text-xs text-slate-500 mt-0.5">谁在此站工作了多久</p>
+        </div>
+        <div class="overflow-x-auto scrollbar-thin">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="text-xs uppercase tracking-wider text-slate-500 border-b border-slate-200 bg-slate-50/50">
+                <th class="text-left font-medium px-6 py-3">播放员</th>
+                <th class="text-right font-medium px-6 py-3">工时</th>
+                <th class="text-right font-medium px-6 py-3">会话数</th>
+                <th class="text-left font-medium px-6 py-3">最后活动</th>
+              </tr>
+            </thead>
+            <tbody id="site-operator-tbody" class="divide-y divide-slate-100"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div id="site-empty" class="hidden bg-white rounded-xl shadow-card border border-slate-200 p-16 text-center">
+      <div class="w-12 h-12 mx-auto rounded-full bg-slate-100 grid place-items-center mb-3">
+        <i data-lucide="inbox" class="w-6 h-6 text-slate-400"></i>
+      </div>
+      <h3 class="text-sm font-semibold text-slate-900">所选时段无数据</h3>
+    </div>
+
+  </div>
+
+  <!-- ========== TAB: OPERATORS ========== -->
+  <div id="tab-operators" class="tab-pane hidden">
+
+    <div class="flex items-center justify-between mb-6">
+      <div>
+        <h2 class="text-lg font-semibold tracking-tight">播放员管理</h2>
+        <p class="text-xs text-slate-500 mt-0.5">添加播放员、生成专属链接、复制后发给员工使用</p>
+      </div>
+      <button id="add-operator-btn" class="h-9 px-4 rounded-md bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium flex items-center gap-2 transition-colors">
+        <i data-lucide="user-plus" class="w-4 h-4"></i>
+        新增播放员
+      </button>
+    </div>
+
+    <!-- 薪资计算器 -->
+    <div class="bg-gradient-to-r from-brand-50 to-indigo-50 rounded-xl border border-brand-100 p-5 mb-6">
+      <div class="flex items-center gap-4 flex-wrap">
+        <div class="flex items-center gap-2">
+          <div class="w-9 h-9 rounded-lg bg-brand-600 grid place-items-center text-white">
+            <i data-lucide="calculator" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <h3 class="text-sm font-semibold text-slate-900">薪资计算</h3>
+            <p class="text-xs text-slate-500">输入时薪自动算工资</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-2 ml-auto">
+          <label class="text-xs font-medium text-slate-700">时薪</label>
+          <div class="relative">
+            <span class="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-400">¥</span>
+            <input id="payroll-rate" type="number" min="0" step="0.5" value="50" class="h-9 pl-7 pr-3 w-28 rounded-md border border-slate-300 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 tabular-nums">
+          </div>
+          <span class="text-xs text-slate-500">/ 小时</span>
+        </div>
+        <div class="text-right">
+          <div class="text-xs text-slate-500">应付总工资</div>
+          <div class="text-2xl font-bold tracking-tight text-brand-700 tabular-nums">¥<span id="payroll-total">0</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="bg-white rounded-xl shadow-card border border-slate-200">
       <div class="overflow-x-auto scrollbar-thin">
         <table class="w-full text-sm">
           <thead>
             <tr class="text-xs uppercase tracking-wider text-slate-500 border-b border-slate-200 bg-slate-50/50">
               <th class="text-left font-medium px-6 py-3">播放员</th>
-              <th class="text-right font-medium px-6 py-3">总工时</th>
-              <th class="text-right font-medium px-6 py-3">活跃天数</th>
+              <th class="text-left font-medium px-6 py-3">手机/备注</th>
+              <th class="text-right font-medium px-6 py-3">累计工时</th>
+              <th class="text-right font-medium px-6 py-3">应付工资</th>
               <th class="text-right font-medium px-6 py-3">会话数</th>
-              <th class="text-right font-medium px-6 py-3">访问站点</th>
-              <th class="text-right font-medium px-6 py-3">设备数</th>
-              <th class="text-left font-medium px-6 py-3">主用设备</th>
               <th class="text-left font-medium px-6 py-3">最后活动</th>
-              <th class="px-2 py-3"></th>
+              <th class="text-left font-medium px-6 py-3">专属链接</th>
+              <th class="text-right font-medium px-6 py-3 w-24">操作</th>
             </tr>
           </thead>
-          <tbody id="operator-tbody" class="divide-y divide-slate-100">
-            <!-- populated by JS -->
-          </tbody>
+          <tbody id="operators-tbody" class="divide-y divide-slate-100"></tbody>
         </table>
       </div>
     </div>
+
   </div>
 
-  <!-- Operator detail view -->
-  <div id="detail-view" class="hidden space-y-6">
-    <div class="flex items-center justify-between">
-      <button id="back-btn" class="text-sm text-slate-600 hover:text-slate-900 flex items-center gap-1.5 -ml-1">
-        <i data-lucide="arrow-left" class="w-4 h-4"></i>
-        返回列表
+  <!-- ========== TAB: SITES ========== -->
+  <div id="tab-sites" class="tab-pane hidden">
+
+    <div class="flex items-center justify-between mb-6">
+      <div>
+        <h2 class="text-lg font-semibold tracking-tight">网站管理</h2>
+        <p class="text-xs text-slate-500 mt-0.5">添加客户网站、配置自动轮播。新增站点立即生效</p>
+      </div>
+      <button id="add-site-btn" class="h-9 px-4 rounded-md bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium flex items-center gap-2 transition-colors">
+        <i data-lucide="plus" class="w-4 h-4"></i>
+        新增网站
       </button>
-      <div id="detail-uid-badge" class="text-sm font-medium px-3 py-1.5 rounded-md bg-brand-50 text-brand-700 border border-brand-100"></div>
-    </div>
-
-    <div id="detail-stats-grid" class="grid grid-cols-2 md:grid-cols-4 gap-4">
-      <!-- populated by JS -->
-    </div>
-
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      <div class="lg:col-span-2 bg-white rounded-xl shadow-card border border-slate-200 p-6">
-        <h3 class="text-sm font-semibold mb-1 flex items-center gap-2">
-          <i data-lucide="line-chart" class="w-4 h-4 text-slate-500"></i>
-          每日工时分布
-        </h3>
-        <p class="text-xs text-slate-500 mb-4">单位：小时（Asia/Shanghai 时区）</p>
-        <div class="h-72"><canvas id="daily-chart"></canvas></div>
-      </div>
-
-      <div class="bg-white rounded-xl shadow-card border border-slate-200 p-6">
-        <h3 class="text-sm font-semibold mb-1 flex items-center gap-2">
-          <i data-lucide="pie-chart" class="w-4 h-4 text-slate-500"></i>
-          站点工时分配
-        </h3>
-        <p class="text-xs text-slate-500 mb-4">按域名聚合</p>
-        <div class="h-72"><canvas id="url-chart"></canvas></div>
-      </div>
     </div>
 
     <div class="bg-white rounded-xl shadow-card border border-slate-200">
-      <div class="px-6 py-4 border-b border-slate-200">
-        <h3 class="text-sm font-semibold flex items-center gap-2">
-          <i data-lucide="globe" class="w-4 h-4 text-slate-500"></i>
-          站点详情
-        </h3>
-      </div>
       <div class="overflow-x-auto scrollbar-thin">
         <table class="w-full text-sm">
           <thead>
             <tr class="text-xs uppercase tracking-wider text-slate-500 border-b border-slate-200 bg-slate-50/50">
+              <th class="text-left font-medium px-6 py-3">名称</th>
               <th class="text-left font-medium px-6 py-3">URL</th>
-              <th class="text-right font-medium px-6 py-3">工时</th>
-              <th class="text-right font-medium px-6 py-3">访问次数</th>
-              <th class="text-right font-medium px-6 py-3">会话数</th>
-              <th class="text-left font-medium px-6 py-3">最后访问</th>
+              <th class="text-left font-medium px-6 py-3">备注</th>
+              <th class="text-left font-medium px-6 py-3">添加时间</th>
+              <th class="text-right font-medium px-6 py-3 w-24">操作</th>
             </tr>
           </thead>
-          <tbody id="url-tbody" class="divide-y divide-slate-100"></tbody>
+          <tbody id="sites-tbody" class="divide-y divide-slate-100"></tbody>
         </table>
       </div>
     </div>
 
-    <div class="bg-white rounded-xl shadow-card border border-slate-200">
-      <div class="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
-        <div>
-          <h3 class="text-sm font-semibold flex items-center gap-2">
-            <i data-lucide="list" class="w-4 h-4 text-slate-500"></i>
-            会话记录
-          </h3>
-          <p class="text-xs text-slate-500 mt-0.5">每次打开 scheduler 即一个会话；含设备指纹</p>
+    <div class="mt-6 bg-amber-50 border border-amber-200 rounded-xl p-5">
+      <div class="flex gap-3">
+        <i data-lucide="info" class="w-5 h-5 text-amber-700 flex-shrink-0 mt-0.5"></i>
+        <div class="text-sm text-amber-900 space-y-2">
+          <p class="font-semibold">添加新网站后还需要做一件事</p>
+          <p>在新网站的 HTML 末尾插入这段脚本（贴在 <code class="bg-amber-100 px-1 rounded">&lt;/body&gt;</code> 之前）：</p>
+          <div class="bg-white border border-amber-300 rounded-md p-3 mt-2 flex items-center gap-2">
+            <code id="snippet-code" class="text-xs font-mono text-slate-700 flex-1">&lt;script src="https://li2335100593-ui.github.io/3-02/carousel.js"&gt;&lt;/script&gt;</code>
+            <button id="snippet-copy-btn" class="text-xs px-2 py-1 rounded bg-amber-100 hover:bg-amber-200 text-amber-900 font-medium">复制</button>
+          </div>
         </div>
-        <div class="text-xs text-slate-500" id="session-count">—</div>
-      </div>
-      <div class="overflow-x-auto scrollbar-thin">
-        <table class="w-full text-sm">
-          <thead>
-            <tr class="text-xs uppercase tracking-wider text-slate-500 border-b border-slate-200 bg-slate-50/50">
-              <th class="text-left font-medium px-6 py-3">开始时间</th>
-              <th class="text-right font-medium px-6 py-3">工时</th>
-              <th class="text-right font-medium px-6 py-3">访问页面</th>
-              <th class="text-right font-medium px-6 py-3">站点数</th>
-              <th class="text-left font-medium px-6 py-3">设备</th>
-              <th class="text-left font-medium px-6 py-3">分辨率</th>
-              <th class="text-left font-medium px-6 py-3">IP</th>
-              <th class="text-left font-medium px-6 py-3">完整结束</th>
-            </tr>
-          </thead>
-          <tbody id="session-tbody" class="divide-y divide-slate-100"></tbody>
-        </table>
       </div>
     </div>
+
   </div>
 
-  <!-- Empty state -->
-  <div id="empty-state" class="hidden bg-white rounded-xl shadow-card border border-slate-200 p-16 text-center">
-    <div class="w-12 h-12 mx-auto rounded-full bg-slate-100 grid place-items-center mb-3">
-      <i data-lucide="inbox" class="w-6 h-6 text-slate-400"></i>
-    </div>
-    <h3 class="text-sm font-semibold text-slate-900">所选时段无数据</h3>
-    <p class="text-xs text-slate-500 mt-1">尝试扩大日期范围，或检查播放员是否开始工作。</p>
-  </div>
-
-  <div id="error-state" class="hidden bg-rose-50 border border-rose-200 rounded-xl p-4 flex items-start gap-3">
+  <div id="error-state" class="hidden mt-6 bg-rose-50 border border-rose-200 rounded-xl p-4 flex items-start gap-3">
     <i data-lucide="alert-circle" class="w-5 h-5 text-rose-600 flex-shrink-0 mt-0.5"></i>
     <div>
       <h3 class="text-sm font-semibold text-rose-900">加载失败</h3>
@@ -220,8 +496,91 @@
 
 </main>
 
+<!-- ============== Modal: Add Operator ============== -->
+<div id="modal-operator" class="hidden fixed inset-0 bg-slate-900/50 z-50 grid place-items-center p-4">
+  <div class="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden">
+    <div class="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
+      <h3 class="text-base font-semibold flex items-center gap-2">
+        <i data-lucide="user-plus" class="w-4 h-4 text-brand-600"></i>
+        新增播放员
+      </h3>
+      <button class="modal-close text-slate-400 hover:text-slate-700"><i data-lucide="x" class="w-5 h-5"></i></button>
+    </div>
+    <div class="px-6 py-5 space-y-4">
+      <div>
+        <label class="block text-xs font-medium text-slate-700 mb-1.5">播放员 ID <span class="text-rose-500">*</span></label>
+        <input id="op-code" type="text" class="w-full h-9 px-3 rounded-md border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" placeholder="例如 staff001">
+        <p class="text-xs text-slate-500 mt-1">只能含字母、数字、下划线、横线。每人独立，用于区分工时</p>
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-slate-700 mb-1.5">姓名</label>
+        <input id="op-name" type="text" class="w-full h-9 px-3 rounded-md border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" placeholder="王小明">
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-slate-700 mb-1.5">手机</label>
+        <input id="op-phone" type="text" class="w-full h-9 px-3 rounded-md border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" placeholder="可选">
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-slate-700 mb-1.5">备注</label>
+        <input id="op-note" type="text" class="w-full h-9 px-3 rounded-md border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" placeholder="可选">
+      </div>
+    </div>
+    <div class="px-6 py-4 bg-slate-50 border-t border-slate-200 flex items-center justify-end gap-2">
+      <button class="modal-close h-9 px-4 rounded-md border border-slate-300 hover:bg-white text-sm font-medium">取消</button>
+      <button id="op-submit" class="h-9 px-4 rounded-md bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium flex items-center gap-2">
+        <i data-lucide="check" class="w-4 h-4"></i>
+        创建
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ============== Modal: Add Site ============== -->
+<div id="modal-site" class="hidden fixed inset-0 bg-slate-900/50 z-50 grid place-items-center p-4">
+  <div class="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden">
+    <div class="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
+      <h3 class="text-base font-semibold flex items-center gap-2">
+        <i data-lucide="plus" class="w-4 h-4 text-brand-600"></i>
+        新增网站
+      </h3>
+      <button class="modal-close text-slate-400 hover:text-slate-700"><i data-lucide="x" class="w-5 h-5"></i></button>
+    </div>
+    <div class="px-6 py-5 space-y-4">
+      <div>
+        <label class="block text-xs font-medium text-slate-700 mb-1.5">站点名称 <span class="text-rose-500">*</span></label>
+        <input id="site-name" type="text" class="w-full h-9 px-3 rounded-md border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" placeholder="例如 客厅设计网">
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-slate-700 mb-1.5">URL <span class="text-rose-500">*</span></label>
+        <input id="site-url" type="url" class="w-full h-9 px-3 rounded-md border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" placeholder="https://example.com/">
+        <p class="text-xs text-slate-500 mt-1">必须含 https:// 或 http://</p>
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-slate-700 mb-1.5">备注</label>
+        <input id="site-note" type="text" class="w-full h-9 px-3 rounded-md border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" placeholder="可选">
+      </div>
+    </div>
+    <div class="px-6 py-4 bg-slate-50 border-t border-slate-200 flex items-center justify-end gap-2">
+      <button class="modal-close h-9 px-4 rounded-md border border-slate-300 hover:bg-white text-sm font-medium">取消</button>
+      <button id="site-submit" class="h-9 px-4 rounded-md bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium flex items-center gap-2">
+        <i data-lucide="check" class="w-4 h-4"></i>
+        添加
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ============== Toast ============== -->
+<div id="toast" class="hidden fixed top-6 right-6 z-50 bg-slate-900 text-white text-sm px-4 py-2.5 rounded-md shadow-2xl flex items-center gap-2 toast-enter">
+  <i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-400" id="toast-icon"></i>
+  <span id="toast-message"></span>
+</div>
+
 <script>
+// ===================== Config =====================
 const ANALYTICS_BASE = 'https://exposure-analytics.li2335100593.workers.dev';
+const SCHEDULER_BASE = 'https://li2335100593-ui.github.io/3-02/scheduler.html';
+
 const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => document.querySelectorAll(sel);
 
@@ -229,10 +588,19 @@ const state = {
   from: null,
   to: null,
   selectedUid: null,
-  charts: { daily: null, url: null },
+  charts: { daily: null, url: null, siteDaily: null },
+  currentTab: 'report',
+  cachedOperators: [],
+  payrollRate: 50,
+  // site report tab state
+  siteFrom: null,
+  siteTo: null,
+  selectedSiteUrl: null,
 };
 
-// ========== utilities ==========
+const ONLINE_THRESHOLD_MS = 5 * 60 * 1000; // last_seen within 5min = online
+
+// ===================== Utilities =====================
 function fmtSeconds(sec) {
   if (!sec || sec < 0) sec = 0;
   const h = Math.floor(sec / 3600);
@@ -241,23 +609,13 @@ function fmtSeconds(sec) {
   if (m === 0) return `${h}小时`;
   return `${h}小时${m}分`;
 }
-
-function fmtHours(sec) {
-  return Math.round((sec / 3600) * 100) / 100;
-}
-
+function fmtHours(sec) { return Math.round((sec / 3600) * 100) / 100; }
 function fmtDateTime(ms) {
   if (!ms) return '—';
   const d = new Date(Number(ms));
   if (isNaN(d.getTime())) return '—';
-  const yy = d.getFullYear();
-  const mo = String(d.getMonth() + 1).padStart(2, '0');
-  const dd = String(d.getDate()).padStart(2, '0');
-  const hh = String(d.getHours()).padStart(2, '0');
-  const mi = String(d.getMinutes()).padStart(2, '0');
-  return `${yy}-${mo}-${dd} ${hh}:${mi}`;
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
 }
-
 function fmtRelative(ms) {
   if (!ms) return '—';
   const diff = Date.now() - Number(ms);
@@ -271,111 +629,192 @@ function fmtRelative(ms) {
   if (d < 30) return `${d}天前`;
   return fmtDateTime(ms);
 }
+function deviceIcon(d) { return ({mobile:'smartphone',tablet:'tablet',desktop:'monitor'}[d]) || 'help-circle'; }
+function deviceLabel(d) { return ({mobile:'手机',tablet:'平板',desktop:'电脑'}[d]) || '未知'; }
 
-function deviceIcon(device) {
-  switch (device) {
-    case 'mobile': return 'smartphone';
-    case 'tablet': return 'tablet';
-    case 'desktop': return 'monitor';
-    default: return 'help-circle';
-  }
+// Parse a User-Agent string into { browser, browser_version, os, os_version }.
+// Heuristic — covers the major browsers/OSes; falls back to "Unknown" silently.
+function parseUa(ua) {
+  if (!ua) return { browser: '未知', browser_version: '', os: '未知', os_version: '' };
+  let browser = '其他', browser_version = '';
+  let os = '其他', os_version = '';
+
+  // Browser order matters: Edg before Chrome, Chrome before Safari
+  let m;
+  if ((m = ua.match(/Edg\/([\d.]+)/i))) { browser = 'Edge'; browser_version = m[1].split('.').slice(0, 2).join('.'); }
+  else if ((m = ua.match(/OPR\/([\d.]+)/i))) { browser = 'Opera'; browser_version = m[1].split('.').slice(0, 2).join('.'); }
+  else if ((m = ua.match(/Firefox\/([\d.]+)/i))) { browser = 'Firefox'; browser_version = m[1].split('.').slice(0, 2).join('.'); }
+  else if ((m = ua.match(/CriOS\/([\d.]+)/i))) { browser = 'Chrome (iOS)'; browser_version = m[1].split('.').slice(0, 2).join('.'); }
+  else if ((m = ua.match(/Chrome\/([\d.]+)/i))) { browser = 'Chrome'; browser_version = m[1].split('.').slice(0, 2).join('.'); }
+  else if ((m = ua.match(/Version\/([\d.]+).*Safari/i))) { browser = 'Safari'; browser_version = m[1].split('.').slice(0, 2).join('.'); }
+  else if (/MSIE|Trident/i.test(ua)) { browser = 'IE'; }
+
+  // OS detection
+  if ((m = ua.match(/iPhone OS ([\d_]+)/i)) || (m = ua.match(/CPU OS ([\d_]+) like Mac/i))) {
+    os = 'iOS'; os_version = m[1].replace(/_/g, '.').split('.').slice(0, 2).join('.');
+  } else if ((m = ua.match(/Android ([\d.]+)/i))) {
+    os = 'Android'; os_version = m[1].split('.').slice(0, 2).join('.');
+  } else if ((m = ua.match(/Mac OS X ([\d_]+)/i))) {
+    os = 'macOS'; os_version = m[1].replace(/_/g, '.').split('.').slice(0, 2).join('.');
+  } else if (/Windows NT 10/i.test(ua)) { os = 'Windows'; os_version = '10/11'; }
+  else if (/Windows NT 6\.3/i.test(ua)) { os = 'Windows'; os_version = '8.1'; }
+  else if (/Windows NT 6\.2/i.test(ua)) { os = 'Windows'; os_version = '8'; }
+  else if (/Windows NT 6\.1/i.test(ua)) { os = 'Windows'; os_version = '7'; }
+  else if (/Linux/i.test(ua)) { os = 'Linux'; }
+
+  return { browser, browser_version, os, os_version };
 }
 
-function deviceLabel(device) {
-  switch (device) {
-    case 'mobile': return '手机';
-    case 'tablet': return '平板';
-    case 'desktop': return '电脑';
-    default: return '未知';
-  }
+// tz_offset is JS Date.getTimezoneOffset() — minutes WEST of UTC, so positive = behind UTC.
+function tzLabel(tzOffset) {
+  if (tzOffset == null) return '—';
+  const utcOffset = -tzOffset / 60; // hours east of UTC
+  const sign = utcOffset >= 0 ? '+' : '-';
+  const abs = Math.abs(utcOffset);
+  const whole = Math.floor(abs);
+  const frac = Math.round((abs - whole) * 60);
+  let label = `UTC${sign}${whole}`;
+  if (frac > 0) label += `:${String(frac).padStart(2,'0')}`;
+  // Common timezones
+  const named = {
+    8: '中国/新加坡',
+    9: '日本/韩国',
+    7: '泰国/越南',
+    0: '英国',
+    [-5]: '美东',
+    [-8]: '美西',
+  };
+  if (named[utcOffset]) label += ` (${named[utcOffset]})`;
+  return label;
 }
-
-function shortUid(uid) {
-  if (!uid) return '—';
-  if (uid.length <= 14) return uid;
-  return uid.slice(0, 8) + '…' + uid.slice(-4);
-}
-
-function escapeHtml(s) {
-  if (s == null) return '';
-  return String(s).replace(/[&<>"']/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
-}
-
-function defaultRange() {
-  const to = new Date();
-  const from = new Date(to.getTime() - 30 * 24 * 60 * 60 * 1000);
-  return { from, to };
-}
-
-function ymd(d) {
-  const yy = d.getFullYear();
-  const mo = String(d.getMonth() + 1).padStart(2, '0');
-  const dd = String(d.getDate()).padStart(2, '0');
-  return `${yy}-${mo}-${dd}`;
-}
-
+function shortUid(s) { if (!s) return '—'; return s.length <= 14 ? s : s.slice(0,8)+'…'+s.slice(-4); }
+function escapeHtml(s) { if (s == null) return ''; return String(s).replace(/[&<>"']/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m])); }
+function defaultRange() { const to = new Date(); const from = new Date(to.getTime() - 90*864e5); return { from, to }; }
+function ymd(d) { return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
 function rangeFromInputs() {
   const f = new Date($('#from-date').value + 'T00:00:00');
   const t = new Date($('#to-date').value + 'T23:59:59');
   if (isNaN(f.getTime()) || isNaN(t.getTime())) return null;
   return { from: f.getTime(), to: t.getTime() };
 }
+function showToast(msg, type='success') {
+  const toast = $('#toast');
+  $('#toast-message').textContent = msg;
+  const icon = $('#toast-icon');
+  icon.outerHTML = `<i data-lucide="${type === 'success' ? 'check-circle-2' : 'alert-circle'}" class="w-4 h-4 ${type === 'success' ? 'text-emerald-400' : 'text-rose-400'}" id="toast-icon"></i>`;
+  toast.classList.remove('hidden');
+  toast.classList.remove('toast-enter');
+  void toast.offsetWidth;
+  toast.classList.add('toast-enter');
+  lucide.createIcons();
+  setTimeout(() => toast.classList.add('hidden'), 2400);
+}
+function showError(msg) { $('#error-message').textContent = msg; $('#error-state').classList.remove('hidden'); }
+function hideError() { $('#error-state').classList.add('hidden'); }
 
-// ========== rendering ==========
-function renderTopStats(data) {
-  const totals = data.totals || {};
-  const cards = [
-    {
-      icon: 'clock',
-      label: '总工时',
-      value: `${totals.dwell_hours || 0}`,
-      suffix: '小时',
-      tone: 'brand',
-    },
-    {
-      icon: 'users',
-      label: '活跃播放员',
-      value: totals.operators || 0,
-      suffix: '人',
-      tone: 'emerald',
-    },
-    {
-      icon: 'mouse-pointer-click',
-      label: '总会话',
-      value: (data.operators || []).reduce((a, op) => a + op.sessions, 0),
-      suffix: '次',
-      tone: 'amber',
-    },
-    {
-      icon: 'monitor-smartphone',
-      label: '已识别设备',
-      value: (data.operators || []).reduce((a, op) => a + op.unique_devices, 0),
-      suffix: '台',
-      tone: 'sky',
-    },
-  ];
-  const tones = {
-    brand: 'bg-brand-50 text-brand-700',
-    emerald: 'bg-emerald-50 text-emerald-700',
-    amber: 'bg-amber-50 text-amber-700',
-    sky: 'bg-sky-50 text-sky-700',
-  };
-  $('#stats-grid').innerHTML = cards.map((c) => `
+async function api(path, options = {}) {
+  const res = await fetch(ANALYTICS_BASE + path, options);
+  const json = await res.json();
+  if (!json.ok) throw new Error(json.error || `HTTP ${res.status}`);
+  return json;
+}
+
+// ===================== Tab switching =====================
+function switchTab(tab) {
+  state.currentTab = tab;
+  $$('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+  $$('.tab-pane').forEach(p => p.classList.toggle('hidden', p.id !== `tab-${tab}`));
+  hideError();
+  if (tab === 'report') loadList();
+  if (tab === 'site-report') loadSiteList();
+  if (tab === 'operators') loadOperators();
+  if (tab === 'sites') loadSites();
+}
+
+// ===== Date helpers for snapshot/trend =====
+function startOfTodayMs() {
+  const d = new Date(); d.setHours(0, 0, 0, 0); return d.getTime();
+}
+function endOfTodayMs() { return startOfTodayMs() + 86400000 - 1; }
+function trendBadge(curr, prev) {
+  if (prev === 0 && curr === 0) return '';
+  if (prev === 0) return `<span class="text-xs px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 font-medium ml-1">新</span>`;
+  const pct = Math.round(((curr - prev) / prev) * 100);
+  if (pct === 0) return `<span class="text-xs px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 font-medium ml-1">持平</span>`;
+  const up = pct > 0;
+  const cls = up ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700';
+  const arrow = up ? '↑' : '↓';
+  return `<span class="text-xs px-1.5 py-0.5 rounded ${cls} font-medium ml-1">${arrow} ${Math.abs(pct)}%</span>`;
+}
+
+// ===================== TAB: REPORT =====================
+function statCard(c, tones, trendHtml = '') {
+  return `
     <div class="bg-white rounded-xl shadow-card border border-slate-200 p-5">
       <div class="flex items-start justify-between">
-        <div>
+        <div class="min-w-0 flex-1">
           <p class="text-xs font-medium text-slate-500 uppercase tracking-wider">${escapeHtml(c.label)}</p>
-          <p class="mt-2 text-2xl font-semibold tracking-tight">
-            ${escapeHtml(String(c.value))}
-            <span class="text-sm font-normal text-slate-500 ml-0.5">${escapeHtml(c.suffix)}</span>
-          </p>
+          <p class="mt-2 text-2xl font-semibold tracking-tight truncate">${escapeHtml(String(c.value))}${c.suffix ? `<span class="text-sm font-normal text-slate-500 ml-0.5">${escapeHtml(c.suffix)}</span>` : ''}</p>
+          ${c.sub ? `<p class="text-xs text-slate-500 mt-1 truncate">${escapeHtml(c.sub)}</p>` : ''}
         </div>
-        <div class="w-9 h-9 rounded-lg ${tones[c.tone]} grid place-items-center">
-          <i data-lucide="${c.icon}" class="w-5 h-5"></i>
+        <div class="flex flex-col items-end gap-1.5 ml-2 flex-shrink-0">
+          <div class="w-9 h-9 rounded-lg ${tones[c.tone]} grid place-items-center"><i data-lucide="${c.icon}" class="w-5 h-5"></i></div>
+          ${trendHtml}
         </div>
       </div>
     </div>
-  `).join('');
+  `;
+}
+
+function renderTopStats(data, prevData) {
+  const totals = data.totals || {};
+  const prevTotals = (prevData && prevData.totals) || {};
+  const tones = { brand:'bg-brand-50 text-brand-700', emerald:'bg-emerald-50 text-emerald-700', amber:'bg-amber-50 text-amber-700', sky:'bg-sky-50 text-sky-700' };
+
+  const currHours = totals.dwell_hours || 0;
+  const prevHours = prevTotals.dwell_hours || 0;
+  const currOps = totals.operators || 0;
+  const prevOps = prevTotals.operators || 0;
+  const currSessions = (data.operators || []).reduce((a, op) => a + op.sessions, 0);
+  const prevSessions = ((prevData && prevData.operators) || []).reduce((a, op) => a + op.sessions, 0);
+  const currDevices = (data.operators || []).reduce((a, op) => a + op.unique_devices, 0);
+  const prevDevices = ((prevData && prevData.operators) || []).reduce((a, op) => a + op.unique_devices, 0);
+
+  const cards = [
+    { icon: 'clock', label: '总工时', value: currHours, suffix: '小时', tone: 'brand', prev: prevHours },
+    { icon: 'users', label: '活跃播放员', value: currOps, suffix: '人', tone: 'emerald', prev: prevOps },
+    { icon: 'mouse-pointer-click', label: '总会话', value: currSessions, suffix: '次', tone: 'amber', prev: prevSessions },
+    { icon: 'monitor-smartphone', label: '已识别设备', value: currDevices, suffix: '台', tone: 'sky', prev: prevDevices },
+  ];
+
+  $('#stats-grid').innerHTML = cards.map(c => statCard(c, tones, prevData ? trendBadge(c.value, c.prev) : '')).join('');
+}
+
+function renderTodaySnapshot(today) {
+  const totals = today.totals || {};
+  const ops = today.operators || [];
+  // top site (by dwell)
+  const siteMap = new Map();
+  // We don't have site breakdown for today aggregate. Approximate: top operator's primary device.
+  const topOp = ops[0];
+  const tones = { brand:'bg-brand-50 text-brand-700', emerald:'bg-emerald-50 text-emerald-700', amber:'bg-amber-50 text-amber-700', sky:'bg-sky-50 text-sky-700' };
+  const cards = [
+    { icon: 'clock', label: '今日工时', value: totals.dwell_hours || 0, suffix: '小时', tone: 'brand' },
+    { icon: 'users', label: '今日活跃', value: totals.operators || 0, suffix: '人', tone: 'emerald' },
+    { icon: 'play', label: '今日会话', value: ops.reduce((a, op) => a + op.sessions, 0), suffix: '次', tone: 'amber' },
+    { icon: 'crown', label: '工时之王', value: topOp ? topOp.uid : '—', sub: topOp ? `${fmtHours(topOp.dwell_seconds)} h · ${deviceLabel(topOp.primary_device_type)}` : '暂无数据', tone: 'sky' },
+  ];
+  $('#today-grid').innerHTML = cards.map(c => statCard(c, tones)).join('');
+
+  // online now (last_seen within 5min)
+  const now = Date.now();
+  const onlineOps = (state.cachedOperators || []).filter(op => op.last_seen && (now - op.last_seen) < ONLINE_THRESHOLD_MS);
+  $('#online-now').innerHTML = onlineOps.length > 0
+    ? `<span class="inline-flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>${onlineOps.length} 人在线</span>`
+    : '当前无人在线';
+
+  const todayDate = new Date();
+  $('#today-label').textContent = `· ${todayDate.getFullYear()}-${String(todayDate.getMonth()+1).padStart(2,'0')}-${String(todayDate.getDate()).padStart(2,'0')}`;
 }
 
 function renderOperatorList(data) {
@@ -388,67 +827,51 @@ function renderOperatorList(data) {
   }
   $('#empty-state').classList.add('hidden');
   $('#list-view').classList.remove('hidden');
-
-  $('#operator-tbody').innerHTML = ops.map((op) => `
+  const now = Date.now();
+  $('#operator-tbody').innerHTML = ops.map(op => {
+    const online = op.last_seen && (now - op.last_seen) < ONLINE_THRESHOLD_MS;
+    return `
     <tr class="hover:bg-slate-50 cursor-pointer transition-colors" data-uid="${escapeHtml(op.uid)}">
       <td class="px-6 py-4">
         <div class="flex items-center gap-3">
-          <div class="w-8 h-8 rounded-full bg-gradient-to-br from-brand-500 to-brand-700 text-white text-xs font-semibold grid place-items-center flex-shrink-0">
-            ${escapeHtml((op.uid || '?').slice(0, 2).toUpperCase())}
+          <div class="relative flex-shrink-0">
+            <div class="w-8 h-8 rounded-full bg-gradient-to-br from-brand-500 to-brand-700 text-white text-xs font-semibold grid place-items-center">${escapeHtml((op.uid || '?').slice(0, 2).toUpperCase())}</div>
+            ${online ? '<span class="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-500 border-2 border-white"></span>' : ''}
           </div>
           <div class="min-w-0">
-            <div class="font-medium text-slate-900 truncate">${escapeHtml(op.uid)}</div>
+            <div class="font-medium text-slate-900 truncate flex items-center gap-1.5">${escapeHtml(op.uid)}${online ? '<span class="text-xs text-emerald-600 font-normal">在线</span>' : ''}</div>
             <div class="text-xs text-slate-500">首次 ${fmtDateTime(op.first_seen)}</div>
           </div>
         </div>
       </td>
-      <td class="px-6 py-4 text-right">
-        <div class="font-semibold text-slate-900">${fmtSeconds(op.dwell_seconds)}</div>
-        <div class="text-xs text-slate-500">${fmtHours(op.dwell_seconds)} h</div>
-      </td>
+      <td class="px-6 py-4 text-right"><div class="font-semibold text-slate-900">${fmtSeconds(op.dwell_seconds)}</div><div class="text-xs text-slate-500">${fmtHours(op.dwell_seconds)} h</div></td>
       <td class="px-6 py-4 text-right tabular-nums">${op.active_days}</td>
       <td class="px-6 py-4 text-right tabular-nums">${op.sessions}</td>
       <td class="px-6 py-4 text-right tabular-nums">${op.urls_visited}</td>
       <td class="px-6 py-4 text-right tabular-nums">${op.unique_devices}</td>
-      <td class="px-6 py-4">
-        <div class="inline-flex items-center gap-1.5 text-xs px-2 py-1 rounded-md bg-slate-100 text-slate-700">
-          <i data-lucide="${deviceIcon(op.primary_device_type)}" class="w-3.5 h-3.5"></i>
-          ${deviceLabel(op.primary_device_type)}
-        </div>
-      </td>
+      <td class="px-6 py-4"><div class="inline-flex items-center gap-1.5 text-xs px-2 py-1 rounded-md bg-slate-100 text-slate-700"><i data-lucide="${deviceIcon(op.primary_device_type)}" class="w-3.5 h-3.5"></i>${deviceLabel(op.primary_device_type)}</div></td>
       <td class="px-6 py-4 text-slate-600">${fmtRelative(op.last_seen)}</td>
       <td class="px-2 py-4 text-slate-400"><i data-lucide="chevron-right" class="w-4 h-4"></i></td>
     </tr>
-  `).join('');
+  `;
+  }).join('');
 
-  $$('#operator-tbody tr').forEach((row) => {
-    row.addEventListener('click', () => {
-      state.selectedUid = row.dataset.uid;
-      loadDetail();
-    });
+  $$('#operator-tbody tr').forEach(row => {
+    row.addEventListener('click', () => { state.selectedUid = row.dataset.uid; loadDetail(); });
   });
-
   lucide.createIcons();
 }
 
 function renderDetailStats(summary) {
-  if (!summary) {
-    $('#detail-stats-grid').innerHTML = '';
-    return;
-  }
+  if (!summary) { $('#detail-stats-grid').innerHTML = ''; return; }
   const cards = [
     { icon: 'clock', label: '总工时', value: fmtSeconds(summary.dwell_seconds), sub: `${fmtHours(summary.dwell_seconds)} h`, tone: 'brand' },
     { icon: 'calendar-check-2', label: '活跃天数', value: summary.active_days, sub: '天', tone: 'emerald' },
     { icon: 'mouse-pointer-click', label: '会话数', value: summary.sessions, sub: '次', tone: 'amber' },
     { icon: deviceIcon(summary.primary_device_type), label: '主用设备', value: deviceLabel(summary.primary_device_type), sub: `${summary.unique_devices} 台已识别`, tone: 'sky' },
   ];
-  const tones = {
-    brand: 'bg-brand-50 text-brand-700',
-    emerald: 'bg-emerald-50 text-emerald-700',
-    amber: 'bg-amber-50 text-amber-700',
-    sky: 'bg-sky-50 text-sky-700',
-  };
-  $('#detail-stats-grid').innerHTML = cards.map((c) => `
+  const tones = { brand:'bg-brand-50 text-brand-700', emerald:'bg-emerald-50 text-emerald-700', amber:'bg-amber-50 text-amber-700', sky:'bg-sky-50 text-sky-700' };
+  $('#detail-stats-grid').innerHTML = cards.map(c => `
     <div class="bg-white rounded-xl shadow-card border border-slate-200 p-5">
       <div class="flex items-start justify-between">
         <div>
@@ -456,9 +879,7 @@ function renderDetailStats(summary) {
           <p class="mt-2 text-xl font-semibold tracking-tight">${escapeHtml(String(c.value))}</p>
           <p class="text-xs text-slate-500 mt-1">${escapeHtml(c.sub)}</p>
         </div>
-        <div class="w-9 h-9 rounded-lg ${tones[c.tone]} grid place-items-center">
-          <i data-lucide="${c.icon}" class="w-5 h-5"></i>
-        </div>
+        <div class="w-9 h-9 rounded-lg ${tones[c.tone]} grid place-items-center"><i data-lucide="${c.icon}" class="w-5 h-5"></i></div>
       </div>
     </div>
   `).join('');
@@ -467,42 +888,14 @@ function renderDetailStats(summary) {
 function renderDailyChart(daily) {
   const ctx = document.getElementById('daily-chart');
   if (state.charts.daily) state.charts.daily.destroy();
-  if (!daily || daily.length === 0) {
-    ctx.parentElement.innerHTML = '<div class="h-full grid place-items-center text-xs text-slate-400">无数据</div>';
-    return;
-  }
+  if (!daily || daily.length === 0) { ctx.parentElement.innerHTML = '<div class="h-full grid place-items-center text-xs text-slate-400">无数据</div>'; return; }
   state.charts.daily = new Chart(ctx, {
     type: 'bar',
-    data: {
-      labels: daily.map((d) => d.day.slice(5)),
-      datasets: [{
-        label: '工时 (小时)',
-        data: daily.map((d) => fmtHours(d.dwell_seconds)),
-        backgroundColor: '#6366f1',
-        borderRadius: 4,
-        maxBarThickness: 32,
-      }]
-    },
+    data: { labels: daily.map(d => d.day.slice(5)), datasets: [{ label: '工时 (小时)', data: daily.map(d => fmtHours(d.dwell_seconds)), backgroundColor: '#6366f1', borderRadius: 4, maxBarThickness: 32 }] },
     options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: {
-        legend: { display: false },
-        tooltip: {
-          callbacks: {
-            label: (ctx) => ` ${ctx.parsed.y} h`,
-          },
-          backgroundColor: '#1e293b',
-          padding: 10,
-          cornerRadius: 6,
-          titleFont: { size: 12, weight: '600' },
-          bodyFont: { size: 12 },
-        }
-      },
-      scales: {
-        x: { grid: { display: false }, ticks: { font: { size: 11 }, color: '#64748b' } },
-        y: { grid: { color: '#f1f5f9' }, ticks: { font: { size: 11 }, color: '#64748b' }, beginAtZero: true }
-      }
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => ` ${c.parsed.y} h` }, backgroundColor: '#1e293b', padding: 10, cornerRadius: 6 } },
+      scales: { x: { grid: { display: false }, ticks: { font: { size: 11 }, color: '#64748b' } }, y: { grid: { color: '#f1f5f9' }, ticks: { font: { size: 11 }, color: '#64748b' }, beginAtZero: true } }
     }
   });
 }
@@ -510,62 +903,30 @@ function renderDailyChart(daily) {
 function renderUrlChart(urls) {
   const ctx = document.getElementById('url-chart');
   if (state.charts.url) state.charts.url.destroy();
-  if (!urls || urls.length === 0) {
-    ctx.parentElement.innerHTML = '<div class="h-full grid place-items-center text-xs text-slate-400">无数据</div>';
-    return;
-  }
-  const palette = ['#6366f1', '#10b981', '#f59e0b', '#0ea5e9', '#ec4899', '#8b5cf6', '#84cc16', '#f43f5e'];
+  if (!urls || urls.length === 0) { ctx.parentElement.innerHTML = '<div class="h-full grid place-items-center text-xs text-slate-400">无数据</div>'; return; }
+  const palette = ['#6366f1','#10b981','#f59e0b','#0ea5e9','#ec4899','#8b5cf6','#84cc16','#f43f5e'];
   state.charts.url = new Chart(ctx, {
     type: 'doughnut',
     data: {
-      labels: urls.map((u) => {
-        try { return new URL(u.url).hostname; } catch (e) { return u.url; }
-      }),
-      datasets: [{
-        data: urls.map((u) => fmtHours(u.dwell_seconds)),
-        backgroundColor: urls.map((_, i) => palette[i % palette.length]),
-        borderWidth: 0,
-      }]
+      labels: urls.map(u => { try { return new URL(u.url).hostname; } catch (e) { return u.url; } }),
+      datasets: [{ data: urls.map(u => fmtHours(u.dwell_seconds)), backgroundColor: urls.map((_, i) => palette[i % palette.length]), borderWidth: 0 }]
     },
     options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      cutout: '65%',
-      plugins: {
-        legend: { position: 'bottom', labels: { font: { size: 11 }, color: '#475569', boxWidth: 10, padding: 12 } },
-        tooltip: {
-          callbacks: { label: (ctx) => ` ${ctx.label}: ${ctx.parsed} h` },
-          backgroundColor: '#1e293b',
-          padding: 10,
-          cornerRadius: 6,
-        }
-      }
+      responsive: true, maintainAspectRatio: false, cutout: '65%',
+      plugins: { legend: { position: 'bottom', labels: { font: { size: 11 }, color: '#475569', boxWidth: 10, padding: 12 } }, tooltip: { callbacks: { label: c => ` ${c.label}: ${c.parsed} h` }, backgroundColor: '#1e293b', padding: 10, cornerRadius: 6 } }
     }
   });
 }
 
 function renderUrlTable(urls) {
-  if (!urls || urls.length === 0) {
-    $('#url-tbody').innerHTML = '<tr><td colspan="5" class="px-6 py-8 text-center text-xs text-slate-400">暂无数据</td></tr>';
-    return;
-  }
-  $('#url-tbody').innerHTML = urls.map((u) => {
+  if (!urls || urls.length === 0) { $('#url-tbody').innerHTML = '<tr><td colspan="5" class="px-6 py-8 text-center text-xs text-slate-400">暂无数据</td></tr>'; return; }
+  $('#url-tbody').innerHTML = urls.map(u => {
     let host = u.url, path = '';
-    try {
-      const parsed = new URL(u.url);
-      host = parsed.hostname;
-      path = parsed.pathname === '/' ? '' : parsed.pathname;
-    } catch (e) {}
+    try { const parsed = new URL(u.url); host = parsed.hostname; path = parsed.pathname === '/' ? '' : parsed.pathname; } catch (e) {}
     return `
       <tr class="hover:bg-slate-50 transition-colors">
-        <td class="px-6 py-3.5">
-          <div class="font-medium text-slate-900">${escapeHtml(host)}</div>
-          ${path ? `<div class="text-xs text-slate-500">${escapeHtml(path)}</div>` : ''}
-        </td>
-        <td class="px-6 py-3.5 text-right">
-          <div class="font-semibold">${fmtSeconds(u.dwell_seconds)}</div>
-          <div class="text-xs text-slate-500">${fmtHours(u.dwell_seconds)} h</div>
-        </td>
+        <td class="px-6 py-3.5"><div class="font-medium text-slate-900">${escapeHtml(host)}</div>${path ? `<div class="text-xs text-slate-500">${escapeHtml(path)}</div>` : ''}</td>
+        <td class="px-6 py-3.5 text-right"><div class="font-semibold">${fmtSeconds(u.dwell_seconds)}</div><div class="text-xs text-slate-500">${fmtHours(u.dwell_seconds)} h</div></td>
         <td class="px-6 py-3.5 text-right tabular-nums">${u.visits}</td>
         <td class="px-6 py-3.5 text-right tabular-nums">${u.sessions}</td>
         <td class="px-6 py-3.5 text-slate-600">${fmtRelative(u.last_seen)}</td>
@@ -576,24 +937,24 @@ function renderUrlTable(urls) {
 
 function renderSessionTable(sessions) {
   $('#session-count').textContent = `${(sessions || []).length} 个会话`;
-  if (!sessions || sessions.length === 0) {
-    $('#session-tbody').innerHTML = '<tr><td colspan="8" class="px-6 py-8 text-center text-xs text-slate-400">暂无会话</td></tr>';
-    return;
-  }
-  $('#session-tbody').innerHTML = sessions.map((s) => {
+  if (!sessions || sessions.length === 0) { $('#session-tbody').innerHTML = '<tr><td colspan="9" class="px-6 py-8 text-center text-xs text-slate-400">暂无会话</td></tr>'; return; }
+  $('#session-tbody').innerHTML = sessions.map((s, idx) => {
     const resolution = (s.screen_w && s.screen_h) ? `${s.screen_w} × ${s.screen_h}` : '—';
-    const cleanIcon = s.clean_leaves > 0
-      ? '<i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-600"></i>'
-      : '<i data-lucide="x-circle" class="w-4 h-4 text-slate-300"></i>';
+    const cleanIcon = s.clean_leaves > 0 ? '<i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-600"></i>' : '<i data-lucide="x-circle" class="w-4 h-4 text-slate-300"></i>';
+    const ua = parseUa(s.ua);
+    const browserBadge = `${ua.browser}${ua.browser_version ? ' ' + ua.browser_version : ''}`;
     return `
-      <tr class="hover:bg-slate-50 transition-colors">
+      <tr class="hover:bg-slate-50 transition-colors cursor-pointer session-row" data-sid="${escapeHtml(s.sid)}" data-idx="${idx}">
         <td class="px-6 py-3.5">
-          <div class="font-medium text-slate-900">${fmtDateTime(s.started_at)}</div>
-          <div class="text-xs text-slate-500 font-mono">${escapeHtml(shortUid(s.sid))}</div>
+          <div class="flex items-center gap-2">
+            <i data-lucide="chevron-right" class="w-4 h-4 text-slate-400 chevron transition-transform"></i>
+            <div>
+              <div class="font-medium text-slate-900">${fmtDateTime(s.started_at)}</div>
+              <div class="text-xs text-slate-500 font-mono">${escapeHtml(shortUid(s.sid))}</div>
+            </div>
+          </div>
         </td>
-        <td class="px-6 py-3.5 text-right">
-          <div class="font-semibold">${fmtSeconds(s.dwell_seconds)}</div>
-        </td>
+        <td class="px-6 py-3.5 text-right"><div class="font-semibold">${fmtSeconds(s.dwell_seconds)}</div></td>
         <td class="px-6 py-3.5 text-right tabular-nums">${s.pages_visited}</td>
         <td class="px-6 py-3.5 text-right tabular-nums">${s.unique_urls}</td>
         <td class="px-6 py-3.5">
@@ -601,62 +962,249 @@ function renderSessionTable(sessions) {
             <i data-lucide="${deviceIcon(s.device_type)}" class="w-3.5 h-3.5"></i>
             ${deviceLabel(s.device_type)}
           </div>
+          <div class="text-xs text-slate-500 mt-1">${escapeHtml(browserBadge)} · ${escapeHtml(ua.os)}${ua.os_version ? ' ' + ua.os_version : ''}</div>
         </td>
         <td class="px-6 py-3.5 tabular-nums text-slate-600">${escapeHtml(resolution)}</td>
         <td class="px-6 py-3.5 font-mono text-xs text-slate-500">${escapeHtml(s.ip || '—')}</td>
+        <td class="px-6 py-3.5 text-xs text-slate-600">${escapeHtml(tzLabel(s.tz_offset))}</td>
         <td class="px-6 py-3.5">${cleanIcon}</td>
+      </tr>
+      <tr class="session-detail-row hidden bg-slate-50/60" data-sid="${escapeHtml(s.sid)}">
+        <td colspan="9" class="px-6 py-5">
+          <div class="session-detail-content text-sm" data-sid="${escapeHtml(s.sid)}">
+            <div class="text-xs text-slate-400">加载详情...</div>
+          </div>
+        </td>
       </tr>
     `;
   }).join('');
+
+  $$('.session-row').forEach(row => {
+    row.addEventListener('click', () => toggleSessionExpand(row, sessions[Number(row.dataset.idx)]));
+  });
+  lucide.createIcons();
 }
 
-// ========== loaders ==========
-async function loadList() {
-  const range = rangeFromInputs();
-  if (!range) return showError('日期范围无效');
-  state.from = range.from;
-  state.to = range.to;
-  state.selectedUid = null;
-  showLoading();
+const sessionDetailCache = new Map();
 
+async function toggleSessionExpand(row, sessionData) {
+  const sid = row.dataset.sid;
+  const detailRow = row.nextElementSibling;
+  const chevron = row.querySelector('.chevron');
+  const wasOpen = !detailRow.classList.contains('hidden');
+
+  // Close all other expanded rows for cleanliness
+  $$('.session-detail-row').forEach(r => r.classList.add('hidden'));
+  $$('.session-row .chevron').forEach(c => c.style.transform = '');
+
+  if (wasOpen) return;
+
+  detailRow.classList.remove('hidden');
+  if (chevron) chevron.style.transform = 'rotate(90deg)';
+
+  const contentDiv = detailRow.querySelector('.session-detail-content');
+  if (sessionDetailCache.has(sid)) {
+    contentDiv.innerHTML = renderSessionDetailHtml(sessionData, sessionDetailCache.get(sid));
+    lucide.createIcons();
+    return;
+  }
+  contentDiv.innerHTML = '<div class="text-xs text-slate-400 flex items-center gap-2"><span class="inline-block w-3 h-3 rounded-full border-2 border-slate-300 border-t-brand-600 animate-spin"></span>加载中...</div>';
   try {
-    const res = await fetch(`${ANALYTICS_BASE}/api/operator-report?from=${range.from}&to=${range.to}`);
-    const json = await res.json();
-    if (!json.ok) throw new Error(json.error || 'Unknown error');
-
-    $('#detail-view').classList.add('hidden');
-    renderTopStats(json);
-    renderOperatorList(json);
-    hideError();
+    const json = await api(`/api/session-events?sid=${encodeURIComponent(sid)}`);
+    sessionDetailCache.set(sid, json);
+    contentDiv.innerHTML = renderSessionDetailHtml(sessionData, json);
     lucide.createIcons();
   } catch (err) {
-    showError(err.message || String(err));
+    contentDiv.innerHTML = `<div class="text-xs text-rose-600">加载失败：${escapeHtml(err.message || String(err))}</div>`;
   }
+}
+
+function renderSessionDetailHtml(sessionData, eventsData) {
+  const ua = parseUa(sessionData.ua);
+  const pages = eventsData.pages || [];
+  const events = eventsData.events || [];
+
+  // Top: device fingerprint card
+  let html = `
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-5">
+      <div class="bg-white rounded-lg border border-slate-200 p-3">
+        <div class="text-xs text-slate-500 uppercase tracking-wider mb-1">浏览器</div>
+        <div class="flex items-center gap-2">
+          <i data-lucide="globe-2" class="w-4 h-4 text-brand-600"></i>
+          <span class="font-semibold">${escapeHtml(ua.browser)}</span>
+          ${ua.browser_version ? `<span class="text-xs text-slate-500">v${escapeHtml(ua.browser_version)}</span>` : ''}
+        </div>
+      </div>
+      <div class="bg-white rounded-lg border border-slate-200 p-3">
+        <div class="text-xs text-slate-500 uppercase tracking-wider mb-1">操作系统</div>
+        <div class="flex items-center gap-2">
+          <i data-lucide="${ua.os.toLowerCase().includes('ios') || ua.os.toLowerCase().includes('android') ? 'smartphone' : 'monitor'}" class="w-4 h-4 text-emerald-600"></i>
+          <span class="font-semibold">${escapeHtml(ua.os)}</span>
+          ${ua.os_version ? `<span class="text-xs text-slate-500">${escapeHtml(ua.os_version)}</span>` : ''}
+        </div>
+      </div>
+      <div class="bg-white rounded-lg border border-slate-200 p-3">
+        <div class="text-xs text-slate-500 uppercase tracking-wider mb-1">时区</div>
+        <div class="flex items-center gap-2">
+          <i data-lucide="globe" class="w-4 h-4 text-amber-600"></i>
+          <span class="font-semibold">${escapeHtml(tzLabel(sessionData.tz_offset))}</span>
+        </div>
+      </div>
+    </div>
+  `;
+
+  // Full UA mono row
+  if (sessionData.ua) {
+    html += `
+      <div class="mb-5">
+        <div class="text-xs text-slate-500 uppercase tracking-wider mb-1.5 flex items-center gap-1.5"><i data-lucide="terminal" class="w-3.5 h-3.5"></i>原始 User-Agent</div>
+        <div class="font-mono text-xs text-slate-700 bg-white border border-slate-200 rounded-md p-2.5 break-all">${escapeHtml(sessionData.ua)}</div>
+      </div>
+    `;
+  }
+
+  // Page-by-page timeline
+  if (pages.length > 0) {
+    html += `
+      <div>
+        <div class="text-xs text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-1.5"><i data-lucide="git-branch" class="w-3.5 h-3.5"></i>页面访问时间线 (${pages.length})</div>
+        <div class="space-y-1.5">
+    `;
+    for (const p of pages) {
+      let host = p.url; try { host = new URL(p.url).hostname; } catch (e) {}
+      const endTime = p.ended_at || p.last_heartbeat_at;
+      const endIso = p.ended_iso || p.last_heartbeat_iso;
+      const reasonBadge = p.end_reason === 'normal'
+        ? '<span class="text-xs px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 font-medium">正常切页</span>'
+        : '<span class="text-xs px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 font-medium">未发出 leave</span>';
+      html += `
+        <div class="flex items-center gap-3 bg-white border border-slate-200 rounded-md px-3 py-2 text-sm">
+          <div class="w-1.5 h-1.5 rounded-full ${p.end_reason === 'normal' ? 'bg-emerald-500' : 'bg-amber-500'}"></div>
+          <div class="flex-1 min-w-0">
+            <div class="font-medium text-slate-900 truncate">${escapeHtml(host)}</div>
+            <div class="text-xs text-slate-500">${fmtDateTime(p.started_at)} → ${fmtDateTime(endTime)}</div>
+          </div>
+          <div class="text-right">
+            <div class="font-semibold tabular-nums">${fmtSeconds(p.dwell_seconds)}</div>
+            <div class="text-xs text-slate-500">${p.heartbeat_count} 心跳</div>
+          </div>
+          ${reasonBadge}
+        </div>
+      `;
+    }
+    html += `</div></div>`;
+  }
+
+  // Footnote
+  html += `
+    <div class="text-xs text-slate-400 mt-4 flex items-center gap-1">
+      <i data-lucide="info" class="w-3 h-3"></i>
+      共 ${events.length} 个原始事件 · session id <span class="font-mono">${escapeHtml(sessionData.sid)}</span>
+    </div>
+  `;
+  return html;
+}
+
+async function loadList() {
+  const range = rangeFromInputs(); if (!range) return showError('日期范围无效');
+  state.from = range.from; state.to = range.to; state.selectedUid = null;
+  showLoading();
+
+  // 周环比：上一个等长周期（往前推一个 range 长度）
+  const span = range.to - range.from;
+  const prevFrom = range.from - span;
+  const prevTo = range.from - 1;
+
+  // 今日 = 本地零点到现在
+  const todayFrom = startOfTodayMs();
+  const todayTo = Date.now();
+
+  try {
+    const [curr, prev, today, opsList] = await Promise.all([
+      api(`/api/operator-report?from=${range.from}&to=${range.to}`),
+      api(`/api/operator-report?from=${prevFrom}&to=${prevTo}`).catch(() => null),
+      api(`/api/operator-report?from=${todayFrom}&to=${todayTo}`).catch(() => ({ ok: true, operators: [], totals: { dwell_hours: 0, operators: 0 } })),
+      api(`/api/operators`).catch(() => ({ ok: true, operators: [] })),
+    ]);
+
+    state.cachedOperators = opsList.operators || [];
+
+    $('#detail-view').classList.add('hidden');
+    renderTopStats(curr, prev);
+    renderTodaySnapshot(today);
+    renderOperatorList(curr);
+    hideError();
+    lucide.createIcons();
+  } catch (err) { showError(err.message || String(err)); }
 }
 
 async function loadDetail() {
   if (!state.selectedUid) return loadList();
   showLoading();
   try {
-    const res = await fetch(`${ANALYTICS_BASE}/api/operator-report?from=${state.from}&to=${state.to}&uid=${encodeURIComponent(state.selectedUid)}`);
-    const json = await res.json();
-    if (!json.ok) throw new Error(json.error || 'Unknown error');
-
-    $('#list-view').classList.add('hidden');
-    $('#empty-state').classList.add('hidden');
+    const [detail, heatmap] = await Promise.all([
+      api(`/api/operator-report?from=${state.from}&to=${state.to}&uid=${encodeURIComponent(state.selectedUid)}`),
+      api(`/api/operator-heatmap?from=${state.from}&to=${state.to}&uid=${encodeURIComponent(state.selectedUid)}`).catch(() => null),
+    ]);
+    $('#list-view').classList.add('hidden'); $('#empty-state').classList.add('hidden');
     $('#detail-view').classList.remove('hidden');
     $('#detail-uid-badge').textContent = state.selectedUid;
+    renderDetailStats(detail.summary); renderDailyChart(detail.daily); renderUrlChart(detail.by_url);
+    renderUrlTable(detail.by_url); renderSessionTable(detail.sessions);
+    if (heatmap) renderHeatmap(heatmap);
+    hideError(); lucide.createIcons();
+  } catch (err) { showError(err.message || String(err)); }
+}
 
-    renderDetailStats(json.summary);
-    renderDailyChart(json.daily);
-    renderUrlChart(json.by_url);
-    renderUrlTable(json.by_url);
-    renderSessionTable(json.sessions);
-    hideError();
-    lucide.createIcons();
-  } catch (err) {
-    showError(err.message || String(err));
+// ===== Heatmap (weekday × hour) =====
+function renderHeatmap(hm) {
+  const weekdays = ['日','一','二','三','四','五','六'];
+  const max = hm.max || 1;
+  const matrix = hm.matrix || [];
+
+  // Reorder to Mon-first (index 1..6,0)
+  const order = [1,2,3,4,5,6,0];
+
+  let html = '<div class="inline-block min-w-full">';
+  // header row: hours 0-23
+  html += '<div class="flex gap-0.5 pl-8 mb-1">';
+  for (let h = 0; h < 24; h++) {
+    html += `<div class="w-5 text-[10px] text-slate-400 text-center tabular-nums">${h % 3 === 0 ? h : ''}</div>`;
   }
+  html += '</div>';
+
+  // rows
+  for (const wIdx of order) {
+    html += '<div class="flex gap-0.5 items-center mb-0.5">';
+    html += `<div class="w-7 text-[11px] text-slate-500 pr-1 text-right">周${weekdays[wIdx]}</div>`;
+    for (let h = 0; h < 24; h++) {
+      const v = matrix[wIdx] ? matrix[wIdx][h] || 0 : 0;
+      const intensity = max > 0 ? Math.min(v / max, 1) : 0;
+      // 5-step palette mimicking GitHub contribution graph
+      let bg = '#f1f5f9'; // slate-100
+      if (intensity > 0.0)  bg = '#e0e7ff';
+      if (intensity > 0.2)  bg = '#a5b4fc';
+      if (intensity > 0.45) bg = '#818cf8';
+      if (intensity > 0.7)  bg = '#6366f1';
+      if (intensity > 0.85) bg = '#4338ca';
+      const tooltip = `周${weekdays[wIdx]} ${String(h).padStart(2,'0')}:00 — ${fmtSeconds(v)}`;
+      html += `<div class="w-5 h-5 rounded-sm" style="background:${bg}" title="${escapeHtml(tooltip)}"></div>`;
+    }
+    html += '</div>';
+  }
+
+  // legend
+  html += '<div class="flex items-center gap-2 mt-3 pl-8 text-[11px] text-slate-500">';
+  html += '<span>少</span>';
+  ['#f1f5f9','#e0e7ff','#a5b4fc','#818cf8','#6366f1','#4338ca'].forEach(c => {
+    html += `<div class="w-4 h-4 rounded-sm" style="background:${c}"></div>`;
+  });
+  html += '<span>多</span>';
+  if (max > 0) html += `<span class="ml-auto">峰值 ${fmtSeconds(max)}</span>`;
+  html += '</div>';
+  html += '</div>';
+
+  $('#heatmap-container').innerHTML = max > 0 ? html : '<div class="h-32 grid place-items-center text-xs text-slate-400">无数据</div>';
 }
 
 function showLoading() {
@@ -668,18 +1216,12 @@ function showLoading() {
   `).join('');
 }
 
-function showError(msg) {
-  $('#error-message').textContent = msg;
-  $('#error-state').classList.remove('hidden');
-}
-function hideError() { $('#error-state').classList.add('hidden'); }
-
 function exportCsv() {
   if (!state.from || !state.to) return;
   const url = state.selectedUid
     ? `${ANALYTICS_BASE}/api/operator-report?from=${state.from}&to=${state.to}&uid=${encodeURIComponent(state.selectedUid)}`
     : `${ANALYTICS_BASE}/api/operator-report?from=${state.from}&to=${state.to}`;
-  fetch(url).then((r) => r.json()).then((json) => {
+  fetch(url).then(r => r.json()).then(json => {
     if (!json.ok) return;
     let lines = [];
     if (state.selectedUid) {
@@ -688,23 +1230,13 @@ function exportCsv() {
       lines.push(`summary,total_hours,${fmtHours(json.summary?.dwell_seconds || 0)}`);
       lines.push(`summary,sessions,${json.summary?.sessions || 0}`);
       lines.push(`summary,active_days,${json.summary?.active_days || 0}`);
-      (json.daily || []).forEach((d) => lines.push(`daily,${d.day},${fmtHours(d.dwell_seconds)}`));
-      (json.by_url || []).forEach((u) => lines.push(`url,${u.url},${fmtHours(u.dwell_seconds)}`));
-      (json.sessions || []).forEach((s) => lines.push(`session,${s.sid},${fmtHours(s.dwell_seconds)}`));
+      (json.daily || []).forEach(d => lines.push(`daily,${d.day},${fmtHours(d.dwell_seconds)}`));
+      (json.by_url || []).forEach(u => lines.push(`url,${u.url},${fmtHours(u.dwell_seconds)}`));
+      (json.sessions || []).forEach(s => lines.push(`session,${s.sid},${fmtHours(s.dwell_seconds)}`));
     } else {
       lines.push('uid,total_hours,active_days,sessions,urls_visited,unique_devices,primary_device,first_seen,last_seen');
-      (json.operators || []).forEach((op) => {
-        lines.push([
-          op.uid,
-          fmtHours(op.dwell_seconds),
-          op.active_days,
-          op.sessions,
-          op.urls_visited,
-          op.unique_devices,
-          op.primary_device_type,
-          op.first_seen_iso || '',
-          op.last_seen_iso || '',
-        ].join(','));
+      (json.operators || []).forEach(op => {
+        lines.push([op.uid, fmtHours(op.dwell_seconds), op.active_days, op.sessions, op.urls_visited, op.unique_devices, op.primary_device_type, op.first_seen_iso || '', op.last_seen_iso || ''].join(','));
       });
     }
     const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8' });
@@ -717,30 +1249,379 @@ function exportCsv() {
   });
 }
 
-// ========== boot ==========
+// ===================== TAB: OPERATORS =====================
+async function loadOperators() {
+  $('#operators-tbody').innerHTML = '<tr><td colspan="8" class="px-6 py-12 text-center text-xs text-slate-400">加载中...</td></tr>';
+  try {
+    const json = await api('/api/operators');
+    renderOperatorsTable(json.operators || []);
+    hideError();
+  } catch (err) { showError(err.message); }
+}
+
+function renderOperatorsTable(operators) {
+  if (operators.length === 0) {
+    $('#operators-tbody').innerHTML = `
+      <tr><td colspan="8" class="px-6 py-12 text-center">
+        <div class="w-12 h-12 mx-auto rounded-full bg-slate-100 grid place-items-center mb-3"><i data-lucide="users" class="w-6 h-6 text-slate-400"></i></div>
+        <p class="text-sm font-medium text-slate-900">还没有添加播放员</p>
+        <p class="text-xs text-slate-500 mt-1">点击右上角"新增播放员"开始添加</p>
+      </td></tr>`;
+    $('#payroll-total').textContent = '0.00';
+    lucide.createIcons();
+    return;
+  }
+  state.cachedOperators = operators;
+  const now = Date.now();
+  const rate = state.payrollRate;
+
+  $('#operators-tbody').innerHTML = operators.map(op => {
+    const link = `${SCHEDULER_BASE}?u=${encodeURIComponent(op.operator_code)}`;
+    const online = op.last_seen && (now - op.last_seen) < ONLINE_THRESHOLD_MS;
+    const wage = (op.total_dwell_seconds / 3600) * rate;
+    return `
+      <tr class="hover:bg-slate-50 transition-colors">
+        <td class="px-6 py-4">
+          <div class="flex items-center gap-3">
+            <div class="relative flex-shrink-0">
+              <div class="w-8 h-8 rounded-full bg-gradient-to-br from-brand-500 to-brand-700 text-white text-xs font-semibold grid place-items-center">${escapeHtml((op.name || op.operator_code).slice(0, 2).toUpperCase())}</div>
+              ${online ? '<span class="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-500 border-2 border-white"></span>' : ''}
+            </div>
+            <div class="min-w-0">
+              <div class="font-medium text-slate-900 truncate flex items-center gap-1.5">${escapeHtml(op.name || op.operator_code)}${online ? '<span class="text-xs text-emerald-600 font-normal">在线</span>' : ''}</div>
+              <div class="text-xs text-slate-500 font-mono">${escapeHtml(op.operator_code)}</div>
+            </div>
+          </div>
+        </td>
+        <td class="px-6 py-4 text-slate-600">
+          <div>${escapeHtml(op.phone || '—')}</div>
+          ${op.note ? `<div class="text-xs text-slate-500">${escapeHtml(op.note)}</div>` : ''}
+        </td>
+        <td class="px-6 py-4 text-right"><div class="font-semibold">${fmtSeconds(op.total_dwell_seconds)}</div><div class="text-xs text-slate-500">${fmtHours(op.total_dwell_seconds)} h</div></td>
+        <td class="px-6 py-4 text-right">
+          <div class="font-semibold text-brand-700 tabular-nums">¥${wage.toFixed(2)}</div>
+        </td>
+        <td class="px-6 py-4 text-right tabular-nums">${op.total_sessions}</td>
+        <td class="px-6 py-4 text-slate-600">${op.last_seen ? fmtRelative(op.last_seen) : '—'}</td>
+        <td class="px-6 py-4">
+          <button class="text-xs px-2.5 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 inline-flex items-center gap-1.5 copy-link-btn" data-link="${escapeHtml(link)}">
+            <i data-lucide="copy" class="w-3.5 h-3.5"></i>复制链接
+          </button>
+        </td>
+        <td class="px-6 py-4 text-right">
+          <button class="text-xs px-2 py-1 rounded text-rose-600 hover:bg-rose-50 delete-op-btn" data-code="${escapeHtml(op.operator_code)}">
+            <i data-lucide="trash-2" class="w-4 h-4"></i>
+          </button>
+        </td>
+      </tr>
+    `;
+  }).join('');
+
+  const totalWage = operators.reduce((acc, op) => acc + (op.total_dwell_seconds / 3600) * rate, 0);
+  $('#payroll-total').textContent = totalWage.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  $$('.copy-link-btn').forEach(btn => btn.addEventListener('click', () => {
+    navigator.clipboard.writeText(btn.dataset.link).then(() => showToast('链接已复制'));
+  }));
+  $$('.delete-op-btn').forEach(btn => btn.addEventListener('click', async () => {
+    if (!confirm(`确定停用 ${btn.dataset.code} ?`)) return;
+    try {
+      await api(`/api/operators?operator_code=${encodeURIComponent(btn.dataset.code)}`, { method: 'DELETE' });
+      showToast('已停用'); loadOperators();
+    } catch (err) { showToast(err.message, 'error'); }
+  }));
+  lucide.createIcons();
+}
+
+async function submitOperator() {
+  const code = $('#op-code').value.trim();
+  if (!code) return showToast('请填写播放员 ID', 'error');
+  if (!/^[a-zA-Z0-9_\-]+$/.test(code)) return showToast('ID 只能含字母数字横线下划线', 'error');
+  const body = {
+    operator_code: code,
+    name: $('#op-name').value.trim(),
+    phone: $('#op-phone').value.trim(),
+    note: $('#op-note').value.trim(),
+  };
+  try {
+    await api('/api/operators', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+    showToast('播放员已添加');
+    closeModal('modal-operator');
+    ['op-code','op-name','op-phone','op-note'].forEach(id => $('#' + id).value = '');
+    loadOperators();
+  } catch (err) { showToast(err.message, 'error'); }
+}
+
+// ===================== TAB: SITE REPORT =====================
+function siteRangeFromInputs() {
+  const f = new Date($('#site-from-date').value + 'T00:00:00');
+  const t = new Date($('#site-to-date').value + 'T23:59:59');
+  if (isNaN(f.getTime()) || isNaN(t.getTime())) return null;
+  return { from: f.getTime(), to: t.getTime() };
+}
+
+async function loadSiteList() {
+  const range = siteRangeFromInputs();
+  if (!range) {
+    const def = defaultRange();
+    $('#site-from-date').value = ymd(def.from);
+    $('#site-to-date').value = ymd(def.to);
+    return loadSiteList();
+  }
+  state.siteFrom = range.from; state.siteTo = range.to; state.selectedSiteUrl = null;
+
+  $('#site-stats-grid').innerHTML = Array(4).fill(0).map(() => `
+    <div class="bg-white rounded-xl shadow-card border border-slate-200 p-5"><div class="skeleton h-3 w-20 rounded"></div><div class="skeleton h-7 w-32 rounded mt-3"></div></div>
+  `).join('');
+
+  try {
+    const json = await api(`/api/site-report?from=${range.from}&to=${range.to}`);
+    $('#site-detail-view').classList.add('hidden');
+    renderSiteTopStats(json);
+    renderSiteListTable(json.sites || []);
+    hideError(); lucide.createIcons();
+  } catch (err) { showError(err.message || String(err)); }
+}
+
+function renderSiteTopStats(data) {
+  const totals = data.totals || {};
+  const sites = data.sites || [];
+  const tones = { brand:'bg-brand-50 text-brand-700', emerald:'bg-emerald-50 text-emerald-700', amber:'bg-amber-50 text-amber-700', sky:'bg-sky-50 text-sky-700' };
+  const totalSessions = sites.reduce((a, s) => a + s.sessions, 0);
+  const totalOps = sites.reduce((a, s) => a + s.unique_operators, 0);
+  const cards = [
+    { icon: 'globe', label: '网站数', value: totals.sites || 0, suffix: '个', tone: 'brand' },
+    { icon: 'clock', label: '总工时', value: totals.dwell_hours || 0, suffix: '小时', tone: 'emerald' },
+    { icon: 'mouse-pointer-click', label: '总会话', value: totalSessions, suffix: '次', tone: 'amber' },
+    { icon: 'users', label: '播放员次', value: totalOps, suffix: '人次', tone: 'sky' },
+  ];
+  $('#site-stats-grid').innerHTML = cards.map(c => statCard(c, tones)).join('');
+}
+
+function renderSiteListTable(sites) {
+  $('#site-list-count').textContent = `${sites.length} 个网站`;
+  if (sites.length === 0) {
+    $('#site-list-view').classList.add('hidden');
+    $('#site-empty').classList.remove('hidden');
+    return;
+  }
+  $('#site-empty').classList.add('hidden');
+  $('#site-list-view').classList.remove('hidden');
+
+  $('#site-tbody').innerHTML = sites.map(s => {
+    let host = s.url, path = '';
+    try { const u = new URL(s.url); host = u.hostname; path = u.pathname === '/' ? '' : u.pathname; } catch (e) {}
+    return `
+      <tr class="hover:bg-slate-50 cursor-pointer transition-colors" data-url="${escapeHtml(s.url)}">
+        <td class="px-6 py-4">
+          <div class="flex items-center gap-3">
+            <div class="w-8 h-8 rounded-lg bg-slate-100 grid place-items-center flex-shrink-0"><i data-lucide="globe" class="w-4 h-4 text-slate-600"></i></div>
+            <div class="min-w-0">
+              <div class="font-medium text-slate-900 truncate">${escapeHtml(host)}</div>
+              ${path ? `<div class="text-xs text-slate-500 truncate">${escapeHtml(path)}</div>` : ''}
+            </div>
+          </div>
+        </td>
+        <td class="px-6 py-4 text-right"><div class="font-semibold text-slate-900">${fmtSeconds(s.dwell_seconds)}</div><div class="text-xs text-slate-500">${fmtHours(s.dwell_seconds)} h</div></td>
+        <td class="px-6 py-4 text-right tabular-nums">${s.visits}</td>
+        <td class="px-6 py-4 text-right tabular-nums">${s.sessions}</td>
+        <td class="px-6 py-4 text-right tabular-nums">${s.unique_operators}</td>
+        <td class="px-6 py-4 text-right tabular-nums">${s.unique_devices}</td>
+        <td class="px-6 py-4"><div class="inline-flex items-center gap-1.5 text-xs px-2 py-1 rounded-md bg-slate-100 text-slate-700"><i data-lucide="${deviceIcon(s.primary_device_type)}" class="w-3.5 h-3.5"></i>${deviceLabel(s.primary_device_type)}</div></td>
+        <td class="px-6 py-4 text-slate-600">${fmtRelative(s.last_seen)}</td>
+        <td class="px-2 py-4 text-slate-400"><i data-lucide="chevron-right" class="w-4 h-4"></i></td>
+      </tr>
+    `;
+  }).join('');
+
+  $$('#site-tbody tr').forEach(row => {
+    row.addEventListener('click', () => { state.selectedSiteUrl = row.dataset.url; loadSiteDetail(); });
+  });
+  lucide.createIcons();
+}
+
+async function loadSiteDetail() {
+  if (!state.selectedSiteUrl) return loadSiteList();
+  try {
+    const json = await api(`/api/site-report?from=${state.siteFrom}&to=${state.siteTo}&url=${encodeURIComponent(state.selectedSiteUrl)}`);
+    $('#site-list-view').classList.add('hidden'); $('#site-empty').classList.add('hidden');
+    $('#site-detail-view').classList.remove('hidden');
+    let host = json.url; try { host = new URL(json.url).hostname; } catch (e) {}
+    $('#site-detail-url-badge').textContent = host;
+
+    renderSiteDetailStats(json.summary);
+    renderSiteDailyChart(json.daily);
+    renderSiteOperatorTable(json.by_operator);
+    hideError(); lucide.createIcons();
+  } catch (err) { showError(err.message || String(err)); }
+}
+
+function renderSiteDetailStats(summary) {
+  if (!summary) { $('#site-detail-stats').innerHTML = ''; return; }
+  const tones = { brand:'bg-brand-50 text-brand-700', emerald:'bg-emerald-50 text-emerald-700', amber:'bg-amber-50 text-amber-700', sky:'bg-sky-50 text-sky-700' };
+  const cards = [
+    { icon: 'clock', label: '总工时', value: fmtSeconds(summary.dwell_seconds), sub: `${fmtHours(summary.dwell_seconds)} h`, tone: 'brand' },
+    { icon: 'users', label: '播放员', value: summary.unique_operators, sub: '人参与', tone: 'emerald' },
+    { icon: 'mouse-pointer-click', label: '会话数', value: summary.sessions, sub: '次', tone: 'amber' },
+    { icon: deviceIcon(summary.primary_device_type), label: '主用设备', value: deviceLabel(summary.primary_device_type), sub: `${summary.unique_devices} 台`, tone: 'sky' },
+  ];
+  $('#site-detail-stats').innerHTML = cards.map(c => statCard(c, tones)).join('');
+}
+
+function renderSiteDailyChart(daily) {
+  const ctx = document.getElementById('site-daily-chart');
+  if (state.charts.siteDaily) state.charts.siteDaily.destroy();
+  if (!daily || daily.length === 0) { ctx.parentElement.innerHTML = '<div class="h-72 grid place-items-center text-xs text-slate-400">无数据</div>'; return; }
+  state.charts.siteDaily = new Chart(ctx, {
+    type: 'bar',
+    data: { labels: daily.map(d => d.day.slice(5)), datasets: [{ label: '工时 (小时)', data: daily.map(d => fmtHours(d.dwell_seconds)), backgroundColor: '#10b981', borderRadius: 4, maxBarThickness: 32 }] },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => ` ${c.parsed.y} h` }, backgroundColor: '#1e293b', padding: 10, cornerRadius: 6 } },
+      scales: { x: { grid: { display: false }, ticks: { font: { size: 11 }, color: '#64748b' } }, y: { grid: { color: '#f1f5f9' }, ticks: { font: { size: 11 }, color: '#64748b' }, beginAtZero: true } }
+    }
+  });
+}
+
+function renderSiteOperatorTable(byOp) {
+  if (!byOp || byOp.length === 0) {
+    $('#site-operator-tbody').innerHTML = '<tr><td colspan="4" class="px-6 py-8 text-center text-xs text-slate-400">该站点暂无播放员数据</td></tr>';
+    return;
+  }
+  $('#site-operator-tbody').innerHTML = byOp.map(o => `
+    <tr class="hover:bg-slate-50 transition-colors">
+      <td class="px-6 py-3.5">
+        <div class="flex items-center gap-3">
+          <div class="w-8 h-8 rounded-full bg-gradient-to-br from-brand-500 to-brand-700 text-white text-xs font-semibold grid place-items-center flex-shrink-0">${escapeHtml((o.uid || '?').slice(0, 2).toUpperCase())}</div>
+          <div class="font-medium text-slate-900">${escapeHtml(o.uid)}</div>
+        </div>
+      </td>
+      <td class="px-6 py-3.5 text-right"><div class="font-semibold">${fmtSeconds(o.dwell_seconds)}</div><div class="text-xs text-slate-500">${fmtHours(o.dwell_seconds)} h</div></td>
+      <td class="px-6 py-3.5 text-right tabular-nums">${o.sessions}</td>
+      <td class="px-6 py-3.5 text-slate-600">${fmtRelative(o.last_seen)}</td>
+    </tr>
+  `).join('');
+}
+
+// ===================== TAB: SITES =====================
+async function loadSites() {
+  $('#sites-tbody').innerHTML = '<tr><td colspan="5" class="px-6 py-12 text-center text-xs text-slate-400">加载中...</td></tr>';
+  try {
+    const json = await api('/api/sites');
+    renderSitesTable(json.sites || []);
+    hideError();
+  } catch (err) { showError(err.message); }
+}
+
+function renderSitesTable(sites) {
+  if (sites.length === 0) {
+    $('#sites-tbody').innerHTML = `
+      <tr><td colspan="5" class="px-6 py-12 text-center">
+        <div class="w-12 h-12 mx-auto rounded-full bg-slate-100 grid place-items-center mb-3"><i data-lucide="globe" class="w-6 h-6 text-slate-400"></i></div>
+        <p class="text-sm font-medium text-slate-900">还没有添加网站</p>
+        <p class="text-xs text-slate-500 mt-1">点击右上角"新增网站"开始添加客户网站</p>
+      </td></tr>`;
+    lucide.createIcons();
+    return;
+  }
+  $('#sites-tbody').innerHTML = sites.map(s => {
+    let host = s.url; try { host = new URL(s.url).hostname; } catch (e) {}
+    return `
+      <tr class="hover:bg-slate-50 transition-colors">
+        <td class="px-6 py-4"><div class="font-medium text-slate-900">${escapeHtml(s.name)}</div></td>
+        <td class="px-6 py-4"><a href="${escapeHtml(s.url)}" target="_blank" class="text-brand-600 hover:underline text-sm flex items-center gap-1.5"><i data-lucide="external-link" class="w-3.5 h-3.5"></i>${escapeHtml(host)}</a></td>
+        <td class="px-6 py-4 text-slate-600">${escapeHtml(s.note || '—')}</td>
+        <td class="px-6 py-4 text-slate-600">${fmtRelative(s.created_at)}</td>
+        <td class="px-6 py-4 text-right">
+          <button class="text-xs px-2 py-1 rounded text-rose-600 hover:bg-rose-50 delete-site-btn" data-id="${s.id}">
+            <i data-lucide="trash-2" class="w-4 h-4"></i>
+          </button>
+        </td>
+      </tr>
+    `;
+  }).join('');
+
+  $$('.delete-site-btn').forEach(btn => btn.addEventListener('click', async () => {
+    if (!confirm('确定移除这个网站？')) return;
+    try {
+      await api(`/api/sites?id=${btn.dataset.id}`, { method: 'DELETE' });
+      showToast('已移除'); loadSites();
+    } catch (err) { showToast(err.message, 'error'); }
+  }));
+  lucide.createIcons();
+}
+
+async function submitSite() {
+  const name = $('#site-name').value.trim();
+  const url = $('#site-url').value.trim();
+  const note = $('#site-note').value.trim();
+  if (!name) return showToast('请填写站点名称', 'error');
+  if (!url) return showToast('请填写 URL', 'error');
+  try {
+    await api('/api/sites', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name, url, note }) });
+    showToast('网站已添加');
+    closeModal('modal-site');
+    ['site-name','site-url','site-note'].forEach(id => $('#' + id).value = '');
+    loadSites();
+  } catch (err) { showToast(err.message, 'error'); }
+}
+
+// ===================== Modal helpers =====================
+function openModal(id) { $('#' + id).classList.remove('hidden'); lucide.createIcons(); }
+function closeModal(id) { $('#' + id).classList.add('hidden'); }
+
+// ===================== Boot =====================
 function init() {
   const { from, to } = defaultRange();
   $('#from-date').value = ymd(from);
   $('#to-date').value = ymd(to);
+  $('#site-from-date').value = ymd(from);
+  $('#site-to-date').value = ymd(to);
 
+  // Tabs
+  $$('.tab-btn').forEach(btn => btn.addEventListener('click', () => switchTab(btn.dataset.tab)));
+
+  // Report tab
   $('#refresh-btn').addEventListener('click', loadList);
   $('#export-btn').addEventListener('click', exportCsv);
-  $('#back-btn').addEventListener('click', () => {
-    state.selectedUid = null;
-    loadList();
-  });
+  $('#back-btn').addEventListener('click', () => { state.selectedUid = null; loadList(); });
   $('#from-date').addEventListener('change', loadList);
   $('#to-date').addEventListener('change', loadList);
+
+  // Site report tab
+  $('#site-refresh-btn').addEventListener('click', loadSiteList);
+  $('#site-back-btn').addEventListener('click', () => { state.selectedSiteUrl = null; loadSiteList(); });
+  $('#site-from-date').addEventListener('change', loadSiteList);
+  $('#site-to-date').addEventListener('change', loadSiteList);
+
+  // Operators tab
+  $('#add-operator-btn').addEventListener('click', () => openModal('modal-operator'));
+  $('#op-submit').addEventListener('click', submitOperator);
+  $('#payroll-rate').addEventListener('input', () => {
+    const v = parseFloat($('#payroll-rate').value);
+    state.payrollRate = isNaN(v) || v < 0 ? 0 : v;
+    if (state.cachedOperators.length > 0) renderOperatorsTable(state.cachedOperators);
+  });
+
+  // Sites tab
+  $('#add-site-btn').addEventListener('click', () => openModal('modal-site'));
+  $('#site-submit').addEventListener('click', submitSite);
+  $('#snippet-copy-btn').addEventListener('click', () => {
+    navigator.clipboard.writeText($('#snippet-code').textContent).then(() => showToast('脚本已复制'));
+  });
+
+  // Modal close handlers
+  $$('.modal-close').forEach(btn => btn.addEventListener('click', (e) => {
+    const modal = e.target.closest('[id^="modal-"]');
+    if (modal) closeModal(modal.id);
+  }));
 
   lucide.createIcons();
   loadList();
 }
 
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', init);
-} else {
-  init();
-}
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+else init();
 </script>
 
 </body>
