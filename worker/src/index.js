@@ -19,23 +19,16 @@ function csv(text, status = 200, extraHeaders = {}) {
   });
 }
 
-const CORS_WHITELIST = [
-  "https://ad.4339.live",
-  "https://www.ad.4339.live",
-  "http://localhost:3000",
-  "http://localhost:8080",
-  "http://127.0.0.1:3000",
-  "http://127.0.0.1:8080",
-];
-
 function corsHeaders(origin = "*") {
-  // Only allow whitelisted origins. Reject spoofed origins.
-  const allowedOrigin = CORS_WHITELIST.includes(origin) ? origin : "https://ad.4339.live";
+  // Analytics + report endpoints are intentionally domain-agnostic: this system
+  // is embedded on arbitrary customer sites and reports are loaded from any
+  // admin host. Endpoints write-only or auth-stamped server-side.
   return {
-    "access-control-allow-origin": allowedOrigin,
+    "access-control-allow-origin": origin && origin !== "null" ? origin : "*",
     "access-control-allow-methods": "GET,POST,OPTIONS",
     "access-control-allow-headers": "content-type,x-internal-token",
     "access-control-max-age": "86400",
+    "vary": "origin",
   };
 }
 
@@ -204,10 +197,14 @@ async function handleExposure(req, env, headers) {
   }
 
   const deviceType = body.device_type || parseDeviceType(ua);
+  const screenW = Number.isFinite(Number(body.screen_w)) ? Number(body.screen_w) : null;
+  const screenH = Number.isFinite(Number(body.screen_h)) ? Number(body.screen_h) : null;
+  const tzOffset = Number.isFinite(Number(body.tz_offset)) ? Number(body.tz_offset) : null;
   const insertRes = await env.DB.prepare(
     `INSERT INTO exposure_events (
-      event_type, sid, vid, uid, url, page_index, ip, ua, device_type, client_ts, received_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      event_type, sid, vid, uid, url, page_index, ip, ua, device_type,
+      screen_w, screen_h, tz_offset, client_ts, received_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   )
     .bind(
       eventType,
@@ -219,6 +216,9 @@ async function handleExposure(req, env, headers) {
       ip,
       ua,
       deviceType,
+      screenW,
+      screenH,
+      tzOffset,
       body.client_ts == null ? null : Number(body.client_ts),
       now
     )
@@ -719,6 +719,218 @@ function checkInternalToken(req, env) {
   return true;
 }
 
+// ===== Operator-centric report =====
+// Heartbeats fire every HEARTBEAT_INTERVAL_SEC (30s) on each tracked page.
+// Working time = heartbeat_count * HEARTBEAT_INTERVAL_SEC. This is conservative:
+// it undercounts by up to 30s per session (we don't credit time before the first
+// heartbeat fires), which is the right bias for payroll / billing disputes.
+const HEARTBEAT_INTERVAL_SEC = 30;
+
+async function getOperatorSummaries(env, from, to) {
+  const result = await env.DB.prepare(
+    `SELECT
+      uid,
+      SUM(CASE WHEN event_type = 'heartbeat' THEN 1 ELSE 0 END) * ${HEARTBEAT_INTERVAL_SEC} AS dwell_seconds,
+      COUNT(DISTINCT sid) AS sessions,
+      COUNT(DISTINCT date(received_at / 1000, 'unixepoch', '+8 hours')) AS active_days,
+      COUNT(DISTINCT url) AS urls_visited,
+      COUNT(DISTINCT vid) AS unique_devices,
+      MIN(received_at) AS first_seen,
+      MAX(received_at) AS last_seen,
+      (
+        SELECT device_type FROM exposure_events e2
+        WHERE e2.uid = exposure_events.uid
+          AND e2.received_at >= ? AND e2.received_at <= ?
+          AND e2.device_type IS NOT NULL
+        GROUP BY device_type
+        ORDER BY COUNT(*) DESC
+        LIMIT 1
+      ) AS primary_device_type
+    FROM exposure_events
+    WHERE received_at >= ? AND received_at <= ?
+      AND uid IS NOT NULL AND uid <> ''
+    GROUP BY uid
+    ORDER BY dwell_seconds DESC, uid ASC`
+  )
+    .bind(from, to, from, to)
+    .all();
+  return (result.results || []).map((r) => ({
+    uid: r.uid,
+    dwell_seconds: Number(r.dwell_seconds || 0),
+    sessions: Number(r.sessions || 0),
+    active_days: Number(r.active_days || 0),
+    urls_visited: Number(r.urls_visited || 0),
+    unique_devices: Number(r.unique_devices || 0),
+    primary_device_type: r.primary_device_type || "unknown",
+    first_seen: Number(r.first_seen || 0),
+    last_seen: Number(r.last_seen || 0),
+    first_seen_iso: toIsoOrNull(r.first_seen),
+    last_seen_iso: toIsoOrNull(r.last_seen),
+  }));
+}
+
+async function getOperatorDailyDwell(env, from, to, uid) {
+  const result = await env.DB.prepare(
+    `SELECT
+      date(received_at / 1000, 'unixepoch', '+8 hours') AS day,
+      SUM(CASE WHEN event_type = 'heartbeat' THEN 1 ELSE 0 END) * ${HEARTBEAT_INTERVAL_SEC} AS dwell_seconds,
+      COUNT(DISTINCT sid) AS sessions,
+      COUNT(DISTINCT url) AS urls_visited
+    FROM exposure_events
+    WHERE received_at >= ? AND received_at <= ?
+      AND uid = ?
+    GROUP BY day
+    ORDER BY day ASC`
+  )
+    .bind(from, to, uid)
+    .all();
+  return (result.results || []).map((r) => ({
+    day: r.day,
+    dwell_seconds: Number(r.dwell_seconds || 0),
+    sessions: Number(r.sessions || 0),
+    urls_visited: Number(r.urls_visited || 0),
+  }));
+}
+
+async function getOperatorUrlBreakdown(env, from, to, uid) {
+  const result = await env.DB.prepare(
+    `SELECT
+      url,
+      SUM(CASE WHEN event_type = 'heartbeat' THEN 1 ELSE 0 END) * ${HEARTBEAT_INTERVAL_SEC} AS dwell_seconds,
+      SUM(CASE WHEN event_type = 'page_enter' OR event_type IS NULL THEN 1 ELSE 0 END) AS visits,
+      COUNT(DISTINCT sid) AS sessions,
+      MAX(received_at) AS last_seen
+    FROM exposure_events
+    WHERE received_at >= ? AND received_at <= ?
+      AND uid = ?
+    GROUP BY url
+    ORDER BY dwell_seconds DESC, url ASC`
+  )
+    .bind(from, to, uid)
+    .all();
+  return (result.results || []).map((r) => ({
+    url: r.url,
+    dwell_seconds: Number(r.dwell_seconds || 0),
+    visits: Number(r.visits || 0),
+    sessions: Number(r.sessions || 0),
+    last_seen: Number(r.last_seen || 0),
+    last_seen_iso: toIsoOrNull(r.last_seen),
+  }));
+}
+
+async function getOperatorSessions(env, from, to, uid) {
+  const result = await env.DB.prepare(
+    `SELECT
+      sid,
+      MIN(received_at) AS started_at,
+      MAX(received_at) AS last_event_at,
+      SUM(CASE WHEN event_type = 'heartbeat' THEN 1 ELSE 0 END) * ${HEARTBEAT_INTERVAL_SEC} AS dwell_seconds,
+      SUM(CASE WHEN event_type = 'page_enter' OR event_type IS NULL THEN 1 ELSE 0 END) AS pages_visited,
+      SUM(CASE WHEN event_type = 'page_leave' THEN 1 ELSE 0 END) AS clean_leaves,
+      COUNT(DISTINCT url) AS unique_urls,
+      (
+        SELECT device_type FROM exposure_events e2
+        WHERE e2.sid = exposure_events.sid AND e2.device_type IS NOT NULL
+        LIMIT 1
+      ) AS device_type,
+      (
+        SELECT vid FROM exposure_events e3
+        WHERE e3.sid = exposure_events.sid AND e3.vid IS NOT NULL
+        LIMIT 1
+      ) AS vid,
+      (
+        SELECT ip FROM exposure_events e4
+        WHERE e4.sid = exposure_events.sid AND e4.ip IS NOT NULL
+        LIMIT 1
+      ) AS ip,
+      (
+        SELECT screen_w FROM exposure_events e5
+        WHERE e5.sid = exposure_events.sid AND e5.screen_w IS NOT NULL
+        LIMIT 1
+      ) AS screen_w,
+      (
+        SELECT screen_h FROM exposure_events e6
+        WHERE e6.sid = exposure_events.sid AND e6.screen_h IS NOT NULL
+        LIMIT 1
+      ) AS screen_h
+    FROM exposure_events
+    WHERE received_at >= ? AND received_at <= ?
+      AND uid = ?
+      AND sid IS NOT NULL
+    GROUP BY sid
+    ORDER BY started_at DESC
+    LIMIT 200`
+  )
+    .bind(from, to, uid)
+    .all();
+  return (result.results || []).map((r) => ({
+    sid: r.sid,
+    started_at: Number(r.started_at || 0),
+    last_event_at: Number(r.last_event_at || 0),
+    started_iso: toIsoOrNull(r.started_at),
+    last_event_iso: toIsoOrNull(r.last_event_at),
+    dwell_seconds: Number(r.dwell_seconds || 0),
+    pages_visited: Number(r.pages_visited || 0),
+    clean_leaves: Number(r.clean_leaves || 0),
+    unique_urls: Number(r.unique_urls || 0),
+    device_type: r.device_type || "unknown",
+    vid: r.vid || null,
+    ip: r.ip || null,
+    screen_w: r.screen_w == null ? null : Number(r.screen_w),
+    screen_h: r.screen_h == null ? null : Number(r.screen_h),
+  }));
+}
+
+async function handleOperatorReport(req, env, headers) {
+  const url = new URL(req.url);
+  const range = parseReportRange(url);
+  if (range.error) return json({ ok: false, error: range.error }, 400, headers);
+
+  const uid = normalizeUrl(url.searchParams.get("uid"));
+
+  if (!uid) {
+    const operators = await getOperatorSummaries(env, range.from, range.to);
+    const totalDwell = operators.reduce((acc, op) => acc + op.dwell_seconds, 0);
+    return json(
+      {
+        ok: true,
+        range: { from: range.from, to: range.to },
+        operators,
+        totals: {
+          operators: operators.length,
+          dwell_seconds: totalDwell,
+          dwell_hours: Math.round((totalDwell / 3600) * 100) / 100,
+        },
+      },
+      200,
+      headers
+    );
+  }
+
+  const [summary, daily, urls, sessions] = await Promise.all([
+    getOperatorSummaries(env, range.from, range.to).then((list) =>
+      list.find((op) => op.uid === uid) || null
+    ),
+    getOperatorDailyDwell(env, range.from, range.to, uid),
+    getOperatorUrlBreakdown(env, range.from, range.to, uid),
+    getOperatorSessions(env, range.from, range.to, uid),
+  ]);
+
+  return json(
+    {
+      ok: true,
+      range: { from: range.from, to: range.to },
+      uid,
+      summary,
+      daily,
+      by_url: urls,
+      sessions,
+    },
+    200,
+    headers
+  );
+}
+
 export default {
   async fetch(req, env) {
     const origin = req.headers.get("origin") || "*";
@@ -734,6 +946,7 @@ export default {
 
       if (url.pathname === "/api/report" && req.method === "GET") return await handleReport(req, env, headers);
       if (url.pathname === "/api/report.csv" && req.method === "GET") return await handleCsv(req, env, headers);
+      if (url.pathname === "/api/operator-report" && req.method === "GET") return await handleOperatorReport(req, env, headers);
 
       return json({ ok: false, error: "Not Found" }, 404, headers);
     } catch (err) {

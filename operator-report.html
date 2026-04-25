@@ -1,0 +1,747 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>播放员工时审计报表 — Operator Audit</title>
+  <link rel="preconnect" href="https://cdn.jsdelivr.net">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <style>
+    body { font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+    [x-cloak] { display: none !important; }
+    .scrollbar-thin::-webkit-scrollbar { width: 6px; height: 6px; }
+    .scrollbar-thin::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+    .skeleton { background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 37%, #f1f5f9 63%); background-size: 400% 100%; animation: skel 1.4s ease infinite; }
+    @keyframes skel { 0%{background-position:100% 50%} 100%{background-position:0 50%} }
+  </style>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50:  '#eef2ff',
+              100: '#e0e7ff',
+              500: '#6366f1',
+              600: '#4f46e5',
+              700: '#4338ca',
+              900: '#312e81',
+            }
+          },
+          boxShadow: {
+            card: '0 1px 2px 0 rgb(0 0 0 / 0.04), 0 1px 3px 0 rgb(0 0 0 / 0.06)',
+          }
+        }
+      }
+    }
+  </script>
+</head>
+<body class="bg-slate-50 text-slate-900 antialiased">
+
+<header class="bg-white border-b border-slate-200">
+  <div class="max-w-[1400px] mx-auto px-6 py-4 flex items-center gap-6">
+    <div class="flex items-center gap-3">
+      <div class="w-9 h-9 rounded-lg bg-brand-600 grid place-items-center text-white">
+        <i data-lucide="activity" class="w-5 h-5"></i>
+      </div>
+      <div>
+        <h1 class="text-base font-semibold tracking-tight">播放员工时审计</h1>
+        <p class="text-xs text-slate-500">Operator Audit Report</p>
+      </div>
+    </div>
+    <div class="ml-auto flex items-center gap-3">
+      <div class="flex items-center gap-2 text-sm">
+        <i data-lucide="calendar-range" class="w-4 h-4 text-slate-400"></i>
+        <input id="from-date" type="date" class="h-9 px-3 rounded-md border border-slate-300 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500">
+        <span class="text-slate-400">→</span>
+        <input id="to-date" type="date" class="h-9 px-3 rounded-md border border-slate-300 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500">
+      </div>
+      <button id="refresh-btn" class="h-9 px-4 rounded-md bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium flex items-center gap-2 transition-colors">
+        <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+        刷新
+      </button>
+      <button id="export-btn" class="h-9 px-4 rounded-md border border-slate-300 hover:bg-slate-50 text-sm font-medium flex items-center gap-2 transition-colors">
+        <i data-lucide="download" class="w-4 h-4"></i>
+        导出 CSV
+      </button>
+    </div>
+  </div>
+</header>
+
+<main class="max-w-[1400px] mx-auto px-6 py-6">
+
+  <!-- Stats overview -->
+  <div id="stats-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+    <!-- populated by JS -->
+  </div>
+
+  <!-- Operator list view (default) -->
+  <div id="list-view" class="space-y-6">
+    <div class="bg-white rounded-xl shadow-card border border-slate-200">
+      <div class="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
+        <div>
+          <h2 class="text-sm font-semibold flex items-center gap-2">
+            <i data-lucide="users" class="w-4 h-4 text-slate-500"></i>
+            播放员列表
+          </h2>
+          <p class="text-xs text-slate-500 mt-0.5">点击任意一行查看详细工时与设备指纹</p>
+        </div>
+        <div class="text-xs text-slate-500" id="list-count">—</div>
+      </div>
+      <div class="overflow-x-auto scrollbar-thin">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="text-xs uppercase tracking-wider text-slate-500 border-b border-slate-200 bg-slate-50/50">
+              <th class="text-left font-medium px-6 py-3">播放员</th>
+              <th class="text-right font-medium px-6 py-3">总工时</th>
+              <th class="text-right font-medium px-6 py-3">活跃天数</th>
+              <th class="text-right font-medium px-6 py-3">会话数</th>
+              <th class="text-right font-medium px-6 py-3">访问站点</th>
+              <th class="text-right font-medium px-6 py-3">设备数</th>
+              <th class="text-left font-medium px-6 py-3">主用设备</th>
+              <th class="text-left font-medium px-6 py-3">最后活动</th>
+              <th class="px-2 py-3"></th>
+            </tr>
+          </thead>
+          <tbody id="operator-tbody" class="divide-y divide-slate-100">
+            <!-- populated by JS -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Operator detail view -->
+  <div id="detail-view" class="hidden space-y-6">
+    <div class="flex items-center justify-between">
+      <button id="back-btn" class="text-sm text-slate-600 hover:text-slate-900 flex items-center gap-1.5 -ml-1">
+        <i data-lucide="arrow-left" class="w-4 h-4"></i>
+        返回列表
+      </button>
+      <div id="detail-uid-badge" class="text-sm font-medium px-3 py-1.5 rounded-md bg-brand-50 text-brand-700 border border-brand-100"></div>
+    </div>
+
+    <div id="detail-stats-grid" class="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <!-- populated by JS -->
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div class="lg:col-span-2 bg-white rounded-xl shadow-card border border-slate-200 p-6">
+        <h3 class="text-sm font-semibold mb-1 flex items-center gap-2">
+          <i data-lucide="line-chart" class="w-4 h-4 text-slate-500"></i>
+          每日工时分布
+        </h3>
+        <p class="text-xs text-slate-500 mb-4">单位：小时（Asia/Shanghai 时区）</p>
+        <div class="h-72"><canvas id="daily-chart"></canvas></div>
+      </div>
+
+      <div class="bg-white rounded-xl shadow-card border border-slate-200 p-6">
+        <h3 class="text-sm font-semibold mb-1 flex items-center gap-2">
+          <i data-lucide="pie-chart" class="w-4 h-4 text-slate-500"></i>
+          站点工时分配
+        </h3>
+        <p class="text-xs text-slate-500 mb-4">按域名聚合</p>
+        <div class="h-72"><canvas id="url-chart"></canvas></div>
+      </div>
+    </div>
+
+    <div class="bg-white rounded-xl shadow-card border border-slate-200">
+      <div class="px-6 py-4 border-b border-slate-200">
+        <h3 class="text-sm font-semibold flex items-center gap-2">
+          <i data-lucide="globe" class="w-4 h-4 text-slate-500"></i>
+          站点详情
+        </h3>
+      </div>
+      <div class="overflow-x-auto scrollbar-thin">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="text-xs uppercase tracking-wider text-slate-500 border-b border-slate-200 bg-slate-50/50">
+              <th class="text-left font-medium px-6 py-3">URL</th>
+              <th class="text-right font-medium px-6 py-3">工时</th>
+              <th class="text-right font-medium px-6 py-3">访问次数</th>
+              <th class="text-right font-medium px-6 py-3">会话数</th>
+              <th class="text-left font-medium px-6 py-3">最后访问</th>
+            </tr>
+          </thead>
+          <tbody id="url-tbody" class="divide-y divide-slate-100"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="bg-white rounded-xl shadow-card border border-slate-200">
+      <div class="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
+        <div>
+          <h3 class="text-sm font-semibold flex items-center gap-2">
+            <i data-lucide="list" class="w-4 h-4 text-slate-500"></i>
+            会话记录
+          </h3>
+          <p class="text-xs text-slate-500 mt-0.5">每次打开 scheduler 即一个会话；含设备指纹</p>
+        </div>
+        <div class="text-xs text-slate-500" id="session-count">—</div>
+      </div>
+      <div class="overflow-x-auto scrollbar-thin">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="text-xs uppercase tracking-wider text-slate-500 border-b border-slate-200 bg-slate-50/50">
+              <th class="text-left font-medium px-6 py-3">开始时间</th>
+              <th class="text-right font-medium px-6 py-3">工时</th>
+              <th class="text-right font-medium px-6 py-3">访问页面</th>
+              <th class="text-right font-medium px-6 py-3">站点数</th>
+              <th class="text-left font-medium px-6 py-3">设备</th>
+              <th class="text-left font-medium px-6 py-3">分辨率</th>
+              <th class="text-left font-medium px-6 py-3">IP</th>
+              <th class="text-left font-medium px-6 py-3">完整结束</th>
+            </tr>
+          </thead>
+          <tbody id="session-tbody" class="divide-y divide-slate-100"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Empty state -->
+  <div id="empty-state" class="hidden bg-white rounded-xl shadow-card border border-slate-200 p-16 text-center">
+    <div class="w-12 h-12 mx-auto rounded-full bg-slate-100 grid place-items-center mb-3">
+      <i data-lucide="inbox" class="w-6 h-6 text-slate-400"></i>
+    </div>
+    <h3 class="text-sm font-semibold text-slate-900">所选时段无数据</h3>
+    <p class="text-xs text-slate-500 mt-1">尝试扩大日期范围，或检查播放员是否开始工作。</p>
+  </div>
+
+  <div id="error-state" class="hidden bg-rose-50 border border-rose-200 rounded-xl p-4 flex items-start gap-3">
+    <i data-lucide="alert-circle" class="w-5 h-5 text-rose-600 flex-shrink-0 mt-0.5"></i>
+    <div>
+      <h3 class="text-sm font-semibold text-rose-900">加载失败</h3>
+      <p class="text-xs text-rose-700 mt-1" id="error-message"></p>
+    </div>
+  </div>
+
+</main>
+
+<script>
+const ANALYTICS_BASE = 'https://exposure-analytics.li2335100593.workers.dev';
+const $ = (sel) => document.querySelector(sel);
+const $$ = (sel) => document.querySelectorAll(sel);
+
+const state = {
+  from: null,
+  to: null,
+  selectedUid: null,
+  charts: { daily: null, url: null },
+};
+
+// ========== utilities ==========
+function fmtSeconds(sec) {
+  if (!sec || sec < 0) sec = 0;
+  const h = Math.floor(sec / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  if (h === 0) return `${m}分`;
+  if (m === 0) return `${h}小时`;
+  return `${h}小时${m}分`;
+}
+
+function fmtHours(sec) {
+  return Math.round((sec / 3600) * 100) / 100;
+}
+
+function fmtDateTime(ms) {
+  if (!ms) return '—';
+  const d = new Date(Number(ms));
+  if (isNaN(d.getTime())) return '—';
+  const yy = d.getFullYear();
+  const mo = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  const hh = String(d.getHours()).padStart(2, '0');
+  const mi = String(d.getMinutes()).padStart(2, '0');
+  return `${yy}-${mo}-${dd} ${hh}:${mi}`;
+}
+
+function fmtRelative(ms) {
+  if (!ms) return '—';
+  const diff = Date.now() - Number(ms);
+  if (diff < 0) return fmtDateTime(ms);
+  const min = Math.floor(diff / 60000);
+  if (min < 1) return '刚刚';
+  if (min < 60) return `${min}分钟前`;
+  const h = Math.floor(min / 60);
+  if (h < 24) return `${h}小时前`;
+  const d = Math.floor(h / 24);
+  if (d < 30) return `${d}天前`;
+  return fmtDateTime(ms);
+}
+
+function deviceIcon(device) {
+  switch (device) {
+    case 'mobile': return 'smartphone';
+    case 'tablet': return 'tablet';
+    case 'desktop': return 'monitor';
+    default: return 'help-circle';
+  }
+}
+
+function deviceLabel(device) {
+  switch (device) {
+    case 'mobile': return '手机';
+    case 'tablet': return '平板';
+    case 'desktop': return '电脑';
+    default: return '未知';
+  }
+}
+
+function shortUid(uid) {
+  if (!uid) return '—';
+  if (uid.length <= 14) return uid;
+  return uid.slice(0, 8) + '…' + uid.slice(-4);
+}
+
+function escapeHtml(s) {
+  if (s == null) return '';
+  return String(s).replace(/[&<>"']/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
+}
+
+function defaultRange() {
+  const to = new Date();
+  const from = new Date(to.getTime() - 30 * 24 * 60 * 60 * 1000);
+  return { from, to };
+}
+
+function ymd(d) {
+  const yy = d.getFullYear();
+  const mo = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${yy}-${mo}-${dd}`;
+}
+
+function rangeFromInputs() {
+  const f = new Date($('#from-date').value + 'T00:00:00');
+  const t = new Date($('#to-date').value + 'T23:59:59');
+  if (isNaN(f.getTime()) || isNaN(t.getTime())) return null;
+  return { from: f.getTime(), to: t.getTime() };
+}
+
+// ========== rendering ==========
+function renderTopStats(data) {
+  const totals = data.totals || {};
+  const cards = [
+    {
+      icon: 'clock',
+      label: '总工时',
+      value: `${totals.dwell_hours || 0}`,
+      suffix: '小时',
+      tone: 'brand',
+    },
+    {
+      icon: 'users',
+      label: '活跃播放员',
+      value: totals.operators || 0,
+      suffix: '人',
+      tone: 'emerald',
+    },
+    {
+      icon: 'mouse-pointer-click',
+      label: '总会话',
+      value: (data.operators || []).reduce((a, op) => a + op.sessions, 0),
+      suffix: '次',
+      tone: 'amber',
+    },
+    {
+      icon: 'monitor-smartphone',
+      label: '已识别设备',
+      value: (data.operators || []).reduce((a, op) => a + op.unique_devices, 0),
+      suffix: '台',
+      tone: 'sky',
+    },
+  ];
+  const tones = {
+    brand: 'bg-brand-50 text-brand-700',
+    emerald: 'bg-emerald-50 text-emerald-700',
+    amber: 'bg-amber-50 text-amber-700',
+    sky: 'bg-sky-50 text-sky-700',
+  };
+  $('#stats-grid').innerHTML = cards.map((c) => `
+    <div class="bg-white rounded-xl shadow-card border border-slate-200 p-5">
+      <div class="flex items-start justify-between">
+        <div>
+          <p class="text-xs font-medium text-slate-500 uppercase tracking-wider">${escapeHtml(c.label)}</p>
+          <p class="mt-2 text-2xl font-semibold tracking-tight">
+            ${escapeHtml(String(c.value))}
+            <span class="text-sm font-normal text-slate-500 ml-0.5">${escapeHtml(c.suffix)}</span>
+          </p>
+        </div>
+        <div class="w-9 h-9 rounded-lg ${tones[c.tone]} grid place-items-center">
+          <i data-lucide="${c.icon}" class="w-5 h-5"></i>
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function renderOperatorList(data) {
+  const ops = data.operators || [];
+  $('#list-count').textContent = `${ops.length} 位播放员`;
+  if (ops.length === 0) {
+    $('#list-view').classList.add('hidden');
+    $('#empty-state').classList.remove('hidden');
+    return;
+  }
+  $('#empty-state').classList.add('hidden');
+  $('#list-view').classList.remove('hidden');
+
+  $('#operator-tbody').innerHTML = ops.map((op) => `
+    <tr class="hover:bg-slate-50 cursor-pointer transition-colors" data-uid="${escapeHtml(op.uid)}">
+      <td class="px-6 py-4">
+        <div class="flex items-center gap-3">
+          <div class="w-8 h-8 rounded-full bg-gradient-to-br from-brand-500 to-brand-700 text-white text-xs font-semibold grid place-items-center flex-shrink-0">
+            ${escapeHtml((op.uid || '?').slice(0, 2).toUpperCase())}
+          </div>
+          <div class="min-w-0">
+            <div class="font-medium text-slate-900 truncate">${escapeHtml(op.uid)}</div>
+            <div class="text-xs text-slate-500">首次 ${fmtDateTime(op.first_seen)}</div>
+          </div>
+        </div>
+      </td>
+      <td class="px-6 py-4 text-right">
+        <div class="font-semibold text-slate-900">${fmtSeconds(op.dwell_seconds)}</div>
+        <div class="text-xs text-slate-500">${fmtHours(op.dwell_seconds)} h</div>
+      </td>
+      <td class="px-6 py-4 text-right tabular-nums">${op.active_days}</td>
+      <td class="px-6 py-4 text-right tabular-nums">${op.sessions}</td>
+      <td class="px-6 py-4 text-right tabular-nums">${op.urls_visited}</td>
+      <td class="px-6 py-4 text-right tabular-nums">${op.unique_devices}</td>
+      <td class="px-6 py-4">
+        <div class="inline-flex items-center gap-1.5 text-xs px-2 py-1 rounded-md bg-slate-100 text-slate-700">
+          <i data-lucide="${deviceIcon(op.primary_device_type)}" class="w-3.5 h-3.5"></i>
+          ${deviceLabel(op.primary_device_type)}
+        </div>
+      </td>
+      <td class="px-6 py-4 text-slate-600">${fmtRelative(op.last_seen)}</td>
+      <td class="px-2 py-4 text-slate-400"><i data-lucide="chevron-right" class="w-4 h-4"></i></td>
+    </tr>
+  `).join('');
+
+  $$('#operator-tbody tr').forEach((row) => {
+    row.addEventListener('click', () => {
+      state.selectedUid = row.dataset.uid;
+      loadDetail();
+    });
+  });
+
+  lucide.createIcons();
+}
+
+function renderDetailStats(summary) {
+  if (!summary) {
+    $('#detail-stats-grid').innerHTML = '';
+    return;
+  }
+  const cards = [
+    { icon: 'clock', label: '总工时', value: fmtSeconds(summary.dwell_seconds), sub: `${fmtHours(summary.dwell_seconds)} h`, tone: 'brand' },
+    { icon: 'calendar-check-2', label: '活跃天数', value: summary.active_days, sub: '天', tone: 'emerald' },
+    { icon: 'mouse-pointer-click', label: '会话数', value: summary.sessions, sub: '次', tone: 'amber' },
+    { icon: deviceIcon(summary.primary_device_type), label: '主用设备', value: deviceLabel(summary.primary_device_type), sub: `${summary.unique_devices} 台已识别`, tone: 'sky' },
+  ];
+  const tones = {
+    brand: 'bg-brand-50 text-brand-700',
+    emerald: 'bg-emerald-50 text-emerald-700',
+    amber: 'bg-amber-50 text-amber-700',
+    sky: 'bg-sky-50 text-sky-700',
+  };
+  $('#detail-stats-grid').innerHTML = cards.map((c) => `
+    <div class="bg-white rounded-xl shadow-card border border-slate-200 p-5">
+      <div class="flex items-start justify-between">
+        <div>
+          <p class="text-xs font-medium text-slate-500 uppercase tracking-wider">${escapeHtml(c.label)}</p>
+          <p class="mt-2 text-xl font-semibold tracking-tight">${escapeHtml(String(c.value))}</p>
+          <p class="text-xs text-slate-500 mt-1">${escapeHtml(c.sub)}</p>
+        </div>
+        <div class="w-9 h-9 rounded-lg ${tones[c.tone]} grid place-items-center">
+          <i data-lucide="${c.icon}" class="w-5 h-5"></i>
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function renderDailyChart(daily) {
+  const ctx = document.getElementById('daily-chart');
+  if (state.charts.daily) state.charts.daily.destroy();
+  if (!daily || daily.length === 0) {
+    ctx.parentElement.innerHTML = '<div class="h-full grid place-items-center text-xs text-slate-400">无数据</div>';
+    return;
+  }
+  state.charts.daily = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: daily.map((d) => d.day.slice(5)),
+      datasets: [{
+        label: '工时 (小时)',
+        data: daily.map((d) => fmtHours(d.dwell_seconds)),
+        backgroundColor: '#6366f1',
+        borderRadius: 4,
+        maxBarThickness: 32,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: (ctx) => ` ${ctx.parsed.y} h`,
+          },
+          backgroundColor: '#1e293b',
+          padding: 10,
+          cornerRadius: 6,
+          titleFont: { size: 12, weight: '600' },
+          bodyFont: { size: 12 },
+        }
+      },
+      scales: {
+        x: { grid: { display: false }, ticks: { font: { size: 11 }, color: '#64748b' } },
+        y: { grid: { color: '#f1f5f9' }, ticks: { font: { size: 11 }, color: '#64748b' }, beginAtZero: true }
+      }
+    }
+  });
+}
+
+function renderUrlChart(urls) {
+  const ctx = document.getElementById('url-chart');
+  if (state.charts.url) state.charts.url.destroy();
+  if (!urls || urls.length === 0) {
+    ctx.parentElement.innerHTML = '<div class="h-full grid place-items-center text-xs text-slate-400">无数据</div>';
+    return;
+  }
+  const palette = ['#6366f1', '#10b981', '#f59e0b', '#0ea5e9', '#ec4899', '#8b5cf6', '#84cc16', '#f43f5e'];
+  state.charts.url = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels: urls.map((u) => {
+        try { return new URL(u.url).hostname; } catch (e) { return u.url; }
+      }),
+      datasets: [{
+        data: urls.map((u) => fmtHours(u.dwell_seconds)),
+        backgroundColor: urls.map((_, i) => palette[i % palette.length]),
+        borderWidth: 0,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      cutout: '65%',
+      plugins: {
+        legend: { position: 'bottom', labels: { font: { size: 11 }, color: '#475569', boxWidth: 10, padding: 12 } },
+        tooltip: {
+          callbacks: { label: (ctx) => ` ${ctx.label}: ${ctx.parsed} h` },
+          backgroundColor: '#1e293b',
+          padding: 10,
+          cornerRadius: 6,
+        }
+      }
+    }
+  });
+}
+
+function renderUrlTable(urls) {
+  if (!urls || urls.length === 0) {
+    $('#url-tbody').innerHTML = '<tr><td colspan="5" class="px-6 py-8 text-center text-xs text-slate-400">暂无数据</td></tr>';
+    return;
+  }
+  $('#url-tbody').innerHTML = urls.map((u) => {
+    let host = u.url, path = '';
+    try {
+      const parsed = new URL(u.url);
+      host = parsed.hostname;
+      path = parsed.pathname === '/' ? '' : parsed.pathname;
+    } catch (e) {}
+    return `
+      <tr class="hover:bg-slate-50 transition-colors">
+        <td class="px-6 py-3.5">
+          <div class="font-medium text-slate-900">${escapeHtml(host)}</div>
+          ${path ? `<div class="text-xs text-slate-500">${escapeHtml(path)}</div>` : ''}
+        </td>
+        <td class="px-6 py-3.5 text-right">
+          <div class="font-semibold">${fmtSeconds(u.dwell_seconds)}</div>
+          <div class="text-xs text-slate-500">${fmtHours(u.dwell_seconds)} h</div>
+        </td>
+        <td class="px-6 py-3.5 text-right tabular-nums">${u.visits}</td>
+        <td class="px-6 py-3.5 text-right tabular-nums">${u.sessions}</td>
+        <td class="px-6 py-3.5 text-slate-600">${fmtRelative(u.last_seen)}</td>
+      </tr>
+    `;
+  }).join('');
+}
+
+function renderSessionTable(sessions) {
+  $('#session-count').textContent = `${(sessions || []).length} 个会话`;
+  if (!sessions || sessions.length === 0) {
+    $('#session-tbody').innerHTML = '<tr><td colspan="8" class="px-6 py-8 text-center text-xs text-slate-400">暂无会话</td></tr>';
+    return;
+  }
+  $('#session-tbody').innerHTML = sessions.map((s) => {
+    const resolution = (s.screen_w && s.screen_h) ? `${s.screen_w} × ${s.screen_h}` : '—';
+    const cleanIcon = s.clean_leaves > 0
+      ? '<i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-600"></i>'
+      : '<i data-lucide="x-circle" class="w-4 h-4 text-slate-300"></i>';
+    return `
+      <tr class="hover:bg-slate-50 transition-colors">
+        <td class="px-6 py-3.5">
+          <div class="font-medium text-slate-900">${fmtDateTime(s.started_at)}</div>
+          <div class="text-xs text-slate-500 font-mono">${escapeHtml(shortUid(s.sid))}</div>
+        </td>
+        <td class="px-6 py-3.5 text-right">
+          <div class="font-semibold">${fmtSeconds(s.dwell_seconds)}</div>
+        </td>
+        <td class="px-6 py-3.5 text-right tabular-nums">${s.pages_visited}</td>
+        <td class="px-6 py-3.5 text-right tabular-nums">${s.unique_urls}</td>
+        <td class="px-6 py-3.5">
+          <div class="inline-flex items-center gap-1.5 text-xs px-2 py-1 rounded-md bg-slate-100 text-slate-700">
+            <i data-lucide="${deviceIcon(s.device_type)}" class="w-3.5 h-3.5"></i>
+            ${deviceLabel(s.device_type)}
+          </div>
+        </td>
+        <td class="px-6 py-3.5 tabular-nums text-slate-600">${escapeHtml(resolution)}</td>
+        <td class="px-6 py-3.5 font-mono text-xs text-slate-500">${escapeHtml(s.ip || '—')}</td>
+        <td class="px-6 py-3.5">${cleanIcon}</td>
+      </tr>
+    `;
+  }).join('');
+}
+
+// ========== loaders ==========
+async function loadList() {
+  const range = rangeFromInputs();
+  if (!range) return showError('日期范围无效');
+  state.from = range.from;
+  state.to = range.to;
+  state.selectedUid = null;
+  showLoading();
+
+  try {
+    const res = await fetch(`${ANALYTICS_BASE}/api/operator-report?from=${range.from}&to=${range.to}`);
+    const json = await res.json();
+    if (!json.ok) throw new Error(json.error || 'Unknown error');
+
+    $('#detail-view').classList.add('hidden');
+    renderTopStats(json);
+    renderOperatorList(json);
+    hideError();
+    lucide.createIcons();
+  } catch (err) {
+    showError(err.message || String(err));
+  }
+}
+
+async function loadDetail() {
+  if (!state.selectedUid) return loadList();
+  showLoading();
+  try {
+    const res = await fetch(`${ANALYTICS_BASE}/api/operator-report?from=${state.from}&to=${state.to}&uid=${encodeURIComponent(state.selectedUid)}`);
+    const json = await res.json();
+    if (!json.ok) throw new Error(json.error || 'Unknown error');
+
+    $('#list-view').classList.add('hidden');
+    $('#empty-state').classList.add('hidden');
+    $('#detail-view').classList.remove('hidden');
+    $('#detail-uid-badge').textContent = state.selectedUid;
+
+    renderDetailStats(json.summary);
+    renderDailyChart(json.daily);
+    renderUrlChart(json.by_url);
+    renderUrlTable(json.by_url);
+    renderSessionTable(json.sessions);
+    hideError();
+    lucide.createIcons();
+  } catch (err) {
+    showError(err.message || String(err));
+  }
+}
+
+function showLoading() {
+  $('#stats-grid').innerHTML = Array(4).fill(0).map(() => `
+    <div class="bg-white rounded-xl shadow-card border border-slate-200 p-5">
+      <div class="skeleton h-3 w-20 rounded"></div>
+      <div class="skeleton h-7 w-32 rounded mt-3"></div>
+    </div>
+  `).join('');
+}
+
+function showError(msg) {
+  $('#error-message').textContent = msg;
+  $('#error-state').classList.remove('hidden');
+}
+function hideError() { $('#error-state').classList.add('hidden'); }
+
+function exportCsv() {
+  if (!state.from || !state.to) return;
+  const url = state.selectedUid
+    ? `${ANALYTICS_BASE}/api/operator-report?from=${state.from}&to=${state.to}&uid=${encodeURIComponent(state.selectedUid)}`
+    : `${ANALYTICS_BASE}/api/operator-report?from=${state.from}&to=${state.to}`;
+  fetch(url).then((r) => r.json()).then((json) => {
+    if (!json.ok) return;
+    let lines = [];
+    if (state.selectedUid) {
+      lines.push('section,key,value');
+      lines.push(`summary,uid,${state.selectedUid}`);
+      lines.push(`summary,total_hours,${fmtHours(json.summary?.dwell_seconds || 0)}`);
+      lines.push(`summary,sessions,${json.summary?.sessions || 0}`);
+      lines.push(`summary,active_days,${json.summary?.active_days || 0}`);
+      (json.daily || []).forEach((d) => lines.push(`daily,${d.day},${fmtHours(d.dwell_seconds)}`));
+      (json.by_url || []).forEach((u) => lines.push(`url,${u.url},${fmtHours(u.dwell_seconds)}`));
+      (json.sessions || []).forEach((s) => lines.push(`session,${s.sid},${fmtHours(s.dwell_seconds)}`));
+    } else {
+      lines.push('uid,total_hours,active_days,sessions,urls_visited,unique_devices,primary_device,first_seen,last_seen');
+      (json.operators || []).forEach((op) => {
+        lines.push([
+          op.uid,
+          fmtHours(op.dwell_seconds),
+          op.active_days,
+          op.sessions,
+          op.urls_visited,
+          op.unique_devices,
+          op.primary_device_type,
+          op.first_seen_iso || '',
+          op.last_seen_iso || '',
+        ].join(','));
+      });
+    }
+    const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = state.selectedUid
+      ? `operator-${state.selectedUid}-${ymd(new Date(state.from))}_${ymd(new Date(state.to))}.csv`
+      : `operators-${ymd(new Date(state.from))}_${ymd(new Date(state.to))}.csv`;
+    link.click();
+  });
+}
+
+// ========== boot ==========
+function init() {
+  const { from, to } = defaultRange();
+  $('#from-date').value = ymd(from);
+  $('#to-date').value = ymd(to);
+
+  $('#refresh-btn').addEventListener('click', loadList);
+  $('#export-btn').addEventListener('click', exportCsv);
+  $('#back-btn').addEventListener('click', () => {
+    state.selectedUid = null;
+    loadList();
+  });
+  $('#from-date').addEventListener('change', loadList);
+  $('#to-date').addEventListener('change', loadList);
+
+  lucide.createIcons();
+  loadList();
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', init);
+} else {
+  init();
+}
+</script>
+
+</body>
+</html>

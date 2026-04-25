@@ -1,3 +1,6 @@
+-- Canonical schema. Reflects production state after migration_002.
+-- Used by `wrangler d1 execute --file=schema.sql` for fresh databases.
+
 CREATE TABLE IF NOT EXISTS exposure_events (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   event_type TEXT NOT NULL,
@@ -7,6 +10,9 @@ CREATE TABLE IF NOT EXISTS exposure_events (
   url TEXT NOT NULL,
   page_index INTEGER,
   device_type TEXT,
+  screen_w INTEGER,
+  screen_h INTEGER,
+  tz_offset INTEGER,
   ip TEXT,
   ua TEXT,
   client_ts INTEGER,

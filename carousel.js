@@ -73,6 +73,15 @@
     }
   }
 
+  // ===== Device fingerprint (sent once per page_enter) =====
+  function deviceFingerprint() {
+    var fp = {};
+    try { fp.screen_w = (window.screen && window.screen.width) || null; } catch (e) {}
+    try { fp.screen_h = (window.screen && window.screen.height) || null; } catch (e) {}
+    try { fp.tz_offset = new Date().getTimezoneOffset(); } catch (e) {}
+    return fp;
+  }
+
   // ===== Analytics =====
   function sendExposure(eventType, extra) {
     try {
@@ -86,6 +95,10 @@
         page_index: state.ci,
         client_ts: now()
       };
+      if (eventType === 'page_enter') {
+        var fp = deviceFingerprint();
+        for (var fk in fp) if (fp[fk] != null) payload[fk] = fp[fk];
+      }
       if (extra && typeof extra === 'object') {
         for (var k in extra) payload[k] = extra[k];
       }
@@ -135,7 +148,18 @@
   }
 
   // ===== Get cycle start =====
-  function getCycleStart(cy) {
+  // Priority: hash _ct  >  localStorage  >  cookie  >  new now()
+  // Hash takes top priority so internal-link clicks (which carry ct via mergeIntoUrl)
+  // don't reset the cycle even if cross-domain storage isolation wipes localStorage.
+  function getCycleStart(cy, hashCt) {
+    if (hashCt && !isNaN(hashCt)) {
+      var hashAge = now() - hashCt;
+      if (hashAge >= 0 && hashAge < cy * 1000) {
+        try { localStorage.setItem(LS_CYCLE, String(hashCt)); } catch (e) {}
+        setCookie(CK_CYCLE, String(hashCt), cy);
+        return hashCt;
+      }
+    }
     var ct = null;
     try {
       var s = localStorage.getItem(LS_CYCLE);
@@ -180,8 +204,11 @@
       if (isNaN(ci) || ci < 0 || ci >= urls.length) ci = 0;
       var iv = parseInt(p.get('_iv'), 10) || 300;
       var cy = parseInt(p.get('_cy'), 10) || 3600;
+      var ctRaw = parseInt(p.get('_ct'), 10);
+      var ct = !isNaN(ctRaw) && ctRaw > 0 ? ctRaw : null;
       return {
         ci: ci,
+        ct: ct,
         iv: iv,
         cy: cy,
         cu: cu,
@@ -238,7 +265,7 @@
     base.uid = hashState.uid;
   }
 
-  var cycleStart = getCycleStart(base.cy);
+  var cycleStart = getCycleStart(base.cy, base.ct);
 
   var state = {
     ci: base.ci,
@@ -257,6 +284,7 @@
   function mergeIntoUrl(targetUrl, st) {
     var p = new URLSearchParams(targetUrl.hash ? targetUrl.hash.substring(1) : '');
     p.set('_ci', String(st.ci));
+    p.set('_ct', String(st.ct));
     p.set('_iv', String(st.iv));
     p.set('_cy', String(st.cy));
     p.set('_cu', st.cu);
@@ -364,6 +392,17 @@
     }
   }
 
+  // Force-close detection: pagehide is the most reliable cross-browser hook
+  // (fires for tab close, app switch, navigation, bfcache). Send leave once
+  // via beacon so we always have a session-end timestamp even when the
+  // operator hard-closes the browser/app.
+  var pagehideFired = false;
+  function onPageHide() {
+    if (pagehideFired || navigated) return;
+    pagehideFired = true;
+    sendExposure('page_leave', { dwell_ms: now() - startTime, reason: 'pagehide' });
+  }
+
   // ===== Navigation =====
   var navigated = false;
 
@@ -441,6 +480,7 @@
     initUI();
     requestWakeLock();
     document.addEventListener('visibilitychange', onVisibilityChange);
+    window.addEventListener('pagehide', onPageHide);
     attachLinkInterceptor();
     sendExposure('page_enter');
     tickTimer = setInterval(tick, 1000);
