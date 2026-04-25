@@ -931,6 +931,179 @@ async function handleOperatorReport(req, env, headers) {
   );
 }
 
+// ===== Site-centric report (operator breakdown per URL) =====
+async function getSiteSummaries(env, from, to) {
+  const result = await env.DB.prepare(
+    `SELECT
+      url,
+      SUM(CASE WHEN event_type = 'heartbeat' THEN 1 ELSE 0 END) * ${HEARTBEAT_INTERVAL_SEC} AS dwell_seconds,
+      SUM(CASE WHEN event_type = 'page_enter' OR event_type IS NULL THEN 1 ELSE 0 END) AS visits,
+      COUNT(DISTINCT sid) AS sessions,
+      COUNT(DISTINCT uid) AS unique_operators,
+      COUNT(DISTINCT vid) AS unique_devices,
+      COUNT(DISTINCT date(received_at / 1000, 'unixepoch', '+8 hours')) AS active_days,
+      MAX(received_at) AS last_seen,
+      (
+        SELECT device_type FROM exposure_events e2
+        WHERE e2.url = exposure_events.url
+          AND e2.received_at >= ? AND e2.received_at <= ?
+          AND e2.device_type IS NOT NULL
+        GROUP BY device_type
+        ORDER BY COUNT(*) DESC
+        LIMIT 1
+      ) AS primary_device_type
+    FROM exposure_events
+    WHERE received_at >= ? AND received_at <= ?
+    GROUP BY url
+    ORDER BY dwell_seconds DESC, url ASC`
+  )
+    .bind(from, to, from, to)
+    .all();
+  return (result.results || []).map((r) => ({
+    url: r.url,
+    dwell_seconds: Number(r.dwell_seconds || 0),
+    visits: Number(r.visits || 0),
+    sessions: Number(r.sessions || 0),
+    unique_operators: Number(r.unique_operators || 0),
+    unique_devices: Number(r.unique_devices || 0),
+    active_days: Number(r.active_days || 0),
+    last_seen: Number(r.last_seen || 0),
+    last_seen_iso: toIsoOrNull(r.last_seen),
+    primary_device_type: r.primary_device_type || "unknown",
+  }));
+}
+
+async function getSiteOperatorBreakdown(env, from, to, siteUrl) {
+  const result = await env.DB.prepare(
+    `SELECT
+      uid,
+      SUM(CASE WHEN event_type = 'heartbeat' THEN 1 ELSE 0 END) * ${HEARTBEAT_INTERVAL_SEC} AS dwell_seconds,
+      COUNT(DISTINCT sid) AS sessions,
+      MAX(received_at) AS last_seen
+    FROM exposure_events
+    WHERE received_at >= ? AND received_at <= ?
+      AND url = ?
+      AND uid IS NOT NULL AND uid <> ''
+    GROUP BY uid
+    ORDER BY dwell_seconds DESC, uid ASC`
+  )
+    .bind(from, to, siteUrl)
+    .all();
+  return (result.results || []).map((r) => ({
+    uid: r.uid,
+    dwell_seconds: Number(r.dwell_seconds || 0),
+    sessions: Number(r.sessions || 0),
+    last_seen: Number(r.last_seen || 0),
+    last_seen_iso: toIsoOrNull(r.last_seen),
+  }));
+}
+
+async function getSiteDailyDwell(env, from, to, siteUrl) {
+  const result = await env.DB.prepare(
+    `SELECT
+      date(received_at / 1000, 'unixepoch', '+8 hours') AS day,
+      SUM(CASE WHEN event_type = 'heartbeat' THEN 1 ELSE 0 END) * ${HEARTBEAT_INTERVAL_SEC} AS dwell_seconds,
+      COUNT(DISTINCT sid) AS sessions,
+      COUNT(DISTINCT uid) AS operators
+    FROM exposure_events
+    WHERE received_at >= ? AND received_at <= ? AND url = ?
+    GROUP BY day
+    ORDER BY day ASC`
+  )
+    .bind(from, to, siteUrl)
+    .all();
+  return (result.results || []).map((r) => ({
+    day: r.day,
+    dwell_seconds: Number(r.dwell_seconds || 0),
+    sessions: Number(r.sessions || 0),
+    operators: Number(r.operators || 0),
+  }));
+}
+
+async function handleSiteReport(req, env, headers) {
+  const url = new URL(req.url);
+  const range = parseReportRange(url);
+  if (range.error) return json({ ok: false, error: range.error }, 400, headers);
+
+  const targetUrl = normalizeUrl(url.searchParams.get("url"));
+
+  if (!targetUrl) {
+    const sites = await getSiteSummaries(env, range.from, range.to);
+    const totalDwell = sites.reduce((acc, s) => acc + s.dwell_seconds, 0);
+    return json(
+      {
+        ok: true,
+        range: { from: range.from, to: range.to },
+        sites,
+        totals: {
+          sites: sites.length,
+          dwell_seconds: totalDwell,
+          dwell_hours: Math.round((totalDwell / 3600) * 100) / 100,
+        },
+      },
+      200,
+      headers
+    );
+  }
+
+  const [summary, byOperator, daily] = await Promise.all([
+    getSiteSummaries(env, range.from, range.to).then((list) => list.find((s) => s.url === targetUrl) || null),
+    getSiteOperatorBreakdown(env, range.from, range.to, targetUrl),
+    getSiteDailyDwell(env, range.from, range.to, targetUrl),
+  ]);
+
+  return json(
+    {
+      ok: true,
+      range: { from: range.from, to: range.to },
+      url: targetUrl,
+      summary,
+      by_operator: byOperator,
+      daily,
+    },
+    200,
+    headers
+  );
+}
+
+// ===== Operator hour×weekday heatmap =====
+// Returns a 7×24 matrix of dwell_seconds (rows = weekday 0-6, cols = hour 0-23).
+// Uses Asia/Shanghai timezone via SQLite's built-in timezone shift.
+async function handleOperatorHeatmap(req, env, headers) {
+  const url = new URL(req.url);
+  const range = parseReportRange(url);
+  if (range.error) return json({ ok: false, error: range.error }, 400, headers);
+
+  const uid = url.searchParams.get("uid");
+  if (!uid) return json({ ok: false, error: "uid is required" }, 400, headers);
+
+  const result = await env.DB.prepare(
+    `SELECT
+      CAST(strftime('%w', received_at / 1000, 'unixepoch', '+8 hours') AS INTEGER) AS weekday,
+      CAST(strftime('%H', received_at / 1000, 'unixepoch', '+8 hours') AS INTEGER) AS hour,
+      SUM(CASE WHEN event_type = 'heartbeat' THEN 1 ELSE 0 END) * ${HEARTBEAT_INTERVAL_SEC} AS dwell_seconds
+    FROM exposure_events
+    WHERE received_at >= ? AND received_at <= ? AND uid = ?
+    GROUP BY weekday, hour
+    ORDER BY weekday, hour`
+  )
+    .bind(range.from, range.to, uid)
+    .all();
+
+  const matrix = Array.from({ length: 7 }, () => Array(24).fill(0));
+  let maxVal = 0;
+  for (const r of result.results || []) {
+    const w = Number(r.weekday);
+    const h = Number(r.hour);
+    const v = Number(r.dwell_seconds || 0);
+    if (w >= 0 && w < 7 && h >= 0 && h < 24) {
+      matrix[w][h] = v;
+      if (v > maxVal) maxVal = v;
+    }
+  }
+  return json({ ok: true, range: { from: range.from, to: range.to }, uid, matrix, max: maxVal }, 200, headers);
+}
+
 // ===== Sites management =====
 async function handleSitesList(req, env, headers) {
   const url = new URL(req.url);
@@ -1121,6 +1294,9 @@ export default {
       if (url.pathname === "/api/sites" && req.method === "GET") return await handleSitesList(req, env, headers);
       if (url.pathname === "/api/sites" && req.method === "POST") return await handleSitesAdd(req, env, headers);
       if (url.pathname === "/api/sites" && req.method === "DELETE") return await handleSitesDelete(req, env, headers);
+
+      if (url.pathname === "/api/site-report" && req.method === "GET") return await handleSiteReport(req, env, headers);
+      if (url.pathname === "/api/operator-heatmap" && req.method === "GET") return await handleOperatorHeatmap(req, env, headers);
 
       if (url.pathname === "/api/operators" && req.method === "GET") return await handleOperatorsList(req, env, headers);
       if (url.pathname === "/api/operators" && req.method === "POST") return await handleOperatorsAdd(req, env, headers);
