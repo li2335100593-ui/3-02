@@ -330,13 +330,19 @@
   }
 
   // ===== Timer =====
+  // intervalSec  — per-page rotation interval (e.g., 300s)
+  // pageStartTime — when THIS page boot happened (per-page; reset each navigation)
+  // state.ct      — cycle start (preserved across pages via hash; used only for
+  //                  cycle-reset logic in navigate(), NOT for the per-page timer)
+  // The earlier bug: elapsed() used state.ct as startTime, so when arriving at
+  // page 2 after 5 min on page 1, elapsed was already 300s → instant navigate.
   var intervalSec = state.iv;
-  var startTime = state.ct;
+  var pageStartTime = now();
   var tickTimer = null;
   var lastHbSec = -1;
 
   function elapsed() {
-    return Math.floor((now() - startTime) / 1000);
+    return Math.floor((now() - pageStartTime) / 1000);
   }
 
   function tick() {
@@ -400,7 +406,7 @@
   function onPageHide() {
     if (pagehideFired || navigated) return;
     pagehideFired = true;
-    sendExposure('page_leave', { dwell_ms: now() - startTime, reason: 'pagehide' });
+    sendExposure('page_leave', { dwell_ms: now() - pageStartTime, reason: 'pagehide' });
   }
 
   // ===== Navigation =====
@@ -410,7 +416,7 @@
     if (navigated) return;
     navigated = true;
 
-    sendExposure('page_leave', { dwell_ms: now() - startTime });
+    sendExposure('page_leave', { dwell_ms: now() - pageStartTime });
     if (tickTimer) clearInterval(tickTimer);
     try { if (wakeLockSentinel) wakeLockSentinel.release(); } catch (e) {}
     try { if (silentVideo && silentVideo.parentNode) silentVideo.parentNode.removeChild(silentVideo); } catch (e) {}
