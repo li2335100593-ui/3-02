@@ -329,20 +329,37 @@
     }, true);
   }
 
-  // ===== Timer =====
-  // intervalSec  — per-page rotation interval (e.g., 300s)
-  // pageStartTime — when THIS page boot happened (per-page; reset each navigation)
-  // state.ct      — cycle start (preserved across pages via hash; used only for
-  //                  cycle-reset logic in navigate(), NOT for the per-page timer)
-  // The earlier bug: elapsed() used state.ct as startTime, so when arriving at
-  // page 2 after 5 min on page 1, elapsed was already 300s → instant navigate.
+  // ===== Timer (slot-based scheduling) =====
+  // GUARANTEE: within every cycle of `cy` seconds, exactly cy/iv navigations
+  // occur — page load latency is absorbed inside the slot, never extends it.
+  //
+  // intervalSec    — per-slot length (e.g., 300s)
+  // pageStartTime  — when THIS page boot happened (used for per-page dwell only)
+  // state.ct       — cycle anchor (preserved across pages via hash); slots are
+  //                   measured as absolute windows from ct, NOT from page boot
+  // pageSlotN      — which slot (relative to ct) this page belongs to
+  // pageSlotEndMs  — absolute timestamp when this slot ends (= when to navigate)
+  //
+  // Key insight: navigate() schedules the NEXT slot from the wall clock, so a
+  // slow-loading page that boots 60s late only gets 240s of dwell — the next
+  // navigation still fires exactly at slot end. 12 slots per hour, always.
   var intervalSec = state.iv;
   var pageStartTime = now();
   var tickTimer = null;
   var lastHbSec = -1;
 
+  // Compute this page's slot ONCE at boot and lock it in.
+  var pageSlotN = Math.floor((pageStartTime - state.ct) / (intervalSec * 1000));
+  if (pageSlotN < 0) pageSlotN = 0;
+  var pageSlotEndMs = state.ct + (pageSlotN + 1) * intervalSec * 1000;
+
   function elapsed() {
     return Math.floor((now() - pageStartTime) / 1000);
+  }
+
+  function slotRemainingMs() {
+    var r = pageSlotEndMs - now();
+    return r < 0 ? 0 : r;
   }
 
   function tick() {
@@ -352,7 +369,7 @@
       lastHbSec = e;
       sendExposure('heartbeat', { dwell_ms: e * 1000 });
     }
-    if (e >= intervalSec) {
+    if (now() >= pageSlotEndMs) {
       navigate();
     }
   }
@@ -422,15 +439,27 @@
     try { if (silentVideo && silentVideo.parentNode) silentVideo.parentNode.removeChild(silentVideo); } catch (e) {}
 
     var urls = state.urls;
-    var nextIndex = state.ci + 1;
     var t = now();
+    var slotsPerCycle = Math.floor(state.cy / state.iv);
+    if (slotsPerCycle < 1) slotsPerCycle = 1;
 
-    if (nextIndex >= urls.length || (t - state.ct) >= state.cy * 1000) {
-      nextIndex = 0;
+    // Next slot is anchored to the wall clock (not to ci), so slow page loads
+    // never accumulate drift. Take max(clockSlot+1, pageSlotN+1) as a safety
+    // floor in case of clock anomalies.
+    var clockSlot = Math.floor((t - state.ct) / (intervalSec * 1000));
+    var nextSlotN = clockSlot + 1;
+    if (nextSlotN < pageSlotN + 1) nextSlotN = pageSlotN + 1;
+
+    // Cycle wrap: only reset ct when a full cycle has elapsed, NOT on URL wrap.
+    // This is what guarantees `slotsPerCycle` navigations per `cy` seconds.
+    if (nextSlotN >= slotsPerCycle) {
+      nextSlotN = 0;
       state.ct = t;
       try { localStorage.setItem(LS_CYCLE, String(t)); } catch (e) {}
       setCookie(CK_CYCLE, String(t), state.cy);
     }
+
+    var nextIndex = nextSlotN % urls.length;
 
     var nextUrl;
     try {
@@ -466,10 +495,15 @@
 
   function updateUI(elapsedSec) {
     if (!barEl || !textEl) return;
-    var pct = Math.min((elapsedSec / intervalSec) * 100, 100);
+    // Progress bar tracks countdown to slot end, not per-page elapsed —
+    // ensures the bar reaches 100% exactly when navigation fires.
+    var totalMs = intervalSec * 1000;
+    var remMs = slotRemainingMs();
+    var pct = ((totalMs - remMs) / totalMs) * 100;
+    if (pct < 0) pct = 0;
+    if (pct > 100) pct = 100;
     barEl.style.width = pct + '%';
-    var rem = intervalSec - elapsedSec;
-    if (rem < 0) rem = 0;
+    var rem = Math.ceil(remMs / 1000);
     var min = Math.floor(rem / 60);
     var sec = rem % 60;
     var timeStr = min + ':' + (sec < 10 ? '0' : '') + sec;
