@@ -27,7 +27,9 @@
   var LS_VID = '__carousel_vid';
   var LS_CYCLE = '__carousel_cycle_v4';
   var LS_STATE = '__carousel_state_v4';
+  var LS_QUEUE = '__carousel_exposure_queue_v1';
   var CK_CYCLE = '__carousel_cycle_v4';
+  var MAX_QUEUE_SIZE = 200;
 
   function now() { return Date.now(); }
 
@@ -83,6 +85,102 @@
   }
 
   // ===== Analytics =====
+  function readQueue() {
+    try {
+      var raw = localStorage.getItem(LS_QUEUE);
+      var q = raw ? JSON.parse(raw) : [];
+      return Array.isArray(q) ? q : [];
+    } catch (e) { return []; }
+  }
+
+  function writeQueue(q) {
+    try {
+      if (!q || q.length === 0) {
+        localStorage.removeItem(LS_QUEUE);
+        return;
+      }
+      if (q.length > MAX_QUEUE_SIZE) q = q.slice(q.length - MAX_QUEUE_SIZE);
+      localStorage.setItem(LS_QUEUE, JSON.stringify(q));
+    } catch (e) {}
+  }
+
+  function enqueuePayload(payload) {
+    var q = readQueue();
+    q.push(payload);
+    writeQueue(q);
+  }
+
+  function deliverPayload(payload, preferBeacon) {
+    var body = JSON.stringify(payload);
+    if (preferBeacon && navigator.sendBeacon) {
+      try {
+        if (navigator.sendBeacon(ANALYTICS_URL, new Blob([body], { type: 'application/json' }))) {
+          return Promise.resolve(true);
+        }
+      } catch (e) {}
+    }
+    return fetch(ANALYTICS_URL, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: body,
+      keepalive: true
+    }).then(function (res) {
+      return !!(res && res.ok);
+    }).catch(function () {
+      return false;
+    });
+  }
+
+  var flushingQueue = false;
+  function flushQueueBeaconSync() {
+    if (!navigator.sendBeacon) return false;
+    var q = readQueue();
+    if (!q.length) return true;
+
+    var sent = 0;
+    for (var i = 0; i < q.length; i++) {
+      try {
+        var body = JSON.stringify(q[i]);
+        if (!navigator.sendBeacon(ANALYTICS_URL, new Blob([body], { type: 'application/json' }))) break;
+        sent += 1;
+      } catch (e) {
+        break;
+      }
+    }
+    if (sent > 0) writeQueue(q.slice(sent));
+    return sent === q.length;
+  }
+
+  function flushQueue(preferBeacon) {
+    if (flushingQueue) return Promise.resolve(false);
+    var q = readQueue();
+    if (!q.length) return Promise.resolve(true);
+
+    flushingQueue = true;
+    var sent = 0;
+    var chain = Promise.resolve(true);
+    q.forEach(function (payload) {
+      chain = chain.then(function (okSoFar) {
+        if (!okSoFar) return false;
+        return deliverPayload(payload, preferBeacon).then(function (ok) {
+          if (ok) sent += 1;
+          return ok;
+        });
+      });
+    });
+
+    return chain.then(function () {
+      if (sent > 0) writeQueue(readQueue().slice(sent));
+      flushingQueue = false;
+      if (readQueue().length) flushQueue(false);
+      return sent === q.length;
+    }).catch(function () {
+      if (sent > 0) writeQueue(readQueue().slice(sent));
+      flushingQueue = false;
+      return false;
+    });
+  }
+
   function sendExposure(eventType, extra) {
     try {
       if (!state) return;
@@ -102,13 +200,17 @@
       if (extra && typeof extra === 'object') {
         for (var k in extra) payload[k] = extra[k];
       }
-      var body = JSON.stringify(payload);
       if (eventType === 'page_leave' && navigator.sendBeacon) {
         try {
-          if (navigator.sendBeacon(ANALYTICS_URL, new Blob([body], { type: 'application/json' }))) return;
+          var leaveBody = JSON.stringify(payload);
+          if (navigator.sendBeacon(ANALYTICS_URL, new Blob([leaveBody], { type: 'application/json' }))) {
+            if (!flushingQueue) flushQueueBeaconSync();
+            return;
+          }
         } catch (e) {}
       }
-      fetch(ANALYTICS_URL, { method: 'POST', headers: { 'content-type': 'application/json' }, body: body, keepalive: true }).catch(function () {});
+      enqueuePayload(payload);
+      flushQueue(eventType === 'page_leave');
     } catch (e) {}
   }
 
@@ -346,7 +448,9 @@
   var intervalSec = state.iv;
   var pageStartTime = now();
   var tickTimer = null;
-  var lastHbSec = -1;
+  var nextHeartbeatAt = pageStartTime;
+  var hiddenStartedAt = null;
+  var totalHiddenMs = 0;
 
   // Compute this page's slot ONCE at boot and lock it in.
   var pageSlotN = Math.floor((pageStartTime - state.ct) / (intervalSec * 1000));
@@ -362,13 +466,34 @@
     return r < 0 ? 0 : r;
   }
 
+  function activeDwellMs(at) {
+    var hiddenMs = totalHiddenMs;
+    if (hiddenStartedAt) hiddenMs += Math.max(0, at - hiddenStartedAt);
+    return Math.max(0, at - pageStartTime - hiddenMs);
+  }
+
+  function sendDueHeartbeats() {
+    if (document.visibilityState === 'hidden') return;
+
+    var sent = 0;
+    var maxCatchup = 12;
+    while (now() >= nextHeartbeatAt && sent < maxCatchup) {
+      sendExposure('heartbeat', { dwell_ms: activeDwellMs(nextHeartbeatAt) });
+      nextHeartbeatAt += HEARTBEAT_INTERVAL_SEC * 1000;
+      sent += 1;
+    }
+
+    // Avoid flooding after a long browser suspension; resume from the current wall clock.
+    if (sent >= maxCatchup && now() >= nextHeartbeatAt) {
+      nextHeartbeatAt = now() + HEARTBEAT_INTERVAL_SEC * 1000;
+    }
+  }
+
   function tick() {
     var e = elapsed();
     updateUI(e);
-    if (e >= 0 && e % HEARTBEAT_INTERVAL_SEC === 0 && e !== lastHbSec) {
-      lastHbSec = e;
-      sendExposure('heartbeat', { dwell_ms: e * 1000 });
-    }
+    flushQueue(false);
+    sendDueHeartbeats();
     if (now() >= pageSlotEndMs) {
       navigate();
     }
@@ -410,9 +535,21 @@
   }
 
   function onVisibilityChange() {
-    if (document.visibilityState === 'visible' && !wakeLockSentinel) {
-      requestWakeLock();
+    if (document.visibilityState === 'hidden') {
+      hiddenStartedAt = hiddenStartedAt || now();
+      sendExposure('page_leave', { dwell_ms: activeDwellMs(now()), reason: 'hidden' });
+      return;
     }
+
+    if (hiddenStartedAt) {
+      var hiddenMs = Math.max(0, now() - hiddenStartedAt);
+      totalHiddenMs += hiddenMs;
+      nextHeartbeatAt += hiddenMs;
+      hiddenStartedAt = null;
+    }
+    if (!wakeLockSentinel) requestWakeLock();
+    flushQueue(false);
+    tick();
   }
 
   // Force-close detection: pagehide is the most reliable cross-browser hook
@@ -423,7 +560,7 @@
   function onPageHide() {
     if (pagehideFired || navigated) return;
     pagehideFired = true;
-    sendExposure('page_leave', { dwell_ms: now() - pageStartTime, reason: 'pagehide' });
+    sendExposure('page_leave', { dwell_ms: activeDwellMs(now()), reason: 'pagehide' });
   }
 
   // ===== Navigation =====
@@ -433,7 +570,7 @@
     if (navigated) return;
     navigated = true;
 
-    sendExposure('page_leave', { dwell_ms: now() - pageStartTime });
+    sendExposure('page_leave', { dwell_ms: activeDwellMs(now()) });
     if (tickTimer) clearInterval(tickTimer);
     try { if (wakeLockSentinel) wakeLockSentinel.release(); } catch (e) {}
     try { if (silentVideo && silentVideo.parentNode) silentVideo.parentNode.removeChild(silentVideo); } catch (e) {}
@@ -520,6 +657,9 @@
     initUI();
     requestWakeLock();
     document.addEventListener('visibilitychange', onVisibilityChange);
+    document.addEventListener('resume', function () { flushQueue(false); tick(); });
+    window.addEventListener('pageshow', function () { flushQueue(false); tick(); });
+    window.addEventListener('online', function () { flushQueue(false); });
     window.addEventListener('pagehide', onPageHide);
     attachLinkInterceptor();
     sendExposure('page_enter');
