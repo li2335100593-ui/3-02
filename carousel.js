@@ -566,14 +566,32 @@
   // ===== Navigation =====
   var navigated = false;
 
+  function urlWithoutHash(u) {
+    try {
+      return u.origin + u.pathname + u.search;
+    } catch (e) {
+      return '';
+    }
+  }
+
+  function isSameDocumentTarget(targetUrl) {
+    try {
+      return urlWithoutHash(new URL(window.location.href)) === urlWithoutHash(targetUrl);
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function continueCurrentDocument(nextSlotN, nextIndex) {
+    state.ci = nextIndex;
+    pageSlotN = nextSlotN;
+    pageSlotEndMs = state.ct + (pageSlotN + 1) * intervalSec * 1000;
+    save(state);
+    syncHash(state);
+  }
+
   function navigate() {
     if (navigated) return;
-    navigated = true;
-
-    sendExposure('page_leave', { dwell_ms: activeDwellMs(now()) });
-    if (tickTimer) clearInterval(tickTimer);
-    try { if (wakeLockSentinel) wakeLockSentinel.release(); } catch (e) {}
-    try { if (silentVideo && silentVideo.parentNode) silentVideo.parentNode.removeChild(silentVideo); } catch (e) {}
 
     var urls = state.urls;
     var t = now();
@@ -603,6 +621,17 @@
       nextUrl = new URL(urls[nextIndex], window.location.href);
       if (nextUrl.protocol !== 'http:' && nextUrl.protocol !== 'https:') return;
     } catch (e) { return; }
+
+    if (isSameDocumentTarget(nextUrl)) {
+      continueCurrentDocument(nextSlotN, nextIndex);
+      return;
+    }
+
+    navigated = true;
+    sendExposure('page_leave', { dwell_ms: activeDwellMs(now()) });
+    if (tickTimer) clearInterval(tickTimer);
+    try { if (wakeLockSentinel) wakeLockSentinel.release(); } catch (e) {}
+    try { if (silentVideo && silentVideo.parentNode) silentVideo.parentNode.removeChild(silentVideo); } catch (e) {}
 
     state.ci = nextIndex;
     save(state);
