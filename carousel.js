@@ -601,8 +601,11 @@
     // Next slot is anchored to the wall clock (not to ci), so slow page loads
     // never accumulate drift. Take max(clockSlot+1, pageSlotN+1) as a safety
     // floor in case of clock anomalies.
+    // At the exact slot boundary, floor(now - ct) already points at the next
+    // slot. Adding 1 here skips a slot and can make 2-site rotations land back
+    // on the same URL, which stops real rotation and only advances the hash.
     var clockSlot = Math.floor((t - state.ct) / (intervalSec * 1000));
-    var nextSlotN = clockSlot + 1;
+    var nextSlotN = clockSlot;
     if (nextSlotN < pageSlotN + 1) nextSlotN = pageSlotN + 1;
 
     // Cycle wrap: only reset ct when a full cycle has elapsed, NOT on URL wrap.

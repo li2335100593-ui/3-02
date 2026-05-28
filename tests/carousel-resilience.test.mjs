@@ -34,6 +34,10 @@ function createElement() {
     children: [],
     parentNode: null,
     textContent: '',
+    src: '',
+    muted: false,
+    loop: false,
+    autoplay: false,
     setAttribute() {},
     appendChild(child) {
       child.parentNode = this;
@@ -49,12 +53,32 @@ function createElement() {
   };
 }
 
-async function runCarousel({ urls, seconds, tickMs }) {
+async function drainMicrotasks(rounds = 30) {
+  for (let i = 0; i < rounds; i += 1) await Promise.resolve();
+}
+
+function countByType(events) {
+  return events.reduce((acc, ev) => {
+    acc[ev.event_type] = (acc[ev.event_type] || 0) + 1;
+    return acc;
+  }, {});
+}
+
+function makeHarness({
+  urls,
+  interval = 300,
+  cycle = 3600,
+  tickMs = 1000,
+  fetchFailures = 0,
+  sendBeacon = true,
+}) {
   const start = Date.parse('2026-05-28T00:00:00.000Z');
   let currentTime = start;
   let nextTimerId = 1;
+  let fetchAttempts = 0;
   const intervals = new Map();
-  const events = [];
+  const delivered = [];
+  const attempted = [];
   const navigations = [];
   const storage = new Map();
   const listeners = new Map();
@@ -62,11 +86,11 @@ async function runCarousel({ urls, seconds, tickMs }) {
   initial.hash = new URLSearchParams({
     _ci: '0',
     _ct: String(start),
-    _iv: '300',
-    _cy: '3600',
+    _iv: String(interval),
+    _cy: String(cycle),
     _cu: b64(JSON.stringify(urls)),
     _sid: 'sid_test',
-    _u: 'SINGLE_URL_SOAK',
+    _u: 'MATRIX_UID',
   }).toString();
 
   class FakeDate extends Date {
@@ -117,7 +141,13 @@ async function runCarousel({ urls, seconds, tickMs }) {
       intervals.delete(id);
     },
     fetch(_url, opts = {}) {
-      events.push(JSON.parse(String(opts.body)));
+      const payload = JSON.parse(String(opts.body));
+      attempted.push(payload);
+      fetchAttempts += 1;
+      if (fetchAttempts <= fetchFailures) {
+        return Promise.reject(new Error('synthetic network failure'));
+      }
+      delivered.push(payload);
       return Promise.resolve({ ok: true });
     },
     localStorage: {
@@ -126,12 +156,14 @@ async function runCarousel({ urls, seconds, tickMs }) {
       removeItem: (k) => storage.delete(k),
     },
     navigator: {
-      sendBeacon(_url, blob) {
-        if (blob && typeof blob.text === 'function') {
-          blob.text().then((text) => events.push(JSON.parse(text)));
-        }
-        return true;
-      },
+      sendBeacon: sendBeacon
+        ? (_url, blob) => {
+            if (blob && typeof blob.text === 'function') {
+              blob.text().then((text) => delivered.push(JSON.parse(text)));
+            }
+            return true;
+          }
+        : undefined,
       wakeLock: { request: () => Promise.reject(new Error('not available')) },
     },
     window: {
@@ -157,39 +189,121 @@ async function runCarousel({ urls, seconds, tickMs }) {
   vm.createContext(context);
   vm.runInContext(source, context, { filename: 'carousel.js' });
 
-  async function drainMicrotasks(rounds = 20) {
-    for (let i = 0; i < rounds; i += 1) await Promise.resolve();
+  async function tick(count = 1) {
+    for (let i = 0; i < count; i += 1) {
+      currentTime += tickMs;
+      for (const fn of [...intervals.values()]) fn();
+      await drainMicrotasks();
+    }
   }
 
-  const end = start + seconds * 1000;
-  while (currentTime < end) {
-    currentTime += tickMs;
-    for (const fn of [...intervals.values()]) fn();
-    await drainMicrotasks();
+  async function runFor(seconds) {
+    const end = currentTime + seconds * 1000;
+    while (currentTime < end) await tick();
+    await drainMicrotasks(60);
   }
-  await drainMicrotasks(50);
 
-  return { events, navigations, href: location.href, activeIntervals: intervals.size };
+  async function setVisible(visible) {
+    document.visibilityState = visible ? 'visible' : 'hidden';
+    listeners.get('visibilitychange')?.();
+    await drainMicrotasks(60);
+  }
+
+  return {
+    tick,
+    runFor,
+    setVisible,
+    get delivered() { return delivered; },
+    get attempted() { return attempted; },
+    get byType() { return countByType(delivered); },
+    get navigations() { return navigations; },
+    get activeIntervals() { return intervals.size; },
+    get href() { return location.href; },
+    get queueLength() {
+      const raw = storage.get('__carousel_exposure_queue_v1');
+      return raw ? JSON.parse(raw).length : 0;
+    },
+  };
 }
 
-const single = await runCarousel({
-  urls: ['https://livingroom-design.ddmmoney.com/'],
-  seconds: 2 * 60 * 60,
-  tickMs: 31 * 1000,
-});
+const results = [];
 
-const byType = single.events.reduce((acc, ev) => {
-  acc[ev.event_type] = (acc[ev.event_type] || 0) + 1;
-  return acc;
-}, {});
+{
+  const h = makeHarness({
+    urls: ['https://livingroom-design.ddmmoney.com/'],
+    tickMs: 31_000,
+  });
+  await h.runFor(2 * 60 * 60);
+  assert.equal(h.byType.page_enter, 1, 'single URL should enter once');
+  assert.equal(h.byType.page_leave || 0, 0, 'same-document rollover should not fake page_leave');
+  assert.ok(h.byType.heartbeat >= 240, `single URL 2h should keep heartbeating, got ${h.byType.heartbeat || 0}`);
+  assert.equal(h.navigations.length, 0, 'single URL should not assign location.href to same document');
+  assert.equal(h.activeIntervals, 1, 'single URL timer should stay active');
+  results.push(['single_url_2h_drift', h.byType]);
+}
 
-assert.equal(byType.page_enter, 1, 'single-page soak should enter once');
-assert.equal(byType.page_leave || 0, 0, 'same-document slot advance should not fake page leaves');
-assert.ok(
-  byType.heartbeat >= 240,
-  `expected at least 240 heartbeats across 2h with drift, got ${byType.heartbeat || 0}`,
-);
-assert.equal(single.navigations.length, 0, 'same-document rotation must not assign location.href');
-assert.equal(single.activeIntervals, 1, 'timer must remain active after same-document slot rollover');
+{
+  const h = makeHarness({
+    urls: ['https://example.com/a#one', 'https://example.com/a#two'],
+    tickMs: 31_000,
+  });
+  await h.runFor(20 * 60);
+  assert.ok(h.byType.heartbeat >= 40, `same path hash rotation should keep heartbeating, got ${h.byType.heartbeat || 0}`);
+  assert.equal(h.navigations.length, 0, 'hash-only rotation should not reload the page');
+  assert.equal(h.activeIntervals, 1, 'hash-only rotation timer should stay active');
+  results.push(['same_path_hash_rotation', h.byType]);
+}
 
-console.log(JSON.stringify({ ok: true, byType, activeIntervals: single.activeIntervals }, null, 2));
+{
+  const h = makeHarness({
+    urls: ['https://one.example/', 'https://two.example/'],
+    sendBeacon: false,
+  });
+  await h.runFor(5 * 60 + 2);
+  assert.equal(h.byType.page_leave, 1, 'cross-document rotation should send one page_leave');
+  assert.equal(h.navigations.length, 1, 'cross-document rotation should assign location.href');
+  assert.equal(h.activeIntervals, 0, 'cross-document rotation should stop old document timer');
+  results.push(['cross_document_rotation', h.byType]);
+}
+
+{
+  const h = makeHarness({
+    urls: ['https://livingroom-design.ddmmoney.com/'],
+    fetchFailures: 8,
+    sendBeacon: false,
+    tickMs: 31_000,
+  });
+  await h.runFor(20 * 60);
+  assert.equal(h.queueLength, 0, 'queued events should flush after network recovers');
+  assert.ok(h.byType.heartbeat >= 40, `recovered network should deliver heartbeats, got ${h.byType.heartbeat || 0}`);
+  assert.ok(h.attempted.length > h.delivered.length, 'test should actually exercise failed attempts');
+  results.push(['network_retry_queue_flush', h.byType]);
+}
+
+{
+  const h = makeHarness({
+    urls: ['https://livingroom-design.ddmmoney.com/'],
+  });
+  await h.runFor(4 * 60);
+  await h.setVisible(false);
+  await h.runFor(10 * 60);
+  await h.setVisible(true);
+  await h.runFor(6 * 60);
+  assert.equal(h.byType.page_leave, 1, 'visibility hidden should record a page_leave marker');
+  assert.ok(h.byType.heartbeat >= 19, `visible periods should record heartbeats, got ${h.byType.heartbeat || 0}`);
+  assert.ok(h.byType.heartbeat <= 23, `hidden period should not be counted as active time, got ${h.byType.heartbeat || 0}`);
+  results.push(['hidden_visible_active_dwell', h.byType]);
+}
+
+{
+  const h = makeHarness({
+    urls: ['https://livingroom-design.ddmmoney.com/'],
+    tickMs: 10 * 60 * 1000,
+  });
+  await h.runFor(2 * 60 * 60);
+  assert.ok(h.byType.heartbeat < 240, 'long suspension should not flood every missed heartbeat at once');
+  assert.equal(h.activeIntervals, 1, 'timer should remain active after long suspension catch-up');
+  results.push(['long_suspension_no_flood', h.byType]);
+}
+
+console.log(JSON.stringify({ ok: true, results }, null, 2));
