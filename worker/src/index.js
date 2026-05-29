@@ -798,7 +798,7 @@ async function getOperatorUrlBreakdown(env, from, to, uid) {
     `SELECT
       url,
       SUM(CASE WHEN event_type = 'heartbeat' THEN 1 ELSE 0 END) * ${HEARTBEAT_INTERVAL_SEC} AS dwell_seconds,
-      SUM(CASE WHEN event_type = 'page_enter' OR event_type IS NULL THEN 1 ELSE 0 END) AS visits,
+      SUM(CASE WHEN event_type = 'page_enter' OR event_type IS NULL THEN 1 ELSE 0 END) AS enter_events,
       COUNT(DISTINCT sid) AS sessions,
       MAX(received_at) AS last_seen
     FROM exposure_events
@@ -812,7 +812,7 @@ async function getOperatorUrlBreakdown(env, from, to, uid) {
   return (result.results || []).map((r) => ({
     url: r.url,
     dwell_seconds: Number(r.dwell_seconds || 0),
-    visits: Number(r.visits || 0),
+    visits: Number(r.enter_events || 0) || Number(r.sessions || 0),
     sessions: Number(r.sessions || 0),
     last_seen: Number(r.last_seen || 0),
     last_seen_iso: toIsoOrNull(r.last_seen),
@@ -823,10 +823,15 @@ async function getOperatorSessions(env, from, to, uid) {
   const result = await env.DB.prepare(
     `SELECT
       sid,
-      MIN(received_at) AS started_at,
+      (
+        SELECT MIN(e0.received_at)
+        FROM exposure_events e0
+        WHERE e0.sid = exposure_events.sid
+      ) AS started_at,
+      MIN(received_at) AS range_started_at,
       MAX(received_at) AS last_event_at,
       SUM(CASE WHEN event_type = 'heartbeat' THEN 1 ELSE 0 END) * ${HEARTBEAT_INTERVAL_SEC} AS dwell_seconds,
-      SUM(CASE WHEN event_type = 'page_enter' OR event_type IS NULL THEN 1 ELSE 0 END) AS pages_visited,
+      SUM(CASE WHEN event_type = 'page_enter' OR event_type IS NULL THEN 1 ELSE 0 END) AS enter_events,
       SUM(CASE WHEN event_type = 'page_leave' THEN 1 ELSE 0 END) AS clean_leaves,
       COUNT(DISTINCT url) AS unique_urls,
       (
@@ -869,7 +874,7 @@ async function getOperatorSessions(env, from, to, uid) {
       AND uid = ?
       AND sid IS NOT NULL
     GROUP BY sid
-    ORDER BY started_at DESC
+    ORDER BY last_event_at DESC
     LIMIT 200`
   )
     .bind(from, to, uid)
@@ -877,11 +882,13 @@ async function getOperatorSessions(env, from, to, uid) {
   return (result.results || []).map((r) => ({
     sid: r.sid,
     started_at: Number(r.started_at || 0),
+    range_started_at: Number(r.range_started_at || 0),
     last_event_at: Number(r.last_event_at || 0),
     started_iso: toIsoOrNull(r.started_at),
+    range_started_iso: toIsoOrNull(r.range_started_at),
     last_event_iso: toIsoOrNull(r.last_event_at),
     dwell_seconds: Number(r.dwell_seconds || 0),
-    pages_visited: Number(r.pages_visited || 0),
+    pages_visited: Number(r.enter_events || 0) || Number(r.unique_urls || 0),
     clean_leaves: Number(r.clean_leaves || 0),
     unique_urls: Number(r.unique_urls || 0),
     device_type: r.device_type || "unknown",
@@ -1020,7 +1027,7 @@ async function getSiteSummaries(env, from, to) {
     `SELECT
       url,
       SUM(CASE WHEN event_type = 'heartbeat' THEN 1 ELSE 0 END) * ${HEARTBEAT_INTERVAL_SEC} AS dwell_seconds,
-      SUM(CASE WHEN event_type = 'page_enter' OR event_type IS NULL THEN 1 ELSE 0 END) AS visits,
+      SUM(CASE WHEN event_type = 'page_enter' OR event_type IS NULL THEN 1 ELSE 0 END) AS enter_events,
       COUNT(DISTINCT sid) AS sessions,
       COUNT(DISTINCT uid) AS unique_operators,
       COUNT(DISTINCT vid) AS unique_devices,
@@ -1045,7 +1052,7 @@ async function getSiteSummaries(env, from, to) {
   return (result.results || []).map((r) => ({
     url: r.url,
     dwell_seconds: Number(r.dwell_seconds || 0),
-    visits: Number(r.visits || 0),
+    visits: Number(r.enter_events || 0) || Number(r.sessions || 0),
     sessions: Number(r.sessions || 0),
     unique_operators: Number(r.unique_operators || 0),
     unique_devices: Number(r.unique_devices || 0),
