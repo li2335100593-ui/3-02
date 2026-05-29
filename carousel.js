@@ -449,8 +449,6 @@
   var pageStartTime = now();
   var tickTimer = null;
   var nextHeartbeatAt = pageStartTime;
-  var hiddenStartedAt = null;
-  var totalHiddenMs = 0;
 
   // Compute this page's slot ONCE at boot and lock it in.
   var pageSlotN = Math.floor((pageStartTime - state.ct) / (intervalSec * 1000));
@@ -467,14 +465,10 @@
   }
 
   function activeDwellMs(at) {
-    var hiddenMs = totalHiddenMs;
-    if (hiddenStartedAt) hiddenMs += Math.max(0, at - hiddenStartedAt);
-    return Math.max(0, at - pageStartTime - hiddenMs);
+    return Math.max(0, at - pageStartTime);
   }
 
   function sendDueHeartbeats() {
-    if (document.visibilityState === 'hidden') return;
-
     var sent = 0;
     var maxCatchup = 12;
     while (now() >= nextHeartbeatAt && sent < maxCatchup) {
@@ -535,19 +529,10 @@
   }
 
   function onVisibilityChange() {
-    if (document.visibilityState === 'hidden') {
-      hiddenStartedAt = hiddenStartedAt || now();
-      sendExposure('page_leave', { dwell_ms: activeDwellMs(now()), reason: 'hidden' });
-      return;
-    }
-
-    if (hiddenStartedAt) {
-      var hiddenMs = Math.max(0, now() - hiddenStartedAt);
-      totalHiddenMs += hiddenMs;
-      nextHeartbeatAt += hiddenMs;
-      hiddenStartedAt = null;
-    }
-    if (!wakeLockSentinel) requestWakeLock();
+    // A background tab/window is still an active playback session for this
+    // product. Keep heartbeats going whenever the browser gives us timer time;
+    // only pagehide/tab close should end a session.
+    if (document.visibilityState !== 'hidden' && !wakeLockSentinel) requestWakeLock();
     flushQueue(false);
     tick();
   }

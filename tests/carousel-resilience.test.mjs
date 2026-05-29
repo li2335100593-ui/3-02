@@ -289,10 +289,9 @@ const results = [];
   await h.runFor(10 * 60);
   await h.setVisible(true);
   await h.runFor(6 * 60);
-  assert.equal(h.byType.page_leave, 1, 'visibility hidden should record a page_leave marker');
-  assert.ok(h.byType.heartbeat >= 19, `visible periods should record heartbeats, got ${h.byType.heartbeat || 0}`);
-  assert.ok(h.byType.heartbeat <= 23, `hidden period should not be counted as active time, got ${h.byType.heartbeat || 0}`);
-  results.push(['hidden_visible_active_dwell', h.byType]);
+  assert.equal(h.byType.page_leave || 0, 0, 'background playback should not create a fake session end');
+  assert.ok(h.byType.heartbeat >= 40, `background playback should keep recording heartbeats, got ${h.byType.heartbeat || 0}`);
+  results.push(['background_visible_active_dwell', h.byType]);
 }
 
 {
