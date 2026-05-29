@@ -1,0 +1,33 @@
+name: Deploy Worker
+
+on:
+  workflow_dispatch:
+    inputs:
+      apply_migration_006:
+        description: 'Apply migration_006_monitoring_notifications.sql before deploy'
+        required: true
+        default: 'false'
+        type: choice
+        options: ['true', 'false']
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: worker
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Apply migration 006
+        if: ${{ inputs.apply_migration_006 == 'true' }}
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: npx wrangler d1 execute exposure_analytics --remote --file=sql/migration_006_monitoring_notifications.sql
+      - name: Deploy Worker
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: npx wrangler deploy

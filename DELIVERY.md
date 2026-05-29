@@ -1,17 +1,18 @@
 # 项目交付说明 - 自动轮播 URL 调度与工时审计系统
 
 **更新日期**: 2026-05-29
-**项目状态**: 核心记录链路可用，已补齐运行健康、告警和生产监控基础设施。
+**项目状态**: 核心记录链路、运行健康、告警、主动巡检、CI 和备份基础设施已补齐。
 
 ## 生产交付物
 
 ```text
 scheduler.html            入口调度页
 carousel.js               轮播 SDK，嵌入客户页面
-operator-report.html      工时审计、站点统计、运行健康与告警面板
+operator-report.html      工时审计、站点统计、运行健康、告警与巡检面板
 worker/                   Cloudflare Worker + D1 schema/migrations
 tests/                    SDK 回归测试
-tools/player-health-monitor.mjs 生产健康监控脚本
+tools/player-health-monitor.mjs 生产巡检 + Server酱通知脚本
+.github/workflows/        CI、生产巡检、D1 备份、手动 Worker 部署
 ```
 
 ## 当前生产地址
@@ -20,22 +21,34 @@ tools/player-health-monitor.mjs 生产健康监控脚本
 - Worker API: https://exposure-analytics.li2335100593.workers.dev
 - 轮播 SDK: https://li2335100593-ui.github.io/3-02/carousel.js
 
-## 工程化补强
+## 工程化能力
 
 - SDK heartbeat 附带版本、队列长度、可见状态、轮播 slot、flush 状态。
 - Worker 维护 `player_status`，快速判断播放端是否在线、当前站点、最后心跳和离线队列。
-- Worker 维护 `alert_events`，记录心跳超时、离线队列过大、flush 失败。
-- 管理面板新增“运行健康”区，播放员列表直接显示在线/告警/离线状态。
-- 新增 D1 migration: `worker/sql/migration_005_player_health_alerts.sql`。
-- 新增 `tools/player-health-monitor.mjs`，可用于 cron/自动化平台定时验证生产健康。
+- Worker 维护 `monitor_targets`，只有启用监控的 UID/任务会触发离线告警，避免历史测试数据误报。
+- Worker 维护 `alert_events`，记录心跳超时、预期站点缺失、离线队列过大、flush 失败和通知状态。
+- 管理面板新增“运行健康”和“告警 / 巡检”区，可查看告警历史、确认告警、启停监控目标。
+- GitHub Actions 新增 CI、每 5 分钟生产巡检、每日 D1 备份、手动 Worker 部署。
+- Server酱通知通过 `SERVERCHAN_SENDKEY` 注入，不在仓库保存密钥。
 
-## 已验证能力
+## GitHub Secrets / Variables
 
-- 两站点轮播工时会进入同一个播放员会话，并在站点明细里分别展示。
-- 30 秒 heartbeat 作为工时来源；因此两小时理论值会接近 `1小时59分/2小时`，这是 30 秒粒度和会话边界导致的正常舍入。
-- 网络中断期间事件进入本地队列，恢复后自动 flush；24 小时离线容量回归测试通过，队列长度为 2882，低于 5000 上限。
-- 页面后台/隐藏时不主动结束会话；只要浏览器 timer 继续执行，heartbeat 继续记录。
-- 生产 `/api/player-health` 已验证可返回在线播放端、今日覆盖站点和 open alerts。
+必填 Secrets:
+
+```text
+REPORT_USER
+REPORT_PASS
+SERVERCHAN_SENDKEY
+CLOUDFLARE_API_TOKEN
+```
+
+建议 Variables:
+
+```text
+MONITOR_REQUIRED_UIDS=SOAK_20260529_24H_NET_QUEUE
+MONITOR_REQUIRED_URLS=https://livingroom-design.ddmmoney.com/,https://old-house-renovation.chworld.com.tw
+MONITOR_NOTIFY_REPEAT_MINUTES=60
+```
 
 ## 验证命令
 
@@ -51,27 +64,21 @@ bash tests/run-carousel-tests.sh
 
 ```bash
 cd worker
-npx wrangler d1 execute exposure_analytics --remote --file=sql/migration_005_player_health_alerts.sql
+npx wrangler d1 execute exposure_analytics --remote --file=sql/migration_006_monitoring_notifications.sql
 npx wrangler deploy
 ```
 
 前端通过 GitHub Pages 发布，提交并推送 `main` 后生效。
 
-## 生产监控命令
+## 生产巡检命令
 
 ```bash
 REPORT_USER='client_view_20260529' \
 REPORT_PASS='View-20260529-GAM!' \
+SERVERCHAN_SENDKEY='SCT...' \
+MONITOR_REQUIRED_UIDS='SOAK_20260529_24H_NET_QUEUE' \
+MONITOR_REQUIRED_URLS='https://livingroom-design.ddmmoney.com/,https://old-house-renovation.chworld.com.tw' \
 node tools/player-health-monitor.mjs --once
-```
-
-持续监控:
-
-```bash
-REPORT_USER='client_view_20260529' \
-REPORT_PASS='View-20260529-GAM!' \
-MONITOR_INTERVAL_SEC=60 \
-node tools/player-health-monitor.mjs
 ```
 
 ## 运维判断标准
@@ -80,6 +87,7 @@ node tools/player-health-monitor.mjs
 - `warning`: 超过 2 分钟没有事件，或队列偏大，或明确 flush 失败。
 - `offline`: 超过 5 分钟没有事件，或离线队列接近上限。
 - `open_alerts = 0`: 当前没有需要人工处理的异常。
+- `monitor_targets.is_enabled = 1`: 该 UID 是正式需要巡检的目标。
 
 ## 已知边界
 

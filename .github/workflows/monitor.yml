@@ -1,0 +1,30 @@
+name: Production Monitor
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: production-monitor
+  cancel-in-progress: false
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Check production carousel health
+        env:
+          REPORT_USER: ${{ secrets.REPORT_USER }}
+          REPORT_PASS: ${{ secrets.REPORT_PASS }}
+          SERVERCHAN_SENDKEY: ${{ secrets.SERVERCHAN_SENDKEY }}
+          MONITOR_REQUIRED_UIDS: ${{ vars.MONITOR_REQUIRED_UIDS }}
+          MONITOR_REQUIRED_URLS: ${{ vars.MONITOR_REQUIRED_URLS }}
+          MONITOR_NOTIFY_REPEAT_MINUTES: ${{ vars.MONITOR_NOTIFY_REPEAT_MINUTES || '60' }}
+          OPERATOR_PANEL_URL: https://li2335100593-ui.github.io/3-02/operator-report.html
+        run: node tools/player-health-monitor.mjs --once

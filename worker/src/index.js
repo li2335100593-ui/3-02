@@ -1140,6 +1140,22 @@ function shanghaiDayRangeMs(t = Date.now()) {
   };
 }
 
+function parseJsonArray(value) {
+  if (!value) return [];
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed.map((v) => nullableString(v, 1000)).filter(Boolean) : [];
+  } catch {
+    return [];
+  }
+}
+
+function clampInt(value, min, max, fallback) {
+  const n = Number.parseInt(String(value ?? ""), 10);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.max(min, Math.min(max, n));
+}
+
 function classifyPlayerHealth(row, now = Date.now()) {
   const lastSeen = Number(row.last_seen || 0);
   const ageMs = lastSeen ? now - lastSeen : Number.POSITIVE_INFINITY;
@@ -1221,25 +1237,62 @@ async function resolveAlert(env, alertKey) {
   ).bind(Date.now(), alertKey).run();
 }
 
-async function refreshAlertsForStatus(env, row, now = Date.now()) {
+function mapMonitorTargetRow(r) {
+  return {
+    uid: r.uid,
+    label: r.label || "",
+    expected_urls: parseJsonArray(r.expected_urls_json),
+    is_enabled: Number(r.is_enabled) === 1,
+    stale_after_sec: Number(r.stale_after_sec || 300),
+    note: r.note || "",
+    created_at: Number(r.created_at || 0),
+    created_iso: toIsoOrNull(r.created_at),
+    updated_at: Number(r.updated_at || 0),
+    updated_iso: toIsoOrNull(r.updated_at),
+  };
+}
+
+async function getMonitorTargetMap(env) {
+  const result = await env.DB.prepare(
+    `SELECT * FROM monitor_targets WHERE is_enabled = 1`
+  ).all();
+  const map = new Map();
+  for (const row of result.results || []) map.set(row.uid, mapMonitorTargetRow(row));
+  return map;
+}
+
+async function refreshAlertsForStatus(env, row, now = Date.now(), target = null, coverage = null) {
   const uid = row.uid;
-  const health = classifyPlayerHealth(row, now);
   const offlineKey = `offline:${uid}`;
-  if (health.health === "offline" || health.problems.some((p) => p.includes("心跳"))) {
+  const queueKey = `queue:${uid}`;
+  const flushKey = `flush:${uid}`;
+  const urlsKey = `urls:${uid}`;
+
+  if (!target || !target.is_enabled) {
+    await resolveAlert(env, offlineKey);
+    await resolveAlert(env, queueKey);
+    await resolveAlert(env, flushKey);
+    await resolveAlert(env, urlsKey);
+    return;
+  }
+
+  const lastSeen = Number(row.last_seen || 0);
+  const ageSeconds = lastSeen ? Math.max(0, Math.round((now - lastSeen) / 1000)) : null;
+  const staleAfter = Math.max(60, Number(target.stale_after_sec || 300));
+  if (!lastSeen || ageSeconds > staleAfter) {
     await upsertAlert(env, {
       alertKey: offlineKey,
       uid,
       alertType: "heartbeat_stale",
-      severity: health.severity === "critical" ? "critical" : "warning",
-      message: `${uid} 心跳不新鲜：最后心跳 ${health.age_seconds ?? "未知"} 秒前`,
-      details: { last_seen: row.last_seen, current_url: row.current_url, age_seconds: health.age_seconds },
+      severity: ageSeconds == null || ageSeconds > staleAfter * 2 ? "critical" : "warning",
+      message: `${uid} 心跳不新鲜：最后心跳 ${ageSeconds ?? "未知"} 秒前`,
+      details: { last_seen: row.last_seen, current_url: row.current_url, age_seconds: ageSeconds, stale_after_sec: staleAfter },
     });
   } else {
     await resolveAlert(env, offlineKey);
   }
 
   const queueLength = row.queue_length == null ? null : Number(row.queue_length);
-  const queueKey = `queue:${uid}`;
   if (queueLength != null && queueLength >= 1000) {
     await upsertAlert(env, {
       alertKey: queueKey,
@@ -1253,7 +1306,6 @@ async function refreshAlertsForStatus(env, row, now = Date.now()) {
     await resolveAlert(env, queueKey);
   }
 
-  const flushKey = `flush:${uid}`;
   if (row.last_flush_ok != null && Number(row.last_flush_ok) === 0) {
     await upsertAlert(env, {
       alertKey: flushKey,
@@ -1265,6 +1317,23 @@ async function refreshAlertsForStatus(env, row, now = Date.now()) {
     });
   } else {
     await resolveAlert(env, flushKey);
+  }
+
+  const expectedUrls = target.expected_urls || [];
+  const seenUrls = new Set(((coverage && coverage.urls) || []).map((u) => u.url));
+  const targetAgeMs = now - Number(target.created_at || now);
+  const missingUrls = expectedUrls.filter((u) => !seenUrls.has(u));
+  if (expectedUrls.length > 0 && missingUrls.length > 0 && targetAgeMs > staleAfter * 1000) {
+    await upsertAlert(env, {
+      alertKey: urlsKey,
+      uid,
+      alertType: "expected_url_missing",
+      severity: "warning",
+      message: `${uid} 今日尚未覆盖 ${missingUrls.length} 个预期站点`,
+      details: { expected_urls: expectedUrls, seen_urls: [...seenUrls], missing_urls: missingUrls },
+    });
+  } else {
+    await resolveAlert(env, urlsKey);
   }
 }
 
@@ -1298,7 +1367,7 @@ async function getTodayCoverage(env, uid) {
   };
 }
 
-function mapPlayerStatusRow(row, coverage, now = Date.now()) {
+function mapPlayerStatusRow(row, coverage, now = Date.now(), target = null) {
   const health = classifyPlayerHealth(row, now);
   return {
     uid: row.uid,
@@ -1327,6 +1396,7 @@ function mapPlayerStatusRow(row, coverage, now = Date.now()) {
     updated_iso: toIsoOrNull(row.updated_at),
     ...health,
     today: coverage,
+    monitor_target: target || null,
   };
 }
 
@@ -1347,10 +1417,12 @@ async function handlePlayerHealth(req, env, headers) {
 
   const rows = result.results || [];
   const players = [];
+  const targetMap = await getMonitorTargetMap(env);
   for (const row of rows) {
-    await refreshAlertsForStatus(env, row, now);
+    const target = targetMap.get(row.uid) || null;
     const coverage = await getTodayCoverage(env, row.uid);
-    players.push(mapPlayerStatusRow(row, coverage, now));
+    await refreshAlertsForStatus(env, row, now, target, coverage);
+    players.push(mapPlayerStatusRow(row, coverage, now, target));
   }
 
   const alertClause = uid ? "AND uid = ?" : "";
@@ -1400,6 +1472,11 @@ function mapAlertRow(r) {
     acknowledged_at: Number(r.acknowledged_at || 0),
     acknowledged_iso: toIsoOrNull(r.acknowledged_at),
     acknowledged_by: r.acknowledged_by || null,
+    notified_at: Number(r.notified_at || 0),
+    notified_iso: toIsoOrNull(r.notified_at),
+    notification_channel: r.notification_channel || null,
+    notification_count: Number(r.notification_count || 0),
+    last_notification_error: r.last_notification_error || null,
   };
 }
 
@@ -1407,15 +1484,28 @@ async function handleAlerts(req, env, headers) {
   const url = new URL(req.url);
   if (req.method === "GET") {
     const status = nullableString(url.searchParams.get("status"), 40) || "open";
+    const uid = nullableString(url.searchParams.get("uid"), 200);
+    const limit = clampInt(url.searchParams.get("limit"), 1, 500, 300);
+    const clauses = [];
+    const params = [];
+    if (status !== "all") {
+      clauses.push("status = ?");
+      params.push(status);
+    }
+    if (uid) {
+      clauses.push("uid = ?");
+      params.push(uid);
+    }
+    const where = clauses.length ? `WHERE ${clauses.join(" AND ")}` : "";
     const result = await env.DB.prepare(
       `SELECT *
        FROM alert_events
-       WHERE status = ?
+       ${where}
        ORDER BY
          CASE severity WHEN 'critical' THEN 0 WHEN 'warning' THEN 1 ELSE 2 END,
          last_seen DESC
-       LIMIT 300`
-    ).bind(status).all();
+       LIMIT ?`
+    ).bind(...params, limit).all();
     return json({ ok: true, alerts: (result.results || []).map(mapAlertRow) }, 200, headers);
   }
 
@@ -1446,6 +1536,115 @@ async function handleAlerts(req, env, headers) {
     ).bind(now, body?.acknowledged_by || "operator", key).run();
   }
   return json({ ok: true, acknowledged: ids.length + keys.length }, 200, headers);
+}
+
+async function handleAlertsMarkNotified(req, env, headers) {
+  let body;
+  try {
+    body = await req.json();
+  } catch {
+    return json({ ok: false, error: "Invalid JSON body" }, 400, headers);
+  }
+  const ids = Array.isArray(body?.ids) ? body.ids.map((v) => Number(v)).filter(Number.isFinite) : [];
+  const keys = Array.isArray(body?.alert_keys) ? body.alert_keys.map((v) => nullableString(v, 300)).filter(Boolean) : [];
+  if (ids.length === 0 && keys.length === 0) {
+    return json({ ok: false, error: "ids or alert_keys is required" }, 400, headers);
+  }
+  const channel = nullableString(body?.channel, 80) || "serverchan";
+  const error = nullableString(body?.error, 1000);
+  const now = Date.now();
+  for (const id of ids) {
+    await env.DB.prepare(
+      `UPDATE alert_events
+       SET notified_at = ?, notification_channel = ?,
+           notification_count = COALESCE(notification_count, 0) + 1,
+           last_notification_error = ?
+       WHERE id = ?`
+    ).bind(now, channel, error, id).run();
+  }
+  for (const key of keys) {
+    await env.DB.prepare(
+      `UPDATE alert_events
+       SET notified_at = ?, notification_channel = ?,
+           notification_count = COALESCE(notification_count, 0) + 1,
+           last_notification_error = ?
+       WHERE alert_key = ?`
+    ).bind(now, channel, error, key).run();
+  }
+  return json({ ok: true, marked: ids.length + keys.length, notified_at: now }, 200, headers);
+}
+
+async function handleMonitorTargets(req, env, headers) {
+  if (req.method === "GET") {
+    const includeDisabled = new URL(req.url).searchParams.get("all") === "1";
+    const where = includeDisabled ? "" : "WHERE is_enabled = 1";
+    const result = await env.DB.prepare(
+      `SELECT * FROM monitor_targets ${where} ORDER BY updated_at DESC, uid ASC`
+    ).all();
+    return json({ ok: true, targets: (result.results || []).map(mapMonitorTargetRow) }, 200, headers);
+  }
+
+  if (req.method === "POST") {
+    let body;
+    try {
+      body = await req.json();
+    } catch {
+      return json({ ok: false, error: "Invalid JSON body" }, 400, headers);
+    }
+    const uid = nullableString(body?.uid, 200);
+    if (!uid) return json({ ok: false, error: "uid is required" }, 400, headers);
+    const expectedUrls = Array.isArray(body?.expected_urls)
+      ? body.expected_urls.map((v) => nullableString(v, 1000)).filter(Boolean)
+      : [];
+    const isEnabled = body?.is_enabled === false || body?.is_enabled === 0 ? 0 : 1;
+    const staleAfterSec = clampInt(body?.stale_after_sec, 60, 86400, 300);
+    const now = Date.now();
+    await env.DB.prepare(
+      `INSERT INTO monitor_targets (
+         uid, label, expected_urls_json, is_enabled, stale_after_sec, note, created_at, updated_at
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(uid) DO UPDATE SET
+         label = excluded.label,
+         expected_urls_json = excluded.expected_urls_json,
+         is_enabled = excluded.is_enabled,
+         stale_after_sec = excluded.stale_after_sec,
+         note = excluded.note,
+         updated_at = excluded.updated_at`
+    )
+      .bind(
+        uid,
+        nullableString(body?.label, 200),
+        JSON.stringify(expectedUrls),
+        isEnabled,
+        staleAfterSec,
+        nullableString(body?.note, 1000),
+        now,
+        now
+      )
+      .run();
+    return json({ ok: true, uid }, 200, headers);
+  }
+
+  if (req.method === "DELETE") {
+    const url = new URL(req.url);
+    const uid = nullableString(url.searchParams.get("uid"), 200);
+    const hard = url.searchParams.get("hard") === "1";
+    if (!uid) return json({ ok: false, error: "uid is required" }, 400, headers);
+    if (hard) {
+      await env.DB.prepare(`DELETE FROM monitor_targets WHERE uid = ?`).bind(uid).run();
+    } else {
+      await env.DB.prepare(`UPDATE monitor_targets SET is_enabled = 0, updated_at = ? WHERE uid = ?`)
+        .bind(Date.now(), uid)
+        .run();
+    }
+    await resolveAlert(env, `offline:${uid}`);
+    await resolveAlert(env, `queue:${uid}`);
+    await resolveAlert(env, `flush:${uid}`);
+    await resolveAlert(env, `urls:${uid}`);
+    return json({ ok: true }, 200, headers);
+  }
+
+  return json({ ok: false, error: "Method Not Allowed" }, 405, headers);
 }
 
 // ===== Site-centric report (operator breakdown per URL) =====
@@ -2193,6 +2392,14 @@ export default {
       if (url.pathname === "/api/alerts/ack" && req.method === "POST") {
         const denied = requireAuth(); if (denied) return denied;
         return await handleAlerts(req, env, headers);
+      }
+      if (url.pathname === "/api/alerts/mark-notified" && req.method === "POST") {
+        const denied = requireAuth(); if (denied) return denied;
+        return await handleAlertsMarkNotified(req, env, headers);
+      }
+      if (url.pathname === "/api/monitor-targets" && ["GET", "POST", "DELETE"].includes(req.method)) {
+        const denied = requireAuth(); if (denied) return denied;
+        return await handleMonitorTargets(req, env, headers);
       }
 
       // ---- Sites write (auth) ----

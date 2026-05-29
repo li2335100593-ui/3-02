@@ -132,6 +132,10 @@
         <i data-lucide="globe" class="w-4 h-4"></i>
         <span data-i18n="tab.sites">网站</span>
       </button>
+      <button class="tab-btn flex items-center gap-2" data-tab="monitoring">
+        <i data-lucide="radar" class="w-4 h-4"></i>
+        <span>告警 / 巡检</span>
+      </button>
       <button id="tab-accounts-btn" class="tab-btn flex items-center gap-2 hidden" data-tab="accounts">
         <i data-lucide="shield" class="w-4 h-4"></i>
         <span data-i18n="tab.accounts">账户</span>
@@ -613,6 +617,85 @@
 
   </div>
 
+  <!-- ========== TAB: MONITORING ========== -->
+  <div id="tab-monitoring" class="tab-pane hidden">
+    <div class="flex items-center justify-between mb-6">
+      <div>
+        <h2 class="text-lg font-semibold tracking-tight">告警 / 巡检</h2>
+        <p class="text-xs text-slate-500 mt-0.5">只对启用监控的 UID 触发离线告警，历史测试数据不会误报</p>
+      </div>
+      <button id="monitor-refresh-btn" class="h-9 px-4 rounded-md border border-slate-300 bg-white hover:bg-slate-50 text-sm font-medium flex items-center gap-2 transition-colors">
+        <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+        <span>刷新</span>
+      </button>
+    </div>
+
+    <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+      <div class="xl:col-span-1 space-y-6">
+        <div class="bg-white rounded-xl shadow-card border border-slate-200 p-5">
+          <h3 class="text-sm font-semibold text-slate-900 flex items-center gap-2">
+            <i data-lucide="crosshair" class="w-4 h-4 text-brand-600"></i>
+            监控目标
+          </h3>
+          <div class="mt-4 space-y-3">
+            <label class="block text-xs font-medium text-slate-600">UID</label>
+            <input id="monitor-uid" class="w-full h-9 px-3 rounded-md border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" placeholder="SOAK_20260529_24H_NET_QUEUE">
+            <label class="block text-xs font-medium text-slate-600">标签</label>
+            <input id="monitor-label" class="w-full h-9 px-3 rounded-md border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" placeholder="24h soak / 客户正式任务">
+            <label class="block text-xs font-medium text-slate-600">预期站点（一行一个）</label>
+            <textarea id="monitor-urls" rows="4" class="w-full px-3 py-2 rounded-md border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" placeholder="https://livingroom-design.ddmmoney.com/&#10;https://old-house-renovation.chworld.com.tw/"></textarea>
+            <label class="block text-xs font-medium text-slate-600">心跳超时秒数</label>
+            <input id="monitor-stale" type="number" min="60" value="300" class="w-full h-9 px-3 rounded-md border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+            <label class="block text-xs font-medium text-slate-600">备注</label>
+            <input id="monitor-note" class="w-full h-9 px-3 rounded-md border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" placeholder="可选">
+            <button id="monitor-save-btn" class="w-full h-9 rounded-md bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium">保存并启用</button>
+          </div>
+        </div>
+
+        <div class="bg-white rounded-xl shadow-card border border-slate-200">
+          <div class="px-5 py-4 border-b border-slate-200 flex items-center justify-between">
+            <h3 class="text-sm font-semibold text-slate-900">已启用目标</h3>
+            <span id="monitor-target-count" class="text-xs text-slate-500">0 个</span>
+          </div>
+          <div id="monitor-targets" class="divide-y divide-slate-100"></div>
+        </div>
+      </div>
+
+      <div class="xl:col-span-2 bg-white rounded-xl shadow-card border border-slate-200">
+        <div class="px-5 py-4 border-b border-slate-200 flex items-center justify-between gap-3">
+          <div>
+            <h3 class="text-sm font-semibold text-slate-900 flex items-center gap-2">
+              <i data-lucide="bell-ring" class="w-4 h-4 text-amber-600"></i>
+              告警历史
+            </h3>
+            <p class="text-xs text-slate-500 mt-0.5">包含 open / acknowledged / resolved，以及 Server酱通知状态</p>
+          </div>
+          <select id="alert-status-filter" class="h-9 rounded-md border border-slate-300 px-2 text-sm bg-white">
+            <option value="open">未处理</option>
+            <option value="acknowledged">已确认</option>
+            <option value="resolved">已恢复</option>
+            <option value="all">全部</option>
+          </select>
+        </div>
+        <div class="overflow-x-auto scrollbar-thin">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="text-xs uppercase tracking-wider text-slate-500 border-b border-slate-200 bg-slate-50/50">
+                <th class="text-left font-medium px-5 py-3">告警</th>
+                <th class="text-left font-medium px-5 py-3">播放员</th>
+                <th class="text-left font-medium px-5 py-3">状态</th>
+                <th class="text-left font-medium px-5 py-3">通知</th>
+                <th class="text-left font-medium px-5 py-3">最后出现</th>
+                <th class="text-right font-medium px-5 py-3">操作</th>
+              </tr>
+            </thead>
+            <tbody id="alerts-tbody" class="divide-y divide-slate-100"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- ========== TAB: ACCOUNTS (super_admin) ========== -->
   <div id="tab-accounts" class="tab-pane hidden">
 
@@ -830,6 +913,8 @@ const state = {
   rangePreset: 'today',
   cachedOperators: [],
   cachedHealth: null,
+  cachedMonitorTargets: [],
+  cachedAlerts: [],
   payrollRate: 50,
   payrollCurrency: 'CNY', // 'CNY' | 'USD' | 'TWD'
   siteFrom: null,
@@ -1654,6 +1739,7 @@ function switchTab(tab) {
   if (tab === 'site-report') loadSiteList();
   if (tab === 'operators') loadOperators();
   if (tab === 'sites') loadSites();
+  if (tab === 'monitoring') loadMonitoring();
   if (tab === 'accounts') loadAccounts();
 }
 
@@ -2758,6 +2844,135 @@ function logout() {
   showLoginOverlay(t('common.logged_out'));
 }
 
+// ===================== TAB: MONITORING =====================
+function alertTone(severity) {
+  if (severity === 'critical') return 'bg-rose-50 text-rose-700';
+  if (severity === 'warning') return 'bg-amber-50 text-amber-700';
+  return 'bg-slate-100 text-slate-700';
+}
+
+function alertStatusTone(status) {
+  if (status === 'open') return 'bg-rose-50 text-rose-700';
+  if (status === 'acknowledged') return 'bg-brand-50 text-brand-700';
+  return 'bg-emerald-50 text-emerald-700';
+}
+
+async function loadMonitoring() {
+  $('#alerts-tbody').innerHTML = '<tr><td colspan="6" class="px-5 py-12 text-center text-xs text-slate-400">加载中...</td></tr>';
+  $('#monitor-targets').innerHTML = '<div class="px-5 py-8 text-center text-xs text-slate-400">加载中...</div>';
+  try {
+    const status = $('#alert-status-filter') ? $('#alert-status-filter').value : 'open';
+    const [targets, alerts] = await Promise.all([
+      api('/api/monitor-targets?all=1'),
+      api(`/api/alerts?status=${encodeURIComponent(status)}&limit=300`),
+    ]);
+    state.cachedMonitorTargets = targets.targets || [];
+    state.cachedAlerts = alerts.alerts || [];
+    renderMonitorTargets(state.cachedMonitorTargets);
+    renderAlertsTable(state.cachedAlerts);
+    hideError();
+    lucide.createIcons();
+  } catch (err) { showError(err.message || String(err)); }
+}
+
+function renderMonitorTargets(targets) {
+  const active = targets.filter(t => t.is_enabled);
+  $('#monitor-target-count').textContent = `${active.length} 个`;
+  if (!targets.length) {
+    $('#monitor-targets').innerHTML = '<div class="px-5 py-8 text-center text-xs text-slate-400">还没有启用监控目标。</div>';
+    return;
+  }
+  $('#monitor-targets').innerHTML = targets.map(tg => {
+    const urls = tg.expected_urls || [];
+    return `
+      <div class="px-5 py-4 ${tg.is_enabled ? '' : 'opacity-60'}">
+        <div class="flex items-start justify-between gap-3">
+          <div class="min-w-0">
+            <div class="font-medium text-slate-900 truncate">${escapeHtml(tg.uid)}</div>
+            <div class="text-xs text-slate-500 truncate">${escapeHtml(tg.label || tg.note || '—')}</div>
+            <div class="mt-2 flex flex-wrap gap-1">
+              <span class="text-xs px-1.5 py-0.5 rounded ${tg.is_enabled ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}">${tg.is_enabled ? '启用' : '停用'}</span>
+              <span class="text-xs px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">${tg.stale_after_sec}s 超时</span>
+              <span class="text-xs px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">${urls.length} 站点</span>
+            </div>
+          </div>
+          <button class="text-xs px-2 py-1 rounded text-rose-600 hover:bg-rose-50 monitor-disable-btn" data-uid="${escapeHtml(tg.uid)}">停用</button>
+        </div>
+        ${urls.length ? `<div class="mt-3 text-xs text-slate-500 space-y-1">${urls.map(u => `<div class="truncate">${escapeHtml(u)}</div>`).join('')}</div>` : ''}
+      </div>
+    `;
+  }).join('');
+  $$('.monitor-disable-btn').forEach(btn => btn.addEventListener('click', async () => {
+    if (!confirm(`停用 ${btn.dataset.uid} 的监控？`)) return;
+    try {
+      await api(`/api/monitor-targets?uid=${encodeURIComponent(btn.dataset.uid)}`, { method: 'DELETE' });
+      showToast('已停用监控目标');
+      loadMonitoring();
+    } catch (err) { showToast(err.message, 'error'); }
+  }));
+}
+
+function renderAlertsTable(alerts) {
+  if (!alerts.length) {
+    $('#alerts-tbody').innerHTML = '<tr><td colspan="6" class="px-5 py-12 text-center text-xs text-slate-400">当前筛选条件下没有告警。</td></tr>';
+    return;
+  }
+  $('#alerts-tbody').innerHTML = alerts.map(a => {
+    const notified = a.notified_at ? `${fmtRelative(a.notified_at)} · ${a.notification_channel || 'serverchan'} · ${a.notification_count || 1}次` : '未通知';
+    return `
+      <tr class="hover:bg-slate-50 transition-colors">
+        <td class="px-5 py-4">
+          <div class="flex items-center gap-2">
+            <span class="text-xs px-2 py-1 rounded-md ${alertTone(a.severity)} font-medium">${escapeHtml(a.severity)}</span>
+            <div>
+              <div class="font-medium text-slate-900">${escapeHtml(a.alert_type || 'alert')}</div>
+              <div class="text-xs text-slate-500 max-w-md truncate">${escapeHtml(a.message || '')}</div>
+            </div>
+          </div>
+        </td>
+        <td class="px-5 py-4 text-slate-700">${escapeHtml(a.uid || '系统')}</td>
+        <td class="px-5 py-4"><span class="text-xs px-2 py-1 rounded-md ${alertStatusTone(a.status)} font-medium">${escapeHtml(a.status)}</span></td>
+        <td class="px-5 py-4 text-xs text-slate-600">${escapeHtml(notified)}${a.last_notification_error ? `<div class="text-rose-600 truncate">${escapeHtml(a.last_notification_error)}</div>` : ''}</td>
+        <td class="px-5 py-4 text-slate-600">${fmtRelative(a.last_seen)}</td>
+        <td class="px-5 py-4 text-right">
+          ${a.status === 'open' ? `<button class="text-xs px-2 py-1 rounded bg-brand-50 text-brand-700 hover:bg-brand-100 ack-alert-btn" data-key="${escapeHtml(a.alert_key)}">确认</button>` : '<span class="text-xs text-slate-400">—</span>'}
+        </td>
+      </tr>
+    `;
+  }).join('');
+  $$('.ack-alert-btn').forEach(btn => btn.addEventListener('click', async () => {
+    try {
+      await api('/api/alerts/ack', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ alert_keys: [btn.dataset.key], acknowledged_by: state.user?.username || 'operator' }),
+      });
+      showToast('告警已确认');
+      loadMonitoring();
+    } catch (err) { showToast(err.message, 'error'); }
+  }));
+}
+
+async function submitMonitorTarget() {
+  const uid = $('#monitor-uid').value.trim();
+  const label = $('#monitor-label').value.trim();
+  const expected_urls = $('#monitor-urls').value.split(/\n+/).map(s => s.trim()).filter(Boolean);
+  const stale_after_sec = parseInt($('#monitor-stale').value, 10) || 300;
+  const note = $('#monitor-note').value.trim();
+  if (!uid) return showToast('UID 必填', 'error');
+  try {
+    await api('/api/monitor-targets', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ uid, label, expected_urls, stale_after_sec, note, is_enabled: true }),
+    });
+    showToast('监控目标已保存');
+    ['monitor-uid','monitor-label','monitor-urls','monitor-note'].forEach(id => $('#' + id).value = '');
+    $('#monitor-stale').value = '300';
+    loadMonitoring();
+  } catch (err) { showToast(err.message, 'error'); }
+}
+
 // ===================== TAB: ACCOUNTS =====================
 async function loadAccounts() {
   $('#accounts-tbody').innerHTML = '<tr><td colspan="7" class="px-6 py-12 text-center text-xs text-slate-400">加载中...</td></tr>';
@@ -2924,6 +3139,11 @@ function init() {
   $('#snippet-copy-btn').addEventListener('click', () => {
     navigator.clipboard.writeText($('#snippet-code').textContent).then(() => showToast(t('sites.snippet_copied')));
   });
+
+  // Monitoring tab
+  $('#monitor-refresh-btn').addEventListener('click', loadMonitoring);
+  $('#monitor-save-btn').addEventListener('click', submitMonitorTarget);
+  $('#alert-status-filter').addEventListener('change', loadMonitoring);
 
   // Accounts tab
   $('#add-account-btn').addEventListener('click', () => openModal('modal-account'));

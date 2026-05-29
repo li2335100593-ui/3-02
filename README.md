@@ -8,8 +8,9 @@
 - **断网保护**：播放端使用本地队列保留约 24 小时 heartbeat，网络恢复后自动 flush。
 - **后台记录**：浏览器窗口后台/隐藏时仍按可执行 timer 继续记录，不再把隐藏误判为结束。
 - **运行健康**：`/api/player-health` 暴露播放端在线状态、最后心跳、当前站点、队列长度、SDK 版本。
-- **告警记录**：`alert_events` 记录心跳超时、离线队列过大、flush 失败等异常，可在报表面板查看。
-- **自动监控脚本**：`tools/player-health-monitor.mjs` 可放入 cron/自动化平台，持续检查生产健康。
+- **告警记录**：`alert_events` 记录心跳超时、预期站点缺失、离线队列过大、flush 失败和通知状态。
+- **监控目标**：`monitor_targets` 明确哪些 UID/任务需要主动巡检，历史测试 UID 不会误报。
+- **自动巡检**：`tools/player-health-monitor.mjs` 支持 GitHub Actions 定时巡检和 Server酱推送。
 
 ## 快速开始
 
@@ -202,7 +203,7 @@ Wake Lock API 需要**安全上下文**，因此所有页面必须使用 HTTPS �
 - **播放端**：Vanilla JavaScript，`scheduler.html` + `carousel.js`。
 - **后端**：Cloudflare Worker + D1。
 - **管理端**：静态 `operator-report.html`，通过 Bearer token 访问 Worker API。
-- **监控**：`player_status` + `alert_events` + `tools/player-health-monitor.mjs`。
+- **监控**：`player_status` + `monitor_targets` + `alert_events` + `tools/player-health-monitor.mjs` + GitHub Actions。
 
 ---
 
@@ -220,9 +221,16 @@ Wake Lock API 需要**安全上下文**，因此所有页面必须使用 HTTPS �
 
 ## 生产监控
 
+GitHub Secrets 必填：`REPORT_USER`、`REPORT_PASS`、`SERVERCHAN_SENDKEY`、`CLOUDFLARE_API_TOKEN`。
+
+GitHub Variables 建议：`MONITOR_REQUIRED_UIDS`、`MONITOR_REQUIRED_URLS`、`MONITOR_NOTIFY_REPEAT_MINUTES`。
+
 ```bash
 REPORT_USER='client_view_20260529' \
 REPORT_PASS='View-20260529-GAM!' \
+SERVERCHAN_SENDKEY='SCT...' \
+MONITOR_REQUIRED_UIDS='SOAK_20260529_24H_NET_QUEUE' \
+MONITOR_REQUIRED_URLS='https://livingroom-design.ddmmoney.com/,https://old-house-renovation.chworld.com.tw' \
 node tools/player-health-monitor.mjs --once
 ```
 
@@ -232,6 +240,13 @@ node tools/player-health-monitor.mjs --once
 REPORT_USER='...' REPORT_PASS='...' MONITOR_INTERVAL_SEC=60 \
 node tools/player-health-monitor.mjs
 ```
+
+GitHub Actions：
+
+- `ci.yml`：push/PR 自动跑语法检查和轮播回归。
+- `monitor.yml`：每 5 分钟巡检生产并通过 Server酱通知。
+- `backup.yml`：每天导出 D1 SQL 并上传 artifact。
+- `deploy-worker.yml`：手动应用 migration / 部署 Worker。
 
 ---
 

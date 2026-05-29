@@ -1,6 +1,6 @@
 # Exposure Analytics Worker
 
-Cloudflare Worker + D1 backend for carousel exposure tracking, operator reports, site reports, runtime health, and alerts.
+Cloudflare Worker + D1 backend for carousel exposure tracking, operator reports, site reports, runtime health, alerts, monitor targets, and notification bookkeeping.
 
 ## Deploy
 
@@ -10,10 +10,11 @@ npx wrangler d1 execute exposure_analytics --remote --file ./sql/schema.sql
 npx wrangler deploy
 ```
 
-Apply incremental migrations when needed:
+Apply incremental migrations once per production database:
 
 ```bash
 npx wrangler d1 execute exposure_analytics --remote --file ./sql/migration_005_player_health_alerts.sql
+npx wrangler d1 execute exposure_analytics --remote --file ./sql/migration_006_monitoring_notifications.sql
 ```
 
 ## Public Endpoint
@@ -30,8 +31,10 @@ Use `POST /api/auth/login` to get a Bearer token first.
 - `GET /api/site-report?from=<ms>&to=<ms>`
 - `GET /api/session-events?sid=<sid>`
 - `GET /api/player-health[?uid=<uid>]`
-- `GET /api/alerts?status=open`
+- `GET /api/alerts?status=open|acknowledged|resolved|all&uid=<uid>&limit=300`
 - `POST /api/alerts/ack`
+- `POST /api/alerts/mark-notified`
+- `GET/POST/DELETE /api/monitor-targets`
 - `GET/POST/DELETE /api/operators`
 - `GET/POST/DELETE /api/sites`
 - `GET/POST/DELETE /api/accounts`
@@ -39,6 +42,7 @@ Use `POST /api/auth/login` to get a Bearer token first.
 ## Runtime Health Tables
 
 - `player_status`: derived latest state by `uid`; safe to rebuild from `exposure_events` if needed.
-- `alert_events`: derived alert history for stale heartbeats, large offline queues, and flush failures.
+- `monitor_targets`: explicit production UIDs/tasks to monitor; historical UIDs do not create stale alerts unless enabled here.
+- `alert_events`: derived alert history for stale heartbeats, missing expected URLs, large offline queues, and flush failures.
 
 `exposure_events` remains the source of truth for reports.
