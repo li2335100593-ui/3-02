@@ -1,40 +1,44 @@
 # Exposure Analytics Worker
 
-## Quick Start
+Cloudflare Worker + D1 backend for carousel exposure tracking, operator reports, site reports, runtime health, and alerts.
 
-1. Update `wrangler.toml` with your real `database_id`.
-2. Login:
+## Deploy
 
 ```bash
 npx wrangler login
-```
-
-3. Initialize schema:
-
-```bash
 npx wrangler d1 execute exposure_analytics --remote --file ./sql/schema.sql
-```
-
-4. Optional fixture seed:
-
-```bash
-npx wrangler d1 execute exposure_analytics --remote --file ./sql/seed-fixture.sql
-```
-
-5. Deploy:
-
-```bash
 npx wrangler deploy
 ```
 
-## Endpoints
+Apply incremental migrations when needed:
 
-- `POST /api/exposure`
-- `POST /api/config/urls` (sync scheduler URL list)
-- `GET /api/report?from=<ms>&to=<ms>&url=<optional>&urls=<u1,u2,...>&page=1&page_size=50`
-- `GET /api/report.csv?from=<ms>&to=<ms>&url=<optional>&urls=<u1,u2,...>`
-- `GET /health`
+```bash
+npx wrangler d1 execute exposure_analytics --remote --file ./sql/migration_005_player_health_alerts.sql
+```
 
-## Repeated IP Metric
+## Public Endpoint
 
-`daily_repeat_ip` uses: same URL + same day + same IP with exposures >= 2.
+- `POST /api/exposure` - append-only event ingestion from `carousel.js`.
+- `GET /health` - Worker health check.
+
+## Authenticated Endpoints
+
+Use `POST /api/auth/login` to get a Bearer token first.
+
+- `GET /api/operator-report?from=<ms>&to=<ms>`
+- `GET /api/operator-detail?uid=<uid>&from=<ms>&to=<ms>`
+- `GET /api/site-report?from=<ms>&to=<ms>`
+- `GET /api/session-events?sid=<sid>`
+- `GET /api/player-health[?uid=<uid>]`
+- `GET /api/alerts?status=open`
+- `POST /api/alerts/ack`
+- `GET/POST/DELETE /api/operators`
+- `GET/POST/DELETE /api/sites`
+- `GET/POST/DELETE /api/accounts`
+
+## Runtime Health Tables
+
+- `player_status`: derived latest state by `uid`; safe to rebuild from `exposure_events` if needed.
+- `alert_events`: derived alert history for stale heartbeats, large offline queues, and flush failures.
+
+`exposure_events` remains the source of truth for reports.

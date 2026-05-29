@@ -98,6 +98,25 @@ function toIsoOrNull(ms) {
   return new Date(n).toISOString();
 }
 
+function nullableString(value, maxLen = 500) {
+  if (value == null) return null;
+  const s = String(value).trim();
+  return s ? s.slice(0, maxLen) : null;
+}
+
+function nullableNumber(value) {
+  if (value == null || value === "") return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
+function nullableBooleanInt(value) {
+  if (value == null) return null;
+  if (value === true || value === 1 || value === "1" || value === "true") return 1;
+  if (value === false || value === 0 || value === "0" || value === "false") return 0;
+  return null;
+}
+
 function rootLikePattern(rootUrl) {
   if (!rootUrl) return "%";
   return rootUrl.endsWith("/") ? `${rootUrl}%` : `${rootUrl}/%`;
@@ -225,7 +244,86 @@ async function handleExposure(req, env, headers) {
     )
     .run();
 
+  // Operational health is derived state. Never let it block append-only event
+  // ingestion, otherwise a migration issue would look like tracking data loss.
+  try {
+    await upsertPlayerStatus(env, body, {
+      eventType,
+      url,
+      now,
+      ip,
+      ua,
+      deviceType,
+      screenW,
+      screenH,
+      tzOffset,
+    });
+  } catch (err) {
+    console.log("player_status_update_failed", err && err.message ? err.message : String(err));
+  }
+
   return json({ ok: true, id: insertRes?.meta?.last_row_id ?? null, received_at: now }, 200, headers);
+}
+
+async function upsertPlayerStatus(env, body, derived) {
+  const uid = nullableString(body.uid, 200);
+  if (!uid) return;
+
+  const eventType = derived.eventType;
+  const lastHeartbeatAt = eventType === "heartbeat" ? derived.now : null;
+  const lastPageEnterAt = eventType === "page_enter" || eventType == null ? derived.now : null;
+
+  await env.DB.prepare(
+    `INSERT INTO player_status (
+      uid, sid, current_url, page_index, last_event_type, last_seen,
+      last_heartbeat_at, last_page_enter_at, queue_length, client_version,
+      visibility_state, navigation_slot, last_flush_ok, device_type,
+      screen_w, screen_h, tz_offset, ip, ua, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(uid) DO UPDATE SET
+      sid = COALESCE(excluded.sid, player_status.sid),
+      current_url = COALESCE(excluded.current_url, player_status.current_url),
+      page_index = COALESCE(excluded.page_index, player_status.page_index),
+      last_event_type = excluded.last_event_type,
+      last_seen = excluded.last_seen,
+      last_heartbeat_at = COALESCE(excluded.last_heartbeat_at, player_status.last_heartbeat_at),
+      last_page_enter_at = COALESCE(excluded.last_page_enter_at, player_status.last_page_enter_at),
+      queue_length = COALESCE(excluded.queue_length, player_status.queue_length),
+      client_version = COALESCE(excluded.client_version, player_status.client_version),
+      visibility_state = COALESCE(excluded.visibility_state, player_status.visibility_state),
+      navigation_slot = COALESCE(excluded.navigation_slot, player_status.navigation_slot),
+      last_flush_ok = COALESCE(excluded.last_flush_ok, player_status.last_flush_ok),
+      device_type = COALESCE(excluded.device_type, player_status.device_type),
+      screen_w = COALESCE(excluded.screen_w, player_status.screen_w),
+      screen_h = COALESCE(excluded.screen_h, player_status.screen_h),
+      tz_offset = COALESCE(excluded.tz_offset, player_status.tz_offset),
+      ip = COALESCE(excluded.ip, player_status.ip),
+      ua = COALESCE(excluded.ua, player_status.ua),
+      updated_at = excluded.updated_at`
+  )
+    .bind(
+      uid,
+      nullableString(body.sid, 200),
+      derived.url,
+      nullableNumber(body.page_index),
+      nullableString(eventType, 50),
+      derived.now,
+      lastHeartbeatAt,
+      lastPageEnterAt,
+      nullableNumber(body.queue_length),
+      nullableString(body.client_version, 80),
+      nullableString(body.visibility_state, 40),
+      nullableNumber(body.navigation_slot),
+      nullableBooleanInt(body.last_flush_ok),
+      derived.deviceType,
+      derived.screenW,
+      derived.screenH,
+      derived.tzOffset,
+      derived.ip,
+      derived.ua,
+      derived.now
+    )
+    .run();
 }
 
 async function getSummaryForUrls(env, from, to, selectedUrls) {
@@ -1021,6 +1119,335 @@ async function handleOperatorReport(req, env, headers) {
   );
 }
 
+const HEALTH_ONLINE_MS = 2 * 60 * 1000;
+const HEALTH_WARN_MS = 5 * 60 * 1000;
+
+function shanghaiDayRangeMs(t = Date.now()) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Shanghai",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date(t)).reduce((acc, p) => {
+    acc[p.type] = p.value;
+    return acc;
+  }, {});
+  const day = `${parts.year}-${parts.month}-${parts.day}`;
+  return {
+    day,
+    from: new Date(`${day}T00:00:00+08:00`).getTime(),
+    to: new Date(`${day}T23:59:59.999+08:00`).getTime(),
+  };
+}
+
+function classifyPlayerHealth(row, now = Date.now()) {
+  const lastSeen = Number(row.last_seen || 0);
+  const ageMs = lastSeen ? now - lastSeen : Number.POSITIVE_INFINITY;
+  const problems = [];
+  let health = "online";
+  let severity = "ok";
+
+  if (!lastSeen || ageMs > HEALTH_WARN_MS) {
+    health = "offline";
+    severity = "critical";
+    problems.push("超过 5 分钟没有心跳");
+  } else if (ageMs > HEALTH_ONLINE_MS) {
+    health = "warning";
+    severity = "warning";
+    problems.push("超过 2 分钟没有心跳");
+  }
+
+  const queueLength = row.queue_length == null ? null : Number(row.queue_length);
+  if (queueLength != null && queueLength >= 4000) {
+    health = "offline";
+    severity = "critical";
+    problems.push("离线队列接近上限");
+  } else if (queueLength != null && queueLength >= 1000 && severity !== "critical") {
+    health = "warning";
+    severity = "warning";
+    problems.push("离线队列偏大");
+  }
+
+  if (row.last_flush_ok != null && Number(row.last_flush_ok) === 0 && severity !== "critical") {
+    health = "warning";
+    severity = "warning";
+    problems.push("最近一次上报 flush 失败");
+  }
+
+  return {
+    health,
+    severity,
+    age_ms: Number.isFinite(ageMs) ? ageMs : null,
+    age_seconds: Number.isFinite(ageMs) ? Math.max(0, Math.round(ageMs / 1000)) : null,
+    problems,
+  };
+}
+
+async function upsertAlert(env, { alertKey, uid, alertType, severity, message, details }) {
+  const now = Date.now();
+  await env.DB.prepare(
+    `INSERT INTO alert_events (
+      alert_key, uid, alert_type, severity, message, details_json,
+      status, first_seen, last_seen
+    ) VALUES (?, ?, ?, ?, ?, ?, 'open', ?, ?)
+    ON CONFLICT(alert_key) DO UPDATE SET
+      severity = excluded.severity,
+      message = excluded.message,
+      details_json = excluded.details_json,
+      status = CASE
+        WHEN alert_events.status = 'acknowledged' THEN alert_events.status
+        ELSE 'open'
+      END,
+      last_seen = excluded.last_seen`
+  )
+    .bind(
+      alertKey,
+      uid || null,
+      alertType,
+      severity,
+      message,
+      details ? JSON.stringify(details) : null,
+      now,
+      now
+    )
+    .run();
+}
+
+async function resolveAlert(env, alertKey) {
+  await env.DB.prepare(
+    `UPDATE alert_events
+     SET status = 'resolved', last_seen = ?
+     WHERE alert_key = ? AND status IN ('open', 'acknowledged')`
+  ).bind(Date.now(), alertKey).run();
+}
+
+async function refreshAlertsForStatus(env, row, now = Date.now()) {
+  const uid = row.uid;
+  const health = classifyPlayerHealth(row, now);
+  const offlineKey = `offline:${uid}`;
+  if (health.health === "offline" || health.problems.some((p) => p.includes("心跳"))) {
+    await upsertAlert(env, {
+      alertKey: offlineKey,
+      uid,
+      alertType: "heartbeat_stale",
+      severity: health.severity === "critical" ? "critical" : "warning",
+      message: `${uid} 心跳不新鲜：最后心跳 ${health.age_seconds ?? "未知"} 秒前`,
+      details: { last_seen: row.last_seen, current_url: row.current_url, age_seconds: health.age_seconds },
+    });
+  } else {
+    await resolveAlert(env, offlineKey);
+  }
+
+  const queueLength = row.queue_length == null ? null : Number(row.queue_length);
+  const queueKey = `queue:${uid}`;
+  if (queueLength != null && queueLength >= 1000) {
+    await upsertAlert(env, {
+      alertKey: queueKey,
+      uid,
+      alertType: "offline_queue_large",
+      severity: queueLength >= 4000 ? "critical" : "warning",
+      message: `${uid} 离线队列偏大：${queueLength} 条`,
+      details: { queue_length: queueLength, current_url: row.current_url },
+    });
+  } else {
+    await resolveAlert(env, queueKey);
+  }
+
+  const flushKey = `flush:${uid}`;
+  if (row.last_flush_ok != null && Number(row.last_flush_ok) === 0) {
+    await upsertAlert(env, {
+      alertKey: flushKey,
+      uid,
+      alertType: "flush_failed",
+      severity: "warning",
+      message: `${uid} 最近一次队列 flush 失败`,
+      details: { queue_length: queueLength, current_url: row.current_url },
+    });
+  } else {
+    await resolveAlert(env, flushKey);
+  }
+}
+
+async function getTodayCoverage(env, uid) {
+  const range = shanghaiDayRangeMs();
+  const row = await env.DB.prepare(
+    `SELECT
+      COUNT(DISTINCT url) AS visited_urls,
+      COUNT(DISTINCT sid) AS sessions,
+      SUM(CASE WHEN event_type = 'heartbeat' THEN 1 ELSE 0 END) * ${HEARTBEAT_INTERVAL_SEC} AS dwell_seconds
+     FROM exposure_events
+     WHERE uid = ? AND received_at >= ? AND received_at <= ?`
+  ).bind(uid, range.from, range.to).first();
+  const urls = await env.DB.prepare(
+    `SELECT url, MAX(received_at) AS last_seen
+     FROM exposure_events
+     WHERE uid = ? AND received_at >= ? AND received_at <= ?
+     GROUP BY url
+     ORDER BY last_seen DESC`
+  ).bind(uid, range.from, range.to).all();
+  return {
+    day: range.day,
+    visited_urls: Number(row?.visited_urls || 0),
+    sessions: Number(row?.sessions || 0),
+    dwell_seconds: Number(row?.dwell_seconds || 0),
+    urls: (urls.results || []).map((r) => ({
+      url: r.url,
+      last_seen: Number(r.last_seen || 0),
+      last_seen_iso: toIsoOrNull(r.last_seen),
+    })),
+  };
+}
+
+function mapPlayerStatusRow(row, coverage, now = Date.now()) {
+  const health = classifyPlayerHealth(row, now);
+  return {
+    uid: row.uid,
+    sid: row.sid || null,
+    current_url: row.current_url || null,
+    page_index: row.page_index == null ? null : Number(row.page_index),
+    last_event_type: row.last_event_type || null,
+    last_seen: Number(row.last_seen || 0),
+    last_seen_iso: toIsoOrNull(row.last_seen),
+    last_heartbeat_at: Number(row.last_heartbeat_at || 0),
+    last_heartbeat_iso: toIsoOrNull(row.last_heartbeat_at),
+    last_page_enter_at: Number(row.last_page_enter_at || 0),
+    last_page_enter_iso: toIsoOrNull(row.last_page_enter_at),
+    queue_length: row.queue_length == null ? null : Number(row.queue_length),
+    client_version: row.client_version || null,
+    visibility_state: row.visibility_state || null,
+    navigation_slot: row.navigation_slot == null ? null : Number(row.navigation_slot),
+    last_flush_ok: row.last_flush_ok == null ? null : Number(row.last_flush_ok) === 1,
+    device_type: row.device_type || "unknown",
+    screen_w: row.screen_w == null ? null : Number(row.screen_w),
+    screen_h: row.screen_h == null ? null : Number(row.screen_h),
+    tz_offset: row.tz_offset == null ? null : Number(row.tz_offset),
+    ip: row.ip || null,
+    ua: row.ua || null,
+    updated_at: Number(row.updated_at || 0),
+    updated_iso: toIsoOrNull(row.updated_at),
+    ...health,
+    today: coverage,
+  };
+}
+
+async function handlePlayerHealth(req, env, headers) {
+  const url = new URL(req.url);
+  const uid = normalizeUrl(url.searchParams.get("uid"));
+  const now = Date.now();
+  const where = uid ? "WHERE uid = ?" : "";
+  const params = uid ? [uid] : [];
+  const statusStmt = env.DB.prepare(
+    `SELECT *
+     FROM player_status
+     ${where}
+     ORDER BY last_seen DESC
+     LIMIT 500`
+  );
+  const result = params.length ? await statusStmt.bind(...params).all() : await statusStmt.all();
+
+  const rows = result.results || [];
+  const players = [];
+  for (const row of rows) {
+    await refreshAlertsForStatus(env, row, now);
+    const coverage = await getTodayCoverage(env, row.uid);
+    players.push(mapPlayerStatusRow(row, coverage, now));
+  }
+
+  const alertClause = uid ? "AND uid = ?" : "";
+  const alertParams = uid ? [uid] : [];
+  const alertStmt = env.DB.prepare(
+    `SELECT *
+     FROM alert_events
+     WHERE status = 'open' ${alertClause}
+     ORDER BY
+       CASE severity WHEN 'critical' THEN 0 WHEN 'warning' THEN 1 ELSE 2 END,
+       last_seen DESC
+     LIMIT 200`
+  );
+  const alerts = alertParams.length ? await alertStmt.bind(...alertParams).all() : await alertStmt.all();
+
+  return json({
+    ok: true,
+    now,
+    players,
+    totals: {
+      players: players.length,
+      online: players.filter((p) => p.health === "online").length,
+      warning: players.filter((p) => p.health === "warning").length,
+      offline: players.filter((p) => p.health === "offline").length,
+      open_alerts: (alerts.results || []).length,
+    },
+    alerts: (alerts.results || []).map(mapAlertRow),
+  }, 200, headers);
+}
+
+function mapAlertRow(r) {
+  let details = null;
+  try { details = r.details_json ? JSON.parse(r.details_json) : null; } catch {}
+  return {
+    id: Number(r.id),
+    alert_key: r.alert_key,
+    uid: r.uid || null,
+    alert_type: r.alert_type,
+    severity: r.severity,
+    message: r.message,
+    details,
+    status: r.status,
+    first_seen: Number(r.first_seen || 0),
+    first_seen_iso: toIsoOrNull(r.first_seen),
+    last_seen: Number(r.last_seen || 0),
+    last_seen_iso: toIsoOrNull(r.last_seen),
+    acknowledged_at: Number(r.acknowledged_at || 0),
+    acknowledged_iso: toIsoOrNull(r.acknowledged_at),
+    acknowledged_by: r.acknowledged_by || null,
+  };
+}
+
+async function handleAlerts(req, env, headers) {
+  const url = new URL(req.url);
+  if (req.method === "GET") {
+    const status = nullableString(url.searchParams.get("status"), 40) || "open";
+    const result = await env.DB.prepare(
+      `SELECT *
+       FROM alert_events
+       WHERE status = ?
+       ORDER BY
+         CASE severity WHEN 'critical' THEN 0 WHEN 'warning' THEN 1 ELSE 2 END,
+         last_seen DESC
+       LIMIT 300`
+    ).bind(status).all();
+    return json({ ok: true, alerts: (result.results || []).map(mapAlertRow) }, 200, headers);
+  }
+
+  let body;
+  try {
+    body = await req.json();
+  } catch {
+    return json({ ok: false, error: "Invalid JSON body" }, 400, headers);
+  }
+  const ids = Array.isArray(body?.ids) ? body.ids.map((v) => Number(v)).filter(Number.isFinite) : [];
+  const keys = Array.isArray(body?.alert_keys) ? body.alert_keys.map((v) => nullableString(v, 300)).filter(Boolean) : [];
+  if (ids.length === 0 && keys.length === 0) {
+    return json({ ok: false, error: "ids or alert_keys is required" }, 400, headers);
+  }
+  const now = Date.now();
+  for (const id of ids) {
+    await env.DB.prepare(
+      `UPDATE alert_events
+       SET status = 'acknowledged', acknowledged_at = ?, acknowledged_by = ?
+       WHERE id = ?`
+    ).bind(now, body?.acknowledged_by || "operator", id).run();
+  }
+  for (const key of keys) {
+    await env.DB.prepare(
+      `UPDATE alert_events
+       SET status = 'acknowledged', acknowledged_at = ?, acknowledged_by = ?
+       WHERE alert_key = ?`
+    ).bind(now, body?.acknowledged_by || "operator", key).run();
+  }
+  return json({ ok: true, acknowledged: ids.length + keys.length }, 200, headers);
+}
+
 // ===== Site-centric report (operator breakdown per URL) =====
 async function getSiteSummaries(env, from, to) {
   const result = await env.DB.prepare(
@@ -1754,6 +2181,18 @@ export default {
       if (url.pathname === "/api/session-events" && req.method === "GET") {
         const denied = requireAuth(); if (denied) return denied;
         return await handleSessionEvents(req, env, headers);
+      }
+      if (url.pathname === "/api/player-health" && req.method === "GET") {
+        const denied = requireAuth(); if (denied) return denied;
+        return await handlePlayerHealth(req, env, headers);
+      }
+      if (url.pathname === "/api/alerts" && req.method === "GET") {
+        const denied = requireAuth(); if (denied) return denied;
+        return await handleAlerts(req, env, headers);
+      }
+      if (url.pathname === "/api/alerts/ack" && req.method === "POST") {
+        const denied = requireAuth(); if (denied) return denied;
+        return await handleAlerts(req, env, headers);
       }
 
       // ---- Sites write (auth) ----

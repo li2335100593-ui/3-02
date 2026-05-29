@@ -10,6 +10,7 @@
 
   var ANALYTICS_URL = 'https://exposure-analytics.li2335100593.workers.dev/api/exposure';
   var HEARTBEAT_INTERVAL_SEC = 30;
+  var SDK_VERSION = '3.1.0-health';
 
   // ===== 内置配置（直接注入模式用）=====
   // 如果 URL hash 里没有配置，就使用这里的默认值
@@ -31,6 +32,7 @@
   var CK_CYCLE = '__carousel_cycle_v4';
   // 24h offline buffer: 30s heartbeats => 2880 events/day, plus page_enter/leave.
   var MAX_QUEUE_SIZE = 5000;
+  var lastFlushOk = null;
 
   function now() { return Date.now(); }
 
@@ -111,6 +113,10 @@
     writeQueue(q);
   }
 
+  function queueLength() {
+    return readQueue().length;
+  }
+
   function deliverPayload(payload, preferBeacon) {
     var body = JSON.stringify(payload);
     if (preferBeacon && navigator.sendBeacon) {
@@ -174,10 +180,12 @@
       if (sent > 0) writeQueue(readQueue().slice(sent));
       flushingQueue = false;
       if (readQueue().length) flushQueue(false);
+      lastFlushOk = sent === q.length;
       return sent === q.length;
     }).catch(function () {
       if (sent > 0) writeQueue(readQueue().slice(sent));
       flushingQueue = false;
+      lastFlushOk = false;
       return false;
     });
   }
@@ -192,8 +200,13 @@
         uid: state.uid || null,
         url: window.location.origin + window.location.pathname,
         page_index: state.ci,
+        client_version: SDK_VERSION,
+        queue_length: queueLength(),
+        visibility_state: document.visibilityState || 'visible',
         client_ts: now()
       };
+      if (typeof pageSlotN !== 'undefined') payload.navigation_slot = pageSlotN;
+      if (lastFlushOk !== null) payload.last_flush_ok = lastFlushOk;
       if (eventType === 'page_enter') {
         var fp = deviceFingerprint();
         for (var fk in fp) if (fp[fk] != null) payload[fk] = fp[fk];

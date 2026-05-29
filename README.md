@@ -1,6 +1,15 @@
-# 自动轮播 URL 调度系统
+# 自动轮播 URL 调度与工时审计系统
 
-纯前端的自动轮播 URL 调度系统。用户打开入口页后，系统自动在 12 个不同域名的客户页面之间每 5 分钟轮转一次，持续 60 分钟后循环。
+自动轮播 URL 调度 + 播放员工时审计 + 运行健康监控系统。用户打开入口页后，系统会在客户页面之间按固定间隔轮转；嵌入式 SDK 每 30 秒上报 heartbeat，后端生成播放员工时、站点明细、会话记录、运行健康和告警。
+
+## 工程化能力
+
+- **工时审计**：按播放员、站点、会话、日期范围统计工时。
+- **断网保护**：播放端使用本地队列保留约 24 小时 heartbeat，网络恢复后自动 flush。
+- **后台记录**：浏览器窗口后台/隐藏时仍按可执行 timer 继续记录，不再把隐藏误判为结束。
+- **运行健康**：`/api/player-health` 暴露播放端在线状态、最后心跳、当前站点、队列长度、SDK 版本。
+- **告警记录**：`alert_events` 记录心跳超时、离线队列过大、flush 失败等异常，可在报表面板查看。
+- **自动监控脚本**：`tools/player-health-monitor.mjs` 可放入 cron/自动化平台，持续检查生产健康。
 
 ## 快速开始
 
@@ -29,7 +38,7 @@
 在 `scheduler.html` 的 `<script>` 标签上使用 `data-*` 属性配置轮播参数：
 
 ```html
-<script 
+<script
   data-urls='["https://domain-a.com","https://domain-b.com","https://domain-c.com"]'
   data-interval="300"
   data-cycle="3600"
@@ -64,7 +73,7 @@
 </head>
 <body>
   <!-- 页面内容 -->
-  
+
   <!-- 在页面底部加入 carousel.js -->
   <script src="https://li2335100593-ui.github.io/3-02/carousel.js"></script>
 </body>
@@ -74,7 +83,7 @@
 ### scheduler.html 配置示例
 
 ```html
-<script 
+<script
   data-urls='[
     "https://domain-a.com/page1",
     "https://domain-b.com/page2",
@@ -190,9 +199,10 @@ Wake Lock API 需要**安全上下文**，因此所有页面必须使用 HTTPS �
 
 ## 技术栈
 
-- **纯前端**：无后端、无数据库、无 API
-- **零依赖**：Vanilla JavaScript，不依赖任何第三方库
-- **轻量级**：scheduler.html + carousel.js 总大小 < 15KB
+- **播放端**：Vanilla JavaScript，`scheduler.html` + `carousel.js`。
+- **后端**：Cloudflare Worker + D1。
+- **管理端**：静态 `operator-report.html`，通过 Bearer token 访问 Worker API。
+- **监控**：`player_status` + `alert_events` + `tools/player-health-monitor.mjs`。
 
 ---
 
@@ -201,7 +211,26 @@ Wake Lock API 需要**安全上下文**，因此所有页面必须使用 HTTPS �
 ```
 ├── scheduler.html       # 入口调度页（用户打开的第一个页面）
 ├── carousel.js          # 轮播 SDK（嵌入到每个目标页面）
+├── operator-report.html # 管理面板（工时、站点、健康、告警）
+├── worker/              # Cloudflare Worker + D1 schema/migrations
+├── tests/               # SDK 回归测试
+├── tools/               # 生产健康监控脚本
 └── README.md            # 本文档
+```
+
+## 生产监控
+
+```bash
+REPORT_USER='client_view_20260529' \
+REPORT_PASS='View-20260529-GAM!' \
+node tools/player-health-monitor.mjs --once
+```
+
+持续监控：
+
+```bash
+REPORT_USER='...' REPORT_PASS='...' MONITOR_INTERVAL_SEC=60 \
+node tools/player-health-monitor.mjs
 ```
 
 ---
