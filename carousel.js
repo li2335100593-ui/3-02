@@ -29,7 +29,8 @@
   var LS_STATE = '__carousel_state_v4';
   var LS_QUEUE = '__carousel_exposure_queue_v1';
   var CK_CYCLE = '__carousel_cycle_v4';
-  var MAX_QUEUE_SIZE = 200;
+  // 24h offline buffer: 30s heartbeats => 2880 events/day, plus page_enter/leave.
+  var MAX_QUEUE_SIZE = 5000;
 
   function now() { return Date.now(); }
 

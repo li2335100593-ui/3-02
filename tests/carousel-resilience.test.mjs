@@ -283,6 +283,19 @@ const results = [];
 {
   const h = makeHarness({
     urls: ['https://livingroom-design.ddmmoney.com/'],
+    fetchFailures: 3_100,
+    sendBeacon: false,
+    tickMs: 31_000,
+  });
+  await h.runFor(24 * 60 * 60);
+  assert.ok(h.queueLength > 2_800, `24h offline should retain queued heartbeats, got queue ${h.queueLength}`);
+  assert.ok(h.queueLength < 5_000, `24h offline should stay within queue cap, got queue ${h.queueLength}`);
+  results.push(['offline_24h_queue_capacity', { queueLength: h.queueLength }]);
+}
+
+{
+  const h = makeHarness({
+    urls: ['https://livingroom-design.ddmmoney.com/'],
   });
   await h.runFor(4 * 60);
   await h.setVisible(false);
