@@ -19,6 +19,8 @@
     .tab-btn:hover { color: #334155; }
     .tab-btn.active { color: #4338ca; }
     .tab-btn.active::after { content: ''; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; background: #4f46e5; }
+    .range-preset-btn { color: #64748b; }
+    .range-preset-btn.active { background: #4f46e5; color: #fff; box-shadow: 0 6px 16px rgb(79 70 229 / 0.20); }
     .toast-enter { animation: toast-in 0.2s ease-out; }
     @keyframes toast-in { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: none; } }
   </style>
@@ -170,26 +172,41 @@
   <!-- ========== TAB: REPORT ========== -->
   <div id="tab-report" class="tab-pane">
 
-    <div class="flex items-center justify-between mb-6">
+    <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4 mb-6">
       <div>
         <h2 class="text-lg font-semibold tracking-tight" data-i18n="report.title">工时审计</h2>
         <p class="text-xs text-slate-500 mt-0.5" data-i18n="report.subtitle">按播放员维度的精确工时记录</p>
       </div>
-      <div class="flex items-center gap-3">
-        <div class="flex items-center gap-2 text-sm">
-          <i data-lucide="calendar-range" class="w-4 h-4 text-slate-400"></i>
-          <input id="from-date" type="date" class="h-9 px-3 rounded-md border border-slate-300 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500">
-          <span class="text-slate-400">→</span>
-          <input id="to-date" type="date" class="h-9 px-3 rounded-md border border-slate-300 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500">
+      <div class="flex flex-col sm:items-end gap-2">
+        <div class="flex flex-wrap items-center justify-start sm:justify-end gap-3">
+          <div class="inline-flex items-center rounded-full bg-white border border-slate-200 p-1 shadow-card" id="report-range-presets">
+            <button type="button" class="range-preset-btn active h-8 px-4 rounded-full text-sm font-medium transition-all" data-range-preset="today" data-i18n="report.range_today">今日</button>
+            <button type="button" class="range-preset-btn h-8 px-4 rounded-full text-sm font-medium transition-all" data-range-preset="yesterday" data-i18n="report.range_yesterday">昨日</button>
+            <button type="button" class="range-preset-btn h-8 px-4 rounded-full text-sm font-medium transition-all" data-range-preset="7d" data-i18n="report.range_7d">近7天</button>
+            <button type="button" class="range-preset-btn h-8 px-4 rounded-full text-sm font-medium transition-all" data-range-preset="custom" data-i18n="report.range_custom">自定义</button>
+          </div>
+          <button id="refresh-btn" class="h-9 px-4 rounded-md bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium flex items-center gap-2 transition-colors">
+            <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+            <span data-i18n="report.refresh">刷新</span>
+          </button>
+          <button id="export-btn" class="h-9 px-4 rounded-md border border-slate-300 hover:bg-slate-50 text-sm font-medium flex items-center gap-2 transition-colors">
+            <i data-lucide="download" class="w-4 h-4"></i>
+            <span data-i18n="report.export_csv">导出 CSV</span>
+          </button>
         </div>
-        <button id="refresh-btn" class="h-9 px-4 rounded-md bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium flex items-center gap-2 transition-colors">
-          <i data-lucide="refresh-cw" class="w-4 h-4"></i>
-          <span data-i18n="report.refresh">刷新</span>
-        </button>
-        <button id="export-btn" class="h-9 px-4 rounded-md border border-slate-300 hover:bg-slate-50 text-sm font-medium flex items-center gap-2 transition-colors">
-          <i data-lucide="download" class="w-4 h-4"></i>
-          <span data-i18n="report.export_csv">导出 CSV</span>
-        </button>
+        <div class="flex flex-wrap items-center justify-start sm:justify-end gap-2 text-sm">
+          <div class="inline-flex items-center gap-1.5 rounded-full bg-brand-50 border border-brand-100 px-3 py-1 text-xs text-brand-700">
+            <i data-lucide="calendar-check" class="w-3.5 h-3.5"></i>
+            <span data-i18n="report.current_range">当前范围</span>
+            <span id="report-range-label" class="font-semibold">—</span>
+          </div>
+          <div id="report-custom-range" class="hidden items-center gap-2 text-sm">
+            <i data-lucide="calendar-range" class="w-4 h-4 text-slate-400"></i>
+            <input id="from-date" type="date" class="h-9 px-3 rounded-md border border-slate-300 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500">
+            <span class="text-slate-400">→</span>
+            <input id="to-date" type="date" class="h-9 px-3 rounded-md border border-slate-300 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500">
+          </div>
+        </div>
       </div>
     </div>
 
@@ -223,8 +240,9 @@
             <h2 class="text-sm font-semibold flex items-center gap-2">
               <i data-lucide="users" class="w-4 h-4 text-slate-500"></i>
               <span data-i18n="op.list_title">播放员列表</span>
+              <span id="list-range-label" class="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600 normal-case">—</span>
             </h2>
-            <p class="text-xs text-slate-500 mt-0.5" data-i18n="op.list_hint">点击任意一行查看详细工时与设备指纹</p>
+            <p class="text-xs text-slate-500 mt-0.5" data-i18n="op.list_hint">只列出所选时段内有播放记录的播放员；点击任意一行查看明细</p>
           </div>
           <div class="text-xs text-slate-500" id="list-count">—</div>
         </div>
@@ -793,6 +811,7 @@ const state = {
   selectedUid: null,
   charts: { daily: null, url: null, siteDaily: null },
   currentTab: 'report',
+  rangePreset: 'today',
   cachedOperators: [],
   payrollRate: 50,
   payrollCurrency: 'CNY', // 'CNY' | 'USD' | 'TWD'
@@ -859,6 +878,11 @@ const I18N = {
     'report.today_snapshot': '今日快照',
     'report.range_summary': '区间汇总',
     'report.range_with_wow': '含周环比',
+    'report.range_today': '今日',
+    'report.range_yesterday': '昨日',
+    'report.range_7d': '近7天',
+    'report.range_custom': '自定义',
+    'report.current_range': '当前范围',
     'report.refresh': '刷新',
     'report.export_csv': '导出 CSV',
     'report.online_now': '人在线',
@@ -878,7 +902,7 @@ const I18N = {
     'stat.devices_identified': '台已识别',
     // Operator list
     'op.list_title': '播放员列表',
-    'op.list_hint': '点击任意一行查看详细工时与设备指纹',
+    'op.list_hint': '只列出所选时段内有播放记录的播放员；点击任意一行查看明细',
     'op.list_count': '位播放员',
     'op.col_operator': '播放员',
     'op.col_total_hours': '总工时',
@@ -1136,6 +1160,11 @@ const I18N = {
     'report.today_snapshot': '今日快照',
     'report.range_summary': '區間彙總',
     'report.range_with_wow': '含週環比',
+    'report.range_today': '今日',
+    'report.range_yesterday': '昨日',
+    'report.range_7d': '近7天',
+    'report.range_custom': '自訂',
+    'report.current_range': '目前區間',
     'report.refresh': '重新整理',
     'report.export_csv': '匯出 CSV',
     'report.online_now': '人在線',
@@ -1153,7 +1182,7 @@ const I18N = {
     'stat.primary_device': '主用裝置',
     'stat.devices_identified': '台已辨識',
     'op.list_title': '播放員列表',
-    'op.list_hint': '點擊任意一列查看詳細工時與裝置指紋',
+    'op.list_hint': '只列出所選時段內有播放紀錄的播放員；點擊任意一列查看明細',
     'op.list_count': '位播放員',
     'op.col_operator': '播放員',
     'op.col_total_hours': '總工時',
@@ -1393,6 +1422,7 @@ function setLang(lang) {
   document.documentElement.setAttribute('lang', lang);
   try { localStorage.setItem(PREF_LANG_KEY, lang); } catch (e) {}
   applyI18n();
+  updateReportRangeUi();
   // Re-render dynamic content for the new language
   if (state.user) {
     onLoggedIn(); // re-renders user menu + reloads current tab
@@ -1500,12 +1530,63 @@ function tzLabel(tzOffset) {
 function shortUid(s) { if (!s) return '—'; return s.length <= 14 ? s : s.slice(0,8)+'…'+s.slice(-4); }
 function escapeHtml(s) { if (s == null) return ''; return String(s).replace(/[&<>"']/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m])); }
 function defaultRange() { const to = new Date(); const from = new Date(to.getTime() - 90*864e5); return { from, to }; }
+function startOfDayDate(d) { const x = new Date(d); x.setHours(0, 0, 0, 0); return x; }
+function endOfDayDate(d) { const x = new Date(d); x.setHours(23, 59, 59, 999); return x; }
+function defaultReportRange() { const today = new Date(); return { from: startOfDayDate(today), to: endOfDayDate(today) }; }
 function ymd(d) { return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
 function rangeFromInputs() {
   const f = new Date($('#from-date').value + 'T00:00:00');
   const t = new Date($('#to-date').value + 'T23:59:59');
   if (isNaN(f.getTime()) || isNaN(t.getTime())) return null;
   return { from: f.getTime(), to: t.getTime() };
+}
+function reportRangeForPreset(preset) {
+  const today = startOfDayDate(new Date());
+  if (preset === 'today') return { from: today.getTime(), to: endOfDayDate(today).getTime() };
+  if (preset === 'yesterday') {
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    return { from: startOfDayDate(yesterday).getTime(), to: endOfDayDate(yesterday).getTime() };
+  }
+  if (preset === '7d') {
+    const from = new Date(today);
+    from.setDate(from.getDate() - 6);
+    return { from: startOfDayDate(from).getTime(), to: endOfDayDate(today).getTime() };
+  }
+  return null;
+}
+function reportRangeLabel(from, to) {
+  if (!from || !to) return '—';
+  const start = ymd(new Date(from));
+  const end = ymd(new Date(to));
+  return start === end ? start : `${start} → ${end}`;
+}
+function syncReportRangeInputs(range) {
+  $('#from-date').value = ymd(new Date(range.from));
+  $('#to-date').value = ymd(new Date(range.to));
+}
+function updateReportRangeUi() {
+  const custom = $('#report-custom-range');
+  if (custom) custom.style.display = state.rangePreset === 'custom' ? 'flex' : 'none';
+  $$('.range-preset-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.rangePreset === state.rangePreset));
+  const range = rangeFromInputs();
+  const label = range ? reportRangeLabel(range.from, range.to) : '—';
+  const rangeLabel = $('#report-range-label');
+  const listLabel = $('#list-range-label');
+  if (rangeLabel) rangeLabel.textContent = label;
+  if (listLabel) listLabel.textContent = label;
+}
+function applyReportRangePreset(preset, shouldLoad = true) {
+  state.rangePreset = preset;
+  const range = reportRangeForPreset(preset);
+  if (range) syncReportRangeInputs(range);
+  updateReportRangeUi();
+  if (shouldLoad && range) loadList();
+}
+function onCustomReportRangeChange() {
+  state.rangePreset = 'custom';
+  updateReportRangeUi();
+  loadList();
 }
 function showToast(msg, type='success') {
   const toast = $('#toast');
@@ -1936,6 +2017,7 @@ function renderSessionDetailHtml(sessionData, eventsData) {
 async function loadList() {
   const range = rangeFromInputs(); if (!range) return showError(t('error.invalid_date_range'));
   state.from = range.from; state.to = range.to; state.selectedUid = null;
+  updateReportRangeUi();
   showLoading();
 
   // 周环比：上一个等长周期（往前推一个 range 长度）
@@ -2672,9 +2754,10 @@ function init() {
   } catch (e) {}
   document.documentElement.setAttribute('lang', state.lang);
 
+  const reportDefault = defaultReportRange();
+  syncReportRangeInputs({ from: reportDefault.from.getTime(), to: reportDefault.to.getTime() });
+  updateReportRangeUi();
   const { from, to } = defaultRange();
-  $('#from-date').value = ymd(from);
-  $('#to-date').value = ymd(to);
   $('#site-from-date').value = ymd(from);
   $('#site-to-date').value = ymd(to);
 
@@ -2703,8 +2786,9 @@ function init() {
   $('#refresh-btn').addEventListener('click', loadList);
   $('#export-btn').addEventListener('click', exportCsv);
   $('#back-btn').addEventListener('click', () => { state.selectedUid = null; loadList(); });
-  $('#from-date').addEventListener('change', loadList);
-  $('#to-date').addEventListener('change', loadList);
+  $$('.range-preset-btn').forEach(btn => btn.addEventListener('click', () => applyReportRangePreset(btn.dataset.rangePreset)));
+  $('#from-date').addEventListener('change', onCustomReportRangeChange);
+  $('#to-date').addEventListener('change', onCustomReportRangeChange);
 
   // Site report tab
   $('#site-refresh-btn').addEventListener('click', loadSiteList);
