@@ -10,7 +10,7 @@
 
   var ANALYTICS_URL = 'https://exposure-analytics.li2335100593.workers.dev/api/exposure';
   var HEARTBEAT_INTERVAL_SEC = 30;
-  var SDK_VERSION = '3.1.1-precise-dwell';
+  var SDK_VERSION = '3.1.2-session-timer';
 
   // ===== 内置配置（直接注入模式用）=====
   // 如果 URL hash 里没有配置，就使用这里的默认值
@@ -328,6 +328,7 @@
         iv: iv,
         cy: cy,
         cu: cu,
+        st: parseInt(p.get('_st'), 10) || null,
         sid: p.get('_sid') || createSid(),
         uid: p.get('_u') || null,
         urls: urls
@@ -389,6 +390,7 @@
     iv: base.iv,
     cy: base.cy,
     cu: base.cu,
+    st: base.st || null,
     sid: base.sid,
     uid: base.uid,
     urls: base.urls
@@ -404,6 +406,7 @@
     p.set('_iv', String(st.iv));
     p.set('_cy', String(st.cy));
     p.set('_cu', st.cu);
+    if (st.st) p.set('_st', String(st.st));
     p.set('_sid', st.sid);
     if (st.uid) p.set('_u', st.uid);
     targetUrl.hash = p.toString();
@@ -462,6 +465,9 @@
   var intervalSec = state.iv;
   var pageStartTime = now();
   var tickTimer = null;
+  if (!state.st || isNaN(state.st) || state.st > pageStartTime + 60 * 1000) {
+    state.st = pageStartTime;
+  }
   // Credit work only after the operator has actually stayed for a full
   // heartbeat interval. Sending at pageStartTime would make each rotation
   // count an extra 30 seconds.
@@ -474,6 +480,10 @@
 
   function elapsed() {
     return Math.floor((now() - pageStartTime) / 1000);
+  }
+
+  function sessionElapsed() {
+    return Math.max(0, Math.floor((now() - state.st) / 1000));
   }
 
   function slotRemainingMs() {
@@ -501,8 +511,7 @@
   }
 
   function tick() {
-    var e = elapsed();
-    updateUI(e);
+    updateUI();
     flushQueue(false);
     sendDueHeartbeats();
     if (now() >= pageSlotEndMs) {
@@ -646,26 +655,139 @@
 
   // ===== UI =====
   var barEl = null;
-  var textEl = null;
+  var timerCardEl = null;
+  var timerElapsedEl = null;
+  var timerSlotEl = null;
+  var timerSyncEl = null;
+  var timerUidEl = null;
+  var timerMiniBarEl = null;
+  var timerMiniTrackEl = null;
+  var timerStatusRowEl = null;
+
+  function pad2(n) {
+    return n < 10 ? '0' + n : String(n);
+  }
+
+  function formatDuration(totalSec) {
+    var h = Math.floor(totalSec / 3600);
+    var m = Math.floor((totalSec % 3600) / 60);
+    var s = totalSec % 60;
+    if (h > 0) return h + ':' + pad2(m) + ':' + pad2(s);
+    return pad2(m) + ':' + pad2(s);
+  }
 
   function initUI() {
     var container = document.createElement('div');
-    container.style.cssText = 'position:fixed;left:0;bottom:0;width:100%;z-index:2147483647;pointer-events:none;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;';
+    container.style.cssText = 'position:fixed;left:0;bottom:0;width:100%;z-index:2147483647;pointer-events:none;font-family:"Avenir Next","PingFang SC","Microsoft YaHei",sans-serif;';
 
     barEl = document.createElement('div');
-    barEl.style.cssText = 'height:4px;width:0%;background:#35a3ff;transition:width 0.25s linear;';
+    barEl.style.cssText = 'height:4px;width:0%;background:linear-gradient(90deg,#16f2b3,#35a3ff,#8b5cf6);box-shadow:0 -6px 22px rgba(53,163,255,.35);transition:width 0.25s linear;';
 
-    textEl = document.createElement('div');
-    textEl.style.cssText = 'position:fixed;right:10px;bottom:8px;padding:2px 8px;font-size:12px;color:#fff;background:rgba(0,0,0,0.55);border-radius:10px;';
-    textEl.textContent = '...';
+    timerCardEl = document.createElement('div');
+    timerCardEl.setAttribute('aria-live', 'polite');
+    timerCardEl.style.cssText = [
+      'position:fixed',
+      'top:max(14px,env(safe-area-inset-top))',
+      'right:max(14px,env(safe-area-inset-right))',
+      'z-index:2147483647',
+      'width:218px',
+      'box-sizing:border-box',
+      'padding:12px 14px 11px',
+      'border-radius:20px',
+      'pointer-events:none',
+      'color:#f8fafc',
+      'font-family:"Avenir Next","PingFang SC","Microsoft YaHei",sans-serif',
+      'background:linear-gradient(145deg,rgba(7,18,35,.94),rgba(18,43,84,.90))',
+      'border:1px solid rgba(255,255,255,.20)',
+      'box-shadow:0 18px 45px rgba(8,20,42,.38),inset 0 1px 0 rgba(255,255,255,.24)',
+      'backdrop-filter:blur(18px) saturate(1.2)',
+      '-webkit-backdrop-filter:blur(18px) saturate(1.2)'
+    ].join(';') + ';';
+
+    timerStatusRowEl = document.createElement('div');
+    timerStatusRowEl.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:5px;';
+
+    var statusLeft = document.createElement('div');
+    statusLeft.style.cssText = 'display:flex;align-items:center;gap:7px;min-width:0;';
+
+    var dot = document.createElement('span');
+    dot.style.cssText = 'display:inline-block;width:8px;height:8px;border-radius:999px;background:#16f2b3;box-shadow:0 0 0 5px rgba(22,242,179,.14),0 0 18px rgba(22,242,179,.75);';
+
+    var statusLabel = document.createElement('span');
+    statusLabel.textContent = '记录中';
+    statusLabel.style.cssText = 'font-size:12px;font-weight:800;letter-spacing:.08em;color:#dffcf4;';
+
+    timerUidEl = document.createElement('div');
+    timerUidEl.style.cssText = 'max-width:96px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;font-weight:700;color:rgba(226,240,255,.72);';
+    timerUidEl.textContent = state.uid || '未设 UID';
+    if (state.uid) timerUidEl.title = state.uid;
+
+    statusLeft.appendChild(dot);
+    statusLeft.appendChild(statusLabel);
+    timerStatusRowEl.appendChild(statusLeft);
+    timerStatusRowEl.appendChild(timerUidEl);
+
+    timerElapsedEl = document.createElement('div');
+    timerElapsedEl.style.cssText = 'font-size:28px;line-height:1.05;font-weight:900;letter-spacing:.02em;font-variant-numeric:tabular-nums;color:#ffffff;text-shadow:0 6px 24px rgba(0,0,0,.28);';
+    timerElapsedEl.textContent = '00:00';
+
+    timerSlotEl = document.createElement('div');
+    timerSlotEl.style.cssText = 'margin-top:7px;font-size:12px;line-height:1.35;color:rgba(226,240,255,.82);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;';
+
+    timerMiniTrackEl = document.createElement('div');
+    timerMiniTrackEl.style.cssText = 'height:6px;margin-top:9px;border-radius:999px;background:rgba(226,240,255,.16);overflow:hidden;';
+    timerMiniBarEl = document.createElement('div');
+    timerMiniBarEl.style.cssText = 'height:100%;width:0%;border-radius:999px;background:linear-gradient(90deg,#16f2b3,#35a3ff);box-shadow:0 0 18px rgba(53,163,255,.48);transition:width .25s linear;';
+    timerMiniTrackEl.appendChild(timerMiniBarEl);
+
+    timerSyncEl = document.createElement('div');
+    timerSyncEl.style.cssText = 'margin-top:8px;font-size:11px;line-height:1.25;color:rgba(226,240,255,.66);font-variant-numeric:tabular-nums;';
+
+    timerCardEl.appendChild(timerStatusRowEl);
+    timerCardEl.appendChild(timerElapsedEl);
+    timerCardEl.appendChild(timerSlotEl);
+    timerCardEl.appendChild(timerMiniTrackEl);
+    timerCardEl.appendChild(timerSyncEl);
 
     container.appendChild(barEl);
     document.body.appendChild(container);
-    document.body.appendChild(textEl);
+    document.body.appendChild(timerCardEl);
+    applyTimerLayout();
+    try { window.addEventListener('resize', applyTimerLayout); } catch (e) {}
+    try { window.addEventListener('orientationchange', applyTimerLayout); } catch (e) {}
   }
 
-  function updateUI(elapsedSec) {
-    if (!barEl || !textEl) return;
+  function applyTimerLayout() {
+    if (!timerCardEl || !timerElapsedEl || !timerSlotEl || !timerSyncEl || !timerUidEl || !timerMiniBarEl || !timerMiniTrackEl || !timerStatusRowEl) return;
+    var vw = 999;
+    try { vw = window.innerWidth || document.documentElement.clientWidth || 999; } catch (e) {}
+    var compact = vw <= 520;
+
+    timerCardEl.style.width = compact ? '138px' : '218px';
+    timerCardEl.style.padding = compact ? '7px 9px 8px' : '12px 14px 11px';
+    timerCardEl.style.borderRadius = compact ? '15px' : '20px';
+    timerCardEl.style.top = compact ? 'max(8px,env(safe-area-inset-top))' : 'max(14px,env(safe-area-inset-top))';
+    timerCardEl.style.right = compact ? 'max(8px,env(safe-area-inset-right))' : 'max(14px,env(safe-area-inset-right))';
+    timerCardEl.style.boxShadow = compact
+      ? '0 12px 30px rgba(8,20,42,.34),inset 0 1px 0 rgba(255,255,255,.22)'
+      : '0 18px 45px rgba(8,20,42,.38),inset 0 1px 0 rgba(255,255,255,.24)';
+    timerStatusRowEl.style.marginBottom = compact ? '2px' : '5px';
+    timerElapsedEl.style.fontSize = compact ? '20px' : '28px';
+    timerElapsedEl.style.lineHeight = compact ? '1' : '1.05';
+    timerUidEl.style.display = compact ? 'none' : 'block';
+    timerUidEl.style.maxWidth = compact ? '0' : '96px';
+    timerUidEl.style.fontSize = compact ? '10px' : '11px';
+    timerSlotEl.style.marginTop = compact ? '3px' : '7px';
+    timerSlotEl.style.fontSize = compact ? '10px' : '12px';
+    timerSyncEl.style.marginTop = compact ? '6px' : '8px';
+    timerSyncEl.style.fontSize = compact ? '10px' : '11px';
+    timerSyncEl.style.display = compact ? 'none' : 'block';
+    timerMiniTrackEl.style.height = compact ? '4px' : '6px';
+    timerMiniTrackEl.style.marginTop = compact ? '6px' : '9px';
+  }
+
+  function updateUI() {
+    if (!barEl || !timerElapsedEl || !timerSlotEl || !timerSyncEl || !timerMiniBarEl) return;
     // Progress bar tracks countdown to slot end, not per-page elapsed —
     // ensures the bar reaches 100% exactly when navigation fires.
     var totalMs = intervalSec * 1000;
@@ -674,14 +796,17 @@
     if (pct < 0) pct = 0;
     if (pct > 100) pct = 100;
     barEl.style.width = pct + '%';
+    timerMiniBarEl.style.width = pct + '%';
     var rem = Math.ceil(remMs / 1000);
-    var min = Math.floor(rem / 60);
-    var sec = rem % 60;
-    var timeStr = min + ':' + (sec < 10 ? '0' : '') + sec;
+    var timeStr = formatDuration(rem);
     var pageLabel = (state.ci + 1) + '/' + state.urls.length;
-    var uidLabel = state.uid ? ' [' + state.uid + ']' : '';
-    var ctAgeSec = Math.floor((now() - state.ct) / 1000);
-    textEl.textContent = pageLabel + ' — ' + timeStr + uidLabel + ' | d:' + ctAgeSec + 's';
+    var syncIn = Math.max(0, Math.ceil((nextHeartbeatAt - now()) / 1000));
+    var qLen = queueLength();
+    timerElapsedEl.textContent = formatDuration(sessionElapsed());
+    timerSlotEl.textContent = '站点 ' + pageLabel + ' · 本页剩 ' + timeStr;
+    timerSyncEl.textContent = (qLen > 0)
+      ? ('离线队列 ' + qLen + ' 条 · 网络恢复自动补传')
+      : ('报表同步中 · 下次约 ' + syncIn + 's');
   }
 
   // ===== Boot =====

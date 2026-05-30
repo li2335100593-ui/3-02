@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 
 const source = fs.readFileSync(new URL('../carousel.js', import.meta.url), 'utf8');
+const HARNESS_START = Date.parse('2026-05-28T00:00:00.000Z');
 
 function b64(str) {
   return Buffer.from(str, 'utf8').toString('base64');
@@ -72,7 +73,7 @@ function makeHarness({
   fetchFailures = 0,
   sendBeacon = true,
 }) {
-  const start = Date.parse('2026-05-28T00:00:00.000Z');
+  const start = HARNESS_START;
   let currentTime = start;
   let nextTimerId = 1;
   let fetchAttempts = 0;
@@ -259,9 +260,13 @@ const results = [];
     urls: ['https://one.example/', 'https://two.example/'],
     sendBeacon: false,
   });
+  const bootParams = new URLSearchParams(new URL(h.href).hash.substring(1));
+  assert.equal(bootParams.get('_st'), String(HARNESS_START), 'session timer should be stamped on first SDK boot');
   await h.runFor(5 * 60 + 2);
   assert.equal(h.byType.page_leave, 1, 'cross-document rotation should send one page_leave');
   assert.equal(h.navigations.length, 1, 'cross-document rotation should assign location.href');
+  const nextParams = new URLSearchParams(new URL(h.navigations[0]).hash.substring(1));
+  assert.equal(nextParams.get('_st'), String(HARNESS_START), 'session timer should survive cross-document rotation');
   assert.equal(h.activeIntervals, 0, 'cross-document rotation should stop old document timer');
   results.push(['cross_document_rotation', h.byType]);
 }
