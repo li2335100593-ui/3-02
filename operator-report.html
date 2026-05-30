@@ -1026,6 +1026,9 @@ const I18N = {
     'report.diagnostic_short': '诊断',
     'report.hidden_diagnostics': '已隐藏 {n} 条诊断数据',
     'report.no_hidden_diagnostics': '无诊断数据被隐藏',
+    'report.diagnostic_fallback_badge': '当前仅有诊断数据',
+    'report.diagnostic_fallback_hint': '今天暂无真实播放员记录，已临时显示诊断/压测数据并打标，避免误以为没有记录。',
+    'report.showing_diagnostics': '正在显示 {n} 条诊断数据',
     // Stat cards
     'stat.total_hours': '总工时',
     'stat.active_operators': '活跃播放员',
@@ -1321,6 +1324,9 @@ const I18N = {
     'report.diagnostic_short': '診斷',
     'report.hidden_diagnostics': '已隱藏 {n} 筆診斷資料',
     'report.no_hidden_diagnostics': '無診斷資料被隱藏',
+    'report.diagnostic_fallback_badge': '目前僅有診斷資料',
+    'report.diagnostic_fallback_hint': '今天暫無真實播放員紀錄，已臨時顯示診斷/壓測資料並打標，避免誤以為沒有紀錄。',
+    'report.showing_diagnostics': '正在顯示 {n} 筆診斷資料',
     'stat.total_hours': '總工時',
     'stat.active_operators': '活躍播放員',
     'stat.total_sessions': '總會話',
@@ -1714,20 +1720,25 @@ function recomputeTotalsFromOperators(data, operators) {
 function filterReportPayload(data) {
   if (!data || !Array.isArray(data.operators)) return data;
   const { production, diagnostics } = splitDiagnosticOperators(data.operators);
-  const operators = state.showDiagnostics ? data.operators : production;
+  const useDiagnosticFallback = !state.showDiagnostics && production.length === 0 && diagnostics.length > 0;
+  const operators = state.showDiagnostics ? data.operators : (useDiagnosticFallback ? diagnostics : production);
   return {
     ...data,
     operators,
     totals: recomputeTotalsFromOperators(data, operators),
     _diagnosticCount: diagnostics.length,
+    _diagnosticFallback: useDiagnosticFallback,
   };
 }
 
 function filterHealthPayload(health) {
   const safe = health || { players: [], alerts: [], totals: {} };
   if (state.showDiagnostics || !Array.isArray(safe.players)) return safe;
-  const players = safe.players.filter((p) => !isDiagnosticUid(p.uid));
-  const alerts = (safe.alerts || []).filter((a) => !isDiagnosticUid(a.uid));
+  const productionPlayers = safe.players.filter((p) => !isDiagnosticUid(p.uid));
+  const diagnosticPlayers = safe.players.filter((p) => isDiagnosticUid(p.uid));
+  const useDiagnosticFallback = productionPlayers.length === 0 && diagnosticPlayers.length > 0;
+  const players = useDiagnosticFallback ? diagnosticPlayers : productionPlayers;
+  const alerts = (safe.alerts || []).filter((a) => useDiagnosticFallback ? isDiagnosticUid(a.uid) : !isDiagnosticUid(a.uid));
   const totals = {
     ...(safe.totals || {}),
     players: players.length,
@@ -1736,10 +1747,10 @@ function filterHealthPayload(health) {
     offline: players.filter((p) => p.health === 'offline').length,
     open_alerts: alerts.length,
   };
-  return { ...safe, players, alerts, totals, _diagnosticCount: safe.players.length - players.length };
+  return { ...safe, players, alerts, totals, _diagnosticCount: diagnosticPlayers.length, _diagnosticFallback: useDiagnosticFallback };
 }
 
-function updateDataModeSummary(count = state.hiddenDiagnosticCount) {
+function updateDataModeSummary(count = state.hiddenDiagnosticCount, diagnosticFallback = false) {
   state.hiddenDiagnosticCount = Number(count || 0);
   const title = $('#data-mode-title');
   const badge = $('#data-mode-badge');
@@ -1747,14 +1758,20 @@ function updateDataModeSummary(count = state.hiddenDiagnosticCount) {
   const countEl = $('#diagnostic-count');
   if (!title || !badge || !hint || !countEl) return;
   title.textContent = state.showDiagnostics ? t('report.diagnostic_mode_title') : t('report.data_mode_title');
-  badge.textContent = state.showDiagnostics ? t('report.diagnostic_mode_badge') : t('report.clean_mode_badge');
-  hint.textContent = state.showDiagnostics ? t('report.diagnostic_mode_hint') : t('report.clean_mode_hint');
-  badge.className = state.showDiagnostics
+  badge.textContent = state.showDiagnostics
+    ? t('report.diagnostic_mode_badge')
+    : (diagnosticFallback ? t('report.diagnostic_fallback_badge') : t('report.clean_mode_badge'));
+  hint.textContent = state.showDiagnostics
+    ? t('report.diagnostic_mode_hint')
+    : (diagnosticFallback ? t('report.diagnostic_fallback_hint') : t('report.clean_mode_hint'));
+  badge.className = state.showDiagnostics || diagnosticFallback
     ? 'inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700 border border-amber-100'
     : 'inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700 border border-emerald-100';
   countEl.textContent = state.showDiagnostics
     ? t('report.diagnostic_mode_badge')
-    : (state.hiddenDiagnosticCount > 0 ? t('report.hidden_diagnostics', { n: state.hiddenDiagnosticCount }) : t('report.no_hidden_diagnostics'));
+    : (diagnosticFallback
+      ? t('report.showing_diagnostics', { n: state.hiddenDiagnosticCount })
+      : (state.hiddenDiagnosticCount > 0 ? t('report.hidden_diagnostics', { n: state.hiddenDiagnosticCount }) : t('report.no_hidden_diagnostics')));
 }
 
 function reportQueryMode() {
@@ -2066,7 +2083,7 @@ function renderOperatorList(data) {
   const ops = data.operators || [];
   const hiddenDiagnostics = Number(data._diagnosticCount || 0);
   const healthMap = healthByUid();
-  $('#list-count').textContent = `${ops.length} ${t('op.list_count')}${(!state.showDiagnostics && hiddenDiagnostics) ? ` · ${t('report.hidden_diagnostics', { n: hiddenDiagnostics })}` : ''}`;
+  $('#list-count').textContent = `${ops.length} ${t('op.list_count')}${(!state.showDiagnostics && hiddenDiagnostics && !data._diagnosticFallback) ? ` · ${t('report.hidden_diagnostics', { n: hiddenDiagnostics })}` : ''}${data._diagnosticFallback ? ` · ${t('report.showing_diagnostics', { n: hiddenDiagnostics })}` : ''}`;
   if (ops.length === 0) {
     $('#list-view').classList.add('hidden');
     $('#empty-state').classList.remove('hidden');
@@ -2089,7 +2106,7 @@ function renderOperatorList(data) {
     const warning = health && health.health === 'warning';
     const offline = health && health.health === 'offline';
     const tone = healthTone(health ? health.health : (online ? 'online' : 'offline'));
-    const diagnosticBadge = state.showDiagnostics && isDiagnosticUid(op.uid)
+    const diagnosticBadge = (state.showDiagnostics || data._diagnosticFallback) && isDiagnosticUid(op.uid)
       ? `<span class="text-[10px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-100 font-medium">${t('report.diagnostic_short')}</span>`
       : '';
     return `
@@ -2402,7 +2419,8 @@ async function loadList() {
       todayView?._diagnosticCount || 0,
       healthView?._diagnosticCount || 0
     );
-    updateDataModeSummary(diagnosticCount);
+    const diagnosticFallback = Boolean(currView?._diagnosticFallback || todayView?._diagnosticFallback || healthView?._diagnosticFallback);
+    updateDataModeSummary(diagnosticCount, diagnosticFallback);
     renderHealthPanel(healthView);
 
     $('#detail-view').classList.add('hidden');
@@ -3004,7 +3022,10 @@ async function refreshTodaySnapshot() {
       if (opsList) state.cachedOperators = opsList.operators || [];
       const todayView = filterReportPayload(today);
       const healthView = filterHealthPayload(health || state.cachedHealth);
-      updateDataModeSummary(Math.max(state.hiddenDiagnosticCount || 0, todayView?._diagnosticCount || 0, healthView?._diagnosticCount || 0));
+      updateDataModeSummary(
+        Math.max(state.hiddenDiagnosticCount || 0, todayView?._diagnosticCount || 0, healthView?._diagnosticCount || 0),
+        Boolean(todayView?._diagnosticFallback || healthView?._diagnosticFallback)
+      );
       if (health) renderHealthPanel(healthView);
       renderTodaySnapshot(todayView);
       lucide.createIcons();
