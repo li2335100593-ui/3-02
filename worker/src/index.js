@@ -839,16 +839,18 @@ function checkInternalToken(req, env) {
 }
 
 // ===== Operator-centric report =====
-// Heartbeats fire every HEARTBEAT_INTERVAL_SEC (30s) on each tracked page.
-// Working time is derived from event timing, not raw heartbeat count:
-// each heartbeat credits the elapsed time since the previous event, capped at
-// 30s. This removes first-heartbeat overcount, duplicate/replayed heartbeat
-// inflation, and long offline gaps while remaining conservative for payroll.
+// Heartbeats fire every 30s, but business work time is "continuous duty":
+// as long as a player keeps the carousel open and events continue arriving,
+// hidden/background tabs still count. Only gaps larger than 5 minutes are
+// treated as disconnected time, so browser timer throttling does not undercount.
 const HEARTBEAT_INTERVAL_SEC = 30;
-const DWELL_LOOKBACK_MS = HEARTBEAT_INTERVAL_SEC * 1000;
+const DUTY_GAP_GRACE_SEC = 5 * 60;
+const DWELL_LOOKBACK_MS = DUTY_GAP_GRACE_SEC * 1000;
 const DWELL_CREDIT_SQL = `CASE
-  WHEN event_type = 'heartbeat' AND prev_event_at IS NOT NULL
-  THEN MAX(0, MIN(${HEARTBEAT_INTERVAL_SEC}, (event_at - prev_event_at) / 1000.0))
+  WHEN prev_event_at IS NOT NULL
+    AND (event_at - prev_event_at) >= 0
+    AND (event_at - prev_event_at) <= ${DUTY_GAP_GRACE_SEC * 1000}
+  THEN (event_at - prev_event_at) / 1000.0
   ELSE 0
 END`;
 
@@ -1124,8 +1126,8 @@ async function handleSessionEvents(req, env, headers) {
       block.heartbeat_count += 1;
       block.last_heartbeat_at = ev.received_at;
       if (prevEventAt != null) {
-        const delta = Math.max(0, Math.min(HEARTBEAT_INTERVAL_SEC, (ev.event_at - prevEventAt) / 1000));
-        block.dwell_seconds += Math.round(delta);
+        const delta = Math.max(0, (ev.event_at - prevEventAt) / 1000);
+        if (delta <= DUTY_GAP_GRACE_SEC) block.dwell_seconds += Math.round(delta);
       }
     } else if (ev.event_type === 'page_leave' && block && ev.url === block.url) {
       block.ended_at = ev.received_at;
