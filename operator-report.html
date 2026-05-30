@@ -214,6 +214,30 @@
       </div>
     </div>
 
+    <div id="data-mode-panel" class="mb-6 rounded-2xl border border-slate-200 bg-white shadow-card overflow-hidden">
+      <div class="px-5 py-4 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+        <div class="flex items-start gap-3">
+          <div class="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-700 grid place-items-center border border-emerald-100">
+            <i data-lucide="shield-check" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <div class="flex flex-wrap items-center gap-2">
+              <h3 id="data-mode-title" class="text-sm font-semibold text-slate-900" data-i18n="report.data_mode_title">生产视图</h3>
+              <span id="data-mode-badge" class="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700 border border-emerald-100" data-i18n="report.clean_mode_badge">已隐藏诊断数据</span>
+            </div>
+            <p id="data-mode-hint" class="text-xs text-slate-500 mt-1" data-i18n="report.clean_mode_hint">默认只看真实播放员。SOAK、MANUAL、TEST 等测试 UID 不参与汇总，避免污染客户视图。</p>
+          </div>
+        </div>
+        <div class="flex flex-wrap items-center gap-3">
+          <span id="diagnostic-count" class="text-xs text-slate-500">—</span>
+          <label class="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-medium text-slate-700 cursor-pointer select-none">
+            <input id="diagnostic-toggle" type="checkbox" class="w-4 h-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500">
+            <span data-i18n="report.show_diagnostics">显示诊断数据</span>
+          </label>
+        </div>
+      </div>
+    </div>
+
     <!-- 今日快照 -->
     <div class="mb-6">
       <div class="flex items-center justify-between mb-3">
@@ -386,7 +410,7 @@
         <i data-lucide="inbox" class="w-6 h-6 text-slate-400"></i>
       </div>
       <h3 class="text-sm font-semibold text-slate-900" data-i18n="empty.no_range_data">所选时段无数据</h3>
-      <p class="text-xs text-slate-500 mt-1" data-i18n="empty.no_range_data_hint">尝试扩大日期范围，或检查播放员是否开始工作。</p>
+      <p id="empty-state-hint" class="text-xs text-slate-500 mt-1" data-i18n="empty.no_range_data_hint">尝试扩大日期范围，或检查播放员是否开始工作。</p>
     </div>
 
   </div>
@@ -915,6 +939,8 @@ const state = {
   cachedHealth: null,
   cachedMonitorTargets: [],
   cachedAlerts: [],
+  showDiagnostics: false,
+  hiddenDiagnosticCount: 0,
   payrollRate: 50,
   payrollCurrency: 'CNY', // 'CNY' | 'USD' | 'TWD'
   siteFrom: null,
@@ -928,6 +954,7 @@ const state = {
 
 const PREF_LANG_KEY = 'carousel_pref_lang';
 const PREF_CURRENCY_KEY = 'carousel_pref_currency';
+const PREF_DIAGNOSTICS_KEY = 'carousel_show_diagnostics';
 
 // ===== Currency =====
 const CURRENCY_SYMBOLS = { CNY: '¥', USD: '$', TWD: 'NT$' };
@@ -989,6 +1016,16 @@ const I18N = {
     'report.export_csv': '导出 CSV',
     'report.online_now': '人在线',
     'report.no_one_online': '当前无人在线',
+    'report.data_mode_title': '生产视图',
+    'report.clean_mode_badge': '已隐藏诊断数据',
+    'report.clean_mode_hint': '默认只看真实播放员。SOAK、MANUAL、TEST 等测试 UID 不参与汇总，避免污染客户视图。',
+    'report.diagnostic_mode_title': '诊断视图',
+    'report.diagnostic_mode_badge': '含测试数据',
+    'report.diagnostic_mode_hint': '正在显示 SOAK、MANUAL、TEST 等测试 UID，仅用于排查，不建议截图给客户。',
+    'report.show_diagnostics': '显示诊断数据',
+    'report.diagnostic_short': '诊断',
+    'report.hidden_diagnostics': '已隐藏 {n} 条诊断数据',
+    'report.no_hidden_diagnostics': '无诊断数据被隐藏',
     // Stat cards
     'stat.total_hours': '总工时',
     'stat.active_operators': '活跃播放员',
@@ -1059,8 +1096,11 @@ const I18N = {
     // Empty / error
     'empty.no_range_data': '所选时段无数据',
     'empty.no_range_data_hint': '尝试扩大日期范围，或检查播放员是否开始工作。',
+    'empty.only_diagnostics_hidden': '生产视图下暂无真实播放员；已隐藏 {n} 条诊断数据。需要排查时可打开“显示诊断数据”。',
     'error.load_failed': '加载失败',
     'error.invalid_date_range': '日期范围无效',
+    'error.api_unreachable': '无法连接后台 API。请检查网络、代理或浏览器扩展后重试。',
+    'error.invalid_credentials': '账号或密码不正确',
     // Site report
     'site_report.title': '站点维度报表',
     'site_report.subtitle': '从客户网站角度看曝光、播放员分布、设备情况',
@@ -1271,6 +1311,16 @@ const I18N = {
     'report.export_csv': '匯出 CSV',
     'report.online_now': '人在線',
     'report.no_one_online': '目前無人在線',
+    'report.data_mode_title': '生產視圖',
+    'report.clean_mode_badge': '已隱藏診斷資料',
+    'report.clean_mode_hint': '預設只看真實播放員。SOAK、MANUAL、TEST 等測試 UID 不參與彙總，避免污染客戶視圖。',
+    'report.diagnostic_mode_title': '診斷視圖',
+    'report.diagnostic_mode_badge': '含測試資料',
+    'report.diagnostic_mode_hint': '正在顯示 SOAK、MANUAL、TEST 等測試 UID，僅用於排查，不建議截圖給客戶。',
+    'report.show_diagnostics': '顯示診斷資料',
+    'report.diagnostic_short': '診斷',
+    'report.hidden_diagnostics': '已隱藏 {n} 筆診斷資料',
+    'report.no_hidden_diagnostics': '無診斷資料被隱藏',
     'stat.total_hours': '總工時',
     'stat.active_operators': '活躍播放員',
     'stat.total_sessions': '總會話',
@@ -1337,8 +1387,11 @@ const I18N = {
     'detail.events_total': '共 {n} 個原始事件 · session id',
     'empty.no_range_data': '所選時段無資料',
     'empty.no_range_data_hint': '嘗試擴大日期範圍，或檢查播放員是否開始工作。',
+    'empty.only_diagnostics_hidden': '生產視圖下暫無真實播放員；已隱藏 {n} 筆診斷資料。需要排查時可開啟「顯示診斷資料」。',
     'error.load_failed': '載入失敗',
     'error.invalid_date_range': '日期範圍無效',
+    'error.api_unreachable': '無法連接後台 API。請檢查網路、代理或瀏覽器擴充套件後重試。',
+    'error.invalid_credentials': '帳號或密碼不正確',
     'site_report.title': '站點維度報表',
     'site_report.subtitle': '從客戶網站角度看曝光、播放員分佈、裝置情況',
     'site_report.list_title': '網站列表',
@@ -1525,6 +1578,7 @@ function setLang(lang) {
   try { localStorage.setItem(PREF_LANG_KEY, lang); } catch (e) {}
   applyI18n();
   updateReportRangeUi();
+  updateDataModeSummary();
   // Re-render dynamic content for the new language
   if (state.user) {
     onLoggedIn(); // re-renders user menu + reloads current tab
@@ -1631,6 +1685,82 @@ function tzLabel(tzOffset) {
 }
 function shortUid(s) { if (!s) return '—'; return s.length <= 14 ? s : s.slice(0,8)+'…'+s.slice(-4); }
 function escapeHtml(s) { if (s == null) return ''; return String(s).replace(/[&<>"']/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m])); }
+const DIAGNOSTIC_UID_PATTERNS = [/^SOAK_/i, /^MANUAL_/i, /^TEST_/i, /^DEBUG_/i, /^DEMO/i, /^EC2$/i, /^FORTEST$/i];
+
+function isDiagnosticUid(uid) {
+  const value = String(uid || '').trim();
+  return DIAGNOSTIC_UID_PATTERNS.some((pattern) => pattern.test(value));
+}
+
+function splitDiagnosticOperators(operators) {
+  const production = [];
+  const diagnostics = [];
+  (operators || []).forEach((op) => {
+    (isDiagnosticUid(op.uid) ? diagnostics : production).push(op);
+  });
+  return { production, diagnostics };
+}
+
+function recomputeTotalsFromOperators(data, operators) {
+  const totalDwell = (operators || []).reduce((acc, op) => acc + Number(op.dwell_seconds || 0), 0);
+  return {
+    ...(data && data.totals ? data.totals : {}),
+    operators: (operators || []).length,
+    dwell_seconds: totalDwell,
+    dwell_hours: Math.round((totalDwell / 3600) * 100) / 100,
+  };
+}
+
+function filterReportPayload(data) {
+  if (!data || !Array.isArray(data.operators)) return data;
+  const { production, diagnostics } = splitDiagnosticOperators(data.operators);
+  const operators = state.showDiagnostics ? data.operators : production;
+  return {
+    ...data,
+    operators,
+    totals: recomputeTotalsFromOperators(data, operators),
+    _diagnosticCount: diagnostics.length,
+  };
+}
+
+function filterHealthPayload(health) {
+  const safe = health || { players: [], alerts: [], totals: {} };
+  if (state.showDiagnostics || !Array.isArray(safe.players)) return safe;
+  const players = safe.players.filter((p) => !isDiagnosticUid(p.uid));
+  const alerts = (safe.alerts || []).filter((a) => !isDiagnosticUid(a.uid));
+  const totals = {
+    ...(safe.totals || {}),
+    players: players.length,
+    online: players.filter((p) => p.health === 'online').length,
+    warning: players.filter((p) => p.health === 'warning').length,
+    offline: players.filter((p) => p.health === 'offline').length,
+    open_alerts: alerts.length,
+  };
+  return { ...safe, players, alerts, totals, _diagnosticCount: safe.players.length - players.length };
+}
+
+function updateDataModeSummary(count = state.hiddenDiagnosticCount) {
+  state.hiddenDiagnosticCount = Number(count || 0);
+  const title = $('#data-mode-title');
+  const badge = $('#data-mode-badge');
+  const hint = $('#data-mode-hint');
+  const countEl = $('#diagnostic-count');
+  if (!title || !badge || !hint || !countEl) return;
+  title.textContent = state.showDiagnostics ? t('report.diagnostic_mode_title') : t('report.data_mode_title');
+  badge.textContent = state.showDiagnostics ? t('report.diagnostic_mode_badge') : t('report.clean_mode_badge');
+  hint.textContent = state.showDiagnostics ? t('report.diagnostic_mode_hint') : t('report.clean_mode_hint');
+  badge.className = state.showDiagnostics
+    ? 'inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700 border border-amber-100'
+    : 'inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700 border border-emerald-100';
+  countEl.textContent = state.showDiagnostics
+    ? t('report.diagnostic_mode_badge')
+    : (state.hiddenDiagnosticCount > 0 ? t('report.hidden_diagnostics', { n: state.hiddenDiagnosticCount }) : t('report.no_hidden_diagnostics'));
+}
+
+function reportQueryMode() {
+  return state.showDiagnostics ? 'include_diagnostics=1' : 'include_diagnostics=0';
+}
+
 function defaultRange() { const to = new Date(); const from = new Date(to.getTime() - 90*864e5); return { from, to }; }
 function startOfDayDate(d) { const x = new Date(d); x.setHours(0, 0, 0, 0); return x; }
 function endOfDayDate(d) { const x = new Date(d); x.setHours(23, 59, 59, 999); return x; }
@@ -1713,18 +1843,34 @@ function setToken(t) { try { localStorage.setItem(TOKEN_KEY, t); } catch (e) {} 
 function clearToken() { try { localStorage.removeItem(TOKEN_KEY); localStorage.removeItem(USER_KEY); } catch (e) {} }
 function getCachedUser() { try { return JSON.parse(localStorage.getItem(USER_KEY) || 'null'); } catch (e) { return null; } }
 
+function friendlyNetworkError(err) {
+  const msg = err && err.message ? err.message : String(err || '');
+  if (/Failed to fetch|NetworkError|Load failed|fetch failed/i.test(msg)) return t('error.api_unreachable');
+  return msg || t('error.load_failed');
+}
+
+async function fetchJson(url, options = {}) {
+  let res;
+  try {
+    res = await fetch(url, options);
+  } catch (err) {
+    throw new Error(friendlyNetworkError(err));
+  }
+  const json = await res.json().catch(() => ({ ok: false, error: `HTTP ${res.status}` }));
+  return { res, json };
+}
+
 async function api(path, options = {}) {
   const opts = { ...options };
   opts.headers = { ...(opts.headers || {}) };
   const tok = getToken();
   if (tok) opts.headers['authorization'] = `Bearer ${tok}`;
-  const res = await fetch(ANALYTICS_BASE + path, opts);
+  const { res, json } = await fetchJson(ANALYTICS_BASE + path, opts);
   if (res.status === 401) {
     clearToken();
     showLoginOverlay(t('common.session_expired'));
     throw new Error(t('common.session_expired'));
   }
-  const json = await res.json().catch(() => ({ ok: false, error: `HTTP ${res.status}` }));
   if (!json.ok) throw new Error(json.error || `HTTP ${res.status}`);
   return json;
 }
@@ -1820,7 +1966,8 @@ function renderTodaySnapshot(today) {
 
   // online now (last_seen within 5min)
   const now = Date.now();
-  const onlineOps = (state.cachedOperators || []).filter(op => op.last_seen && (now - op.last_seen) < ONLINE_THRESHOLD_MS);
+  const onlineOps = ((state.cachedHealth && state.cachedHealth.players) || [])
+    .filter(p => p.last_seen && (now - p.last_seen) < ONLINE_THRESHOLD_MS);
   $('#online-now').innerHTML = onlineOps.length > 0
     ? `<span class="inline-flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>${onlineOps.length} ${t('report.online_now')}</span>`
     : t('report.no_one_online');
@@ -1917,15 +2064,24 @@ function renderHealthPanel(health) {
 
 function renderOperatorList(data) {
   const ops = data.operators || [];
+  const hiddenDiagnostics = Number(data._diagnosticCount || 0);
   const healthMap = healthByUid();
-  $('#list-count').textContent = `${ops.length} ${t('op.list_count')}`;
+  $('#list-count').textContent = `${ops.length} ${t('op.list_count')}${(!state.showDiagnostics && hiddenDiagnostics) ? ` · ${t('report.hidden_diagnostics', { n: hiddenDiagnostics })}` : ''}`;
   if (ops.length === 0) {
     $('#list-view').classList.add('hidden');
     $('#empty-state').classList.remove('hidden');
+    const emptyHint = $('#empty-state-hint');
+    if (emptyHint) {
+      emptyHint.textContent = (!state.showDiagnostics && hiddenDiagnostics)
+        ? t('empty.only_diagnostics_hidden', { n: hiddenDiagnostics })
+        : t('empty.no_range_data_hint');
+    }
     return;
   }
   $('#empty-state').classList.add('hidden');
   $('#list-view').classList.remove('hidden');
+  const emptyHint = $('#empty-state-hint');
+  if (emptyHint) emptyHint.textContent = t('empty.no_range_data_hint');
   const now = Date.now();
   $('#operator-tbody').innerHTML = ops.map(op => {
     const health = healthMap.get(op.uid);
@@ -1933,6 +2089,9 @@ function renderOperatorList(data) {
     const warning = health && health.health === 'warning';
     const offline = health && health.health === 'offline';
     const tone = healthTone(health ? health.health : (online ? 'online' : 'offline'));
+    const diagnosticBadge = state.showDiagnostics && isDiagnosticUid(op.uid)
+      ? `<span class="text-[10px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-100 font-medium">${t('report.diagnostic_short')}</span>`
+      : '';
     return `
     <tr class="hover:bg-slate-50 cursor-pointer transition-colors" data-uid="${escapeHtml(op.uid)}">
       <td class="px-6 py-4">
@@ -1943,7 +2102,7 @@ function renderOperatorList(data) {
             ${warning || offline ? `<span class="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full ${tone.dot} border-2 border-white"></span>` : ''}
           </div>
           <div class="min-w-0">
-            <div class="font-medium text-slate-900 truncate flex items-center gap-1.5">${escapeHtml(op.uid)}${health ? `<span class="text-xs ${tone.text} font-normal">${tone.label}</span>` : (online ? '<span class="text-xs text-emerald-600 font-normal">在线</span>' : '')}</div>
+            <div class="font-medium text-slate-900 truncate flex items-center gap-1.5">${escapeHtml(op.uid)}${diagnosticBadge}${health ? `<span class="text-xs ${tone.text} font-normal">${tone.label}</span>` : (online ? `<span class="text-xs text-emerald-600 font-normal">${t('op.online')}</span>` : '')}</div>
             <div class="text-xs text-slate-500">首次 ${fmtDateTime(op.first_seen)}</div>
           </div>
         </div>
@@ -2234,12 +2393,22 @@ async function loadList() {
     ]);
 
     state.cachedOperators = opsList.operators || [];
-    renderHealthPanel(health);
+    const currView = filterReportPayload(curr);
+    const prevView = prev ? filterReportPayload(prev) : null;
+    const todayView = filterReportPayload(today);
+    const healthView = filterHealthPayload(health);
+    const diagnosticCount = Math.max(
+      currView?._diagnosticCount || 0,
+      todayView?._diagnosticCount || 0,
+      healthView?._diagnosticCount || 0
+    );
+    updateDataModeSummary(diagnosticCount);
+    renderHealthPanel(healthView);
 
     $('#detail-view').classList.add('hidden');
-    renderTopStats(curr, prev);
-    renderTodaySnapshot(today);
-    renderOperatorList(curr);
+    renderTopStats(currView, prevView);
+    renderTodaySnapshot(todayView);
+    renderOperatorList(currView);
     hideError();
     lucide.createIcons();
   } catch (err) { showError(err.message || String(err)); }
@@ -2324,12 +2493,14 @@ function showLoading() {
   `).join('');
 }
 
-function exportCsv() {
+async function exportCsv() {
   if (!state.from || !state.to) return;
-  const url = state.selectedUid
-    ? `${ANALYTICS_BASE}/api/operator-report?from=${state.from}&to=${state.to}&uid=${encodeURIComponent(state.selectedUid)}`
-    : `${ANALYTICS_BASE}/api/operator-report?from=${state.from}&to=${state.to}`;
-  fetch(url).then(r => r.json()).then(json => {
+  const path = state.selectedUid
+    ? `/api/operator-report?from=${state.from}&to=${state.to}&uid=${encodeURIComponent(state.selectedUid)}`
+    : `/api/operator-report?from=${state.from}&to=${state.to}`;
+  try {
+    const raw = await api(path);
+    const json = state.selectedUid ? raw : filterReportPayload(raw);
     if (!json.ok) return;
     let lines = [];
     if (state.selectedUid) {
@@ -2354,7 +2525,9 @@ function exportCsv() {
       ? `operator-${state.selectedUid}-${ymd(new Date(state.from))}_${ymd(new Date(state.to))}.csv`
       : `operators-${ymd(new Date(state.from))}_${ymd(new Date(state.to))}.csv`;
     link.click();
-  });
+  } catch (err) {
+    showToast(err.message || t('error.load_failed'), 'error');
+  }
 }
 
 // ===================== TAB: OPERATORS =====================
@@ -2483,7 +2656,7 @@ async function loadSiteList() {
   `).join('');
 
   try {
-    const json = await api(`/api/site-report?from=${range.from}&to=${range.to}`);
+    const json = await api(`/api/site-report?from=${range.from}&to=${range.to}&${reportQueryMode()}`);
     $('#site-detail-view').classList.add('hidden');
     renderSiteTopStats(json);
     renderSiteListTable(json.sites || []);
@@ -2551,7 +2724,7 @@ function renderSiteListTable(sites) {
 async function loadSiteDetail() {
   if (!state.selectedSiteUrl) return loadSiteList();
   try {
-    const json = await api(`/api/site-report?from=${state.siteFrom}&to=${state.siteTo}&url=${encodeURIComponent(state.selectedSiteUrl)}`);
+    const json = await api(`/api/site-report?from=${state.siteFrom}&to=${state.siteTo}&url=${encodeURIComponent(state.selectedSiteUrl)}&${reportQueryMode()}`);
     $('#site-list-view').classList.add('hidden'); $('#site-empty').classList.add('hidden');
     $('#site-detail-view').classList.remove('hidden');
     let host = json.url; try { host = new URL(json.url).hostname; } catch (e) {}
@@ -2592,16 +2765,17 @@ function renderSiteDailyChart(daily) {
 }
 
 function renderSiteOperatorTable(byOp) {
-  if (!byOp || byOp.length === 0) {
+  const rows = state.showDiagnostics ? (byOp || []) : (byOp || []).filter((o) => !isDiagnosticUid(o.uid));
+  if (!rows || rows.length === 0) {
     $('#site-operator-tbody').innerHTML = `<tr><td colspan="4" class="px-6 py-8 text-center text-xs text-slate-400">${t('detail.session_no_data')}</td></tr>`;
     return;
   }
-  $('#site-operator-tbody').innerHTML = byOp.map(o => `
+  $('#site-operator-tbody').innerHTML = rows.map(o => `
     <tr class="hover:bg-slate-50 transition-colors">
       <td class="px-6 py-3.5">
         <div class="flex items-center gap-3">
           <div class="w-8 h-8 rounded-full bg-gradient-to-br from-brand-500 to-brand-700 text-white text-xs font-semibold grid place-items-center flex-shrink-0">${escapeHtml((o.uid || '?').slice(0, 2).toUpperCase())}</div>
-          <div class="font-medium text-slate-900">${escapeHtml(o.uid)}</div>
+          <div class="font-medium text-slate-900 flex items-center gap-1.5">${escapeHtml(o.uid)}${state.showDiagnostics && isDiagnosticUid(o.uid) ? `<span class="text-[10px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-100 font-medium">${t('report.diagnostic_short')}</span>` : ''}</div>
         </div>
       </td>
       <td class="px-6 py-3.5 text-right"><div class="font-semibold">${fmtSeconds(o.dwell_seconds)}</div><div class="text-xs text-slate-500">${fmtHours(o.dwell_seconds)} h</div></td>
@@ -2722,8 +2896,7 @@ async function checkAuthAndBoot() {
   }
   // Not authed → check bootstrap status
   try {
-    const r = await fetch(ANALYTICS_BASE + '/api/auth/bootstrap');
-    const j = await r.json();
+    const { json: j } = await fetchJson(ANALYTICS_BASE + '/api/auth/bootstrap');
     setAuthMode(j.needs_bootstrap ? 'bootstrap' : 'login');
   } catch (e) {
     setAuthMode('login');
@@ -2748,12 +2921,11 @@ async function submitLogin() {
       if (password.length < 8) throw new Error(t('login.password_too_short'));
       if (password !== confirm) throw new Error(t('login.password_mismatch'));
 
-      const bootstrapRes = await fetch(ANALYTICS_BASE + '/api/auth/bootstrap', {
+      const { json: bootstrapJson } = await fetchJson(ANALYTICS_BASE + '/api/auth/bootstrap', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ username, email, password }),
       });
-      const bootstrapJson = await bootstrapRes.json();
       if (!bootstrapJson.ok) throw new Error(bootstrapJson.error || '创建失败');
 
       // Now log in immediately with the just-created credentials
@@ -2773,13 +2945,15 @@ async function submitLogin() {
 }
 
 async function doLogin(username, password) {
-  const res = await fetch(ANALYTICS_BASE + '/api/auth/login', {
+  const { json: j } = await fetchJson(ANALYTICS_BASE + '/api/auth/login', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ username, password }),
   });
-  const j = await res.json();
-  if (!j.ok) throw new Error(j.error || '登录失败');
+  if (!j.ok) {
+    if (j.error === 'invalid credentials') throw new Error(t('error.invalid_credentials'));
+    throw new Error(j.error || '登录失败');
+  }
   setToken(j.token);
   try { localStorage.setItem(USER_KEY, JSON.stringify(j.user)); } catch (e) {}
   state.user = j.user;
@@ -2828,8 +3002,11 @@ async function refreshTodaySnapshot() {
     ]);
     if (today) {
       if (opsList) state.cachedOperators = opsList.operators || [];
-      if (health) renderHealthPanel(health);
-      renderTodaySnapshot(today);
+      const todayView = filterReportPayload(today);
+      const healthView = filterHealthPayload(health || state.cachedHealth);
+      updateDataModeSummary(Math.max(state.hiddenDiagnosticCount || 0, todayView?._diagnosticCount || 0, healthView?._diagnosticCount || 0));
+      if (health) renderHealthPanel(healthView);
+      renderTodaySnapshot(todayView);
       lucide.createIcons();
     }
   } catch (e) { /* silent */ }
@@ -3079,6 +3256,7 @@ function init() {
     if (savedLang && I18N[savedLang]) state.lang = savedLang;
     const savedCurrency = localStorage.getItem(PREF_CURRENCY_KEY);
     if (savedCurrency && CURRENCY_SYMBOLS[savedCurrency]) state.payrollCurrency = savedCurrency;
+    state.showDiagnostics = localStorage.getItem(PREF_DIAGNOSTICS_KEY) === '1';
   } catch (e) {}
   document.documentElement.setAttribute('lang', state.lang);
 
@@ -3117,6 +3295,19 @@ function init() {
   $$('.range-preset-btn').forEach(btn => btn.addEventListener('click', () => applyReportRangePreset(btn.dataset.rangePreset)));
   $('#from-date').addEventListener('change', onCustomReportRangeChange);
   $('#to-date').addEventListener('change', onCustomReportRangeChange);
+  const diagnosticToggle = $('#diagnostic-toggle');
+  if (diagnosticToggle) {
+    diagnosticToggle.checked = state.showDiagnostics;
+    diagnosticToggle.addEventListener('change', () => {
+      state.showDiagnostics = diagnosticToggle.checked;
+      try { localStorage.setItem(PREF_DIAGNOSTICS_KEY, state.showDiagnostics ? '1' : '0'); } catch (e) {}
+      state.selectedUid = null;
+      updateDataModeSummary();
+      if (state.currentTab === 'site-report') loadSiteList();
+      else loadList();
+    });
+  }
+  updateDataModeSummary(0);
 
   // Site report tab
   $('#site-refresh-btn').addEventListener('click', loadSiteList);

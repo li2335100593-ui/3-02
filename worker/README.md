@@ -28,7 +28,7 @@ Use `POST /api/auth/login` to get a Bearer token first.
 
 - `GET /api/operator-report?from=<ms>&to=<ms>`
 - `GET /api/operator-detail?uid=<uid>&from=<ms>&to=<ms>`
-- `GET /api/site-report?from=<ms>&to=<ms>`
+- `GET /api/site-report?from=<ms>&to=<ms>` - production view by default: requires a non-empty playback UID and excludes diagnostic UIDs (`SOAK_`, `MANUAL_`, `TEST_`, etc.); add `include_diagnostics=1` for troubleshooting.
 - `GET /api/session-events?sid=<sid>`
 - `GET /api/player-health[?uid=<uid>]`
 - `GET /api/alerts?status=open|acknowledged|resolved|all&uid=<uid>&limit=300`

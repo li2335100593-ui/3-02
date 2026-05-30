@@ -52,6 +52,26 @@ function exposureFilterSql() {
   return "(event_type = 'page_enter' OR event_type IS NULL)";
 }
 
+const PRODUCTION_UID_SQL = `(
+  uid IS NOT NULL
+  AND uid <> ''
+  AND UPPER(uid) NOT IN ('EC2', 'FORTEST')
+  AND substr(UPPER(uid), 1, 5) <> 'SOAK_'
+  AND substr(UPPER(uid), 1, 7) <> 'MANUAL_'
+  AND substr(UPPER(uid), 1, 5) <> 'TEST_'
+  AND substr(UPPER(uid), 1, 6) <> 'DEBUG_'
+  AND substr(UPPER(uid), 1, 4) <> 'DEMO'
+)`;
+
+function includeDiagnostics(url) {
+  const value = String(url.searchParams.get("include_diagnostics") || "").toLowerCase();
+  return value === "1" || value === "true" || value === "yes";
+}
+
+function diagnosticsWhereClause(shouldInclude) {
+  return shouldInclude ? "" : ` AND ${PRODUCTION_UID_SQL}`;
+}
+
 function toInt(value, fallback) {
   const n = Number.parseInt(String(value ?? ""), 10);
   return Number.isFinite(n) ? n : fallback;
@@ -1716,12 +1736,14 @@ async function handleMonitorTargets(req, env, headers) {
 }
 
 // ===== Site-centric report (operator breakdown per URL) =====
-async function getSiteSummaries(env, from, to) {
+async function getSiteSummaries(env, from, to, options = {}) {
+  const diagnosticsClause = diagnosticsWhereClause(options.includeDiagnostics);
   const result = await env.DB.prepare(
     `WITH scoped AS (
       SELECT *, COALESCE(client_ts, received_at) AS event_at
       FROM exposure_events
       WHERE received_at >= ? AND received_at <= ?
+        ${diagnosticsClause}
     ),
     ordered AS (
       SELECT *,
@@ -1741,6 +1763,7 @@ async function getSiteSummaries(env, from, to) {
         SELECT device_type FROM exposure_events e2
         WHERE e2.url = ordered.url
           AND e2.received_at >= ? AND e2.received_at <= ?
+            ${diagnosticsClause}
           AND e2.device_type IS NOT NULL
         GROUP BY device_type
         ORDER BY COUNT(*) DESC
@@ -1767,7 +1790,8 @@ async function getSiteSummaries(env, from, to) {
   }));
 }
 
-async function getSiteOperatorBreakdown(env, from, to, siteUrl) {
+async function getSiteOperatorBreakdown(env, from, to, siteUrl, options = {}) {
+  const diagnosticsClause = diagnosticsWhereClause(options.includeDiagnostics);
   const result = await env.DB.prepare(
     `WITH scoped AS (
       SELECT *, COALESCE(client_ts, received_at) AS event_at
@@ -1775,6 +1799,7 @@ async function getSiteOperatorBreakdown(env, from, to, siteUrl) {
       WHERE received_at >= ? AND received_at <= ?
         AND url = ?
         AND uid IS NOT NULL AND uid <> ''
+        ${diagnosticsClause}
     ),
     ordered AS (
       SELECT *,
@@ -1802,13 +1827,15 @@ async function getSiteOperatorBreakdown(env, from, to, siteUrl) {
   }));
 }
 
-async function getSiteDailyDwell(env, from, to, siteUrl) {
+async function getSiteDailyDwell(env, from, to, siteUrl, options = {}) {
+  const diagnosticsClause = diagnosticsWhereClause(options.includeDiagnostics);
   const result = await env.DB.prepare(
     `WITH scoped AS (
       SELECT *, COALESCE(client_ts, received_at) AS event_at
       FROM exposure_events
       WHERE received_at >= ? AND received_at <= ?
         AND url = ?
+        ${diagnosticsClause}
     ),
     ordered AS (
       SELECT *,
@@ -1841,9 +1868,10 @@ async function handleSiteReport(req, env, headers) {
   if (range.error) return json({ ok: false, error: range.error }, 400, headers);
 
   const targetUrl = normalizeUrl(url.searchParams.get("url"));
+  const includeDiagnosticRows = includeDiagnostics(url);
 
   if (!targetUrl) {
-    const sites = await getSiteSummaries(env, range.from, range.to);
+    const sites = await getSiteSummaries(env, range.from, range.to, { includeDiagnostics: includeDiagnosticRows });
     const totalDwell = sites.reduce((acc, s) => acc + s.dwell_seconds, 0);
     return json(
       {
@@ -1862,9 +1890,9 @@ async function handleSiteReport(req, env, headers) {
   }
 
   const [summary, byOperator, daily] = await Promise.all([
-    getSiteSummaries(env, range.from, range.to).then((list) => list.find((s) => s.url === targetUrl) || null),
-    getSiteOperatorBreakdown(env, range.from, range.to, targetUrl),
-    getSiteDailyDwell(env, range.from, range.to, targetUrl),
+    getSiteSummaries(env, range.from, range.to, { includeDiagnostics: includeDiagnosticRows }).then((list) => list.find((s) => s.url === targetUrl) || null),
+    getSiteOperatorBreakdown(env, range.from, range.to, targetUrl, { includeDiagnostics: includeDiagnosticRows }),
+    getSiteDailyDwell(env, range.from, range.to, targetUrl, { includeDiagnostics: includeDiagnosticRows }),
   ]);
 
   return json(
