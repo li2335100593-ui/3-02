@@ -240,11 +240,13 @@ async function handleExposure(req, env, headers) {
   const screenW = Number.isFinite(Number(body.screen_w)) ? Number(body.screen_w) : null;
   const screenH = Number.isFinite(Number(body.screen_h)) ? Number(body.screen_h) : null;
   const tzOffset = Number.isFinite(Number(body.tz_offset)) ? Number(body.tz_offset) : null;
+  const sessionStartMs = Number.isFinite(Number(body.session_start_ms)) ? Number(body.session_start_ms) : null;
+  const sessionElapsedMs = Number.isFinite(Number(body.session_elapsed_ms)) ? Number(body.session_elapsed_ms) : null;
   const insertRes = await env.DB.prepare(
     `INSERT INTO exposure_events (
       event_type, sid, vid, uid, url, page_index, ip, ua, device_type,
-      screen_w, screen_h, tz_offset, client_ts, received_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      screen_w, screen_h, tz_offset, session_start_ms, session_elapsed_ms, client_ts, received_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   )
     .bind(
       eventType,
@@ -259,6 +261,8 @@ async function handleExposure(req, env, headers) {
       screenW,
       screenH,
       tzOffset,
+      sessionStartMs,
+      sessionElapsedMs,
       body.client_ts == null ? null : Number(body.client_ts),
       now
     )
@@ -277,6 +281,8 @@ async function handleExposure(req, env, headers) {
       screenW,
       screenH,
       tzOffset,
+      sessionStartMs,
+      sessionElapsedMs,
     });
   } catch (err) {
     console.log("player_status_update_failed", err && err.message ? err.message : String(err));
@@ -297,9 +303,10 @@ async function upsertPlayerStatus(env, body, derived) {
     `INSERT INTO player_status (
       uid, sid, current_url, page_index, last_event_type, last_seen,
       last_heartbeat_at, last_page_enter_at, queue_length, client_version,
-      visibility_state, navigation_slot, last_flush_ok, device_type,
-      screen_w, screen_h, tz_offset, ip, ua, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      visibility_state, navigation_slot, last_flush_ok, session_start_ms,
+      last_session_elapsed_ms, device_type, screen_w, screen_h, tz_offset,
+      ip, ua, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(uid) DO UPDATE SET
       sid = COALESCE(excluded.sid, player_status.sid),
       current_url = COALESCE(excluded.current_url, player_status.current_url),
@@ -313,6 +320,8 @@ async function upsertPlayerStatus(env, body, derived) {
       visibility_state = COALESCE(excluded.visibility_state, player_status.visibility_state),
       navigation_slot = COALESCE(excluded.navigation_slot, player_status.navigation_slot),
       last_flush_ok = COALESCE(excluded.last_flush_ok, player_status.last_flush_ok),
+      session_start_ms = COALESCE(excluded.session_start_ms, player_status.session_start_ms),
+      last_session_elapsed_ms = COALESCE(excluded.last_session_elapsed_ms, player_status.last_session_elapsed_ms),
       device_type = COALESCE(excluded.device_type, player_status.device_type),
       screen_w = COALESCE(excluded.screen_w, player_status.screen_w),
       screen_h = COALESCE(excluded.screen_h, player_status.screen_h),
@@ -335,6 +344,8 @@ async function upsertPlayerStatus(env, body, derived) {
       nullableString(body.visibility_state, 40),
       nullableNumber(body.navigation_slot),
       nullableBooleanInt(body.last_flush_ok),
+      derived.sessionStartMs,
+      derived.sessionElapsedMs,
       derived.deviceType,
       derived.screenW,
       derived.screenH,
@@ -858,6 +869,186 @@ function dwellLookbackFrom(from) {
   return Math.max(0, Number(from) - DWELL_LOOKBACK_MS);
 }
 
+function shanghaiDayFromMs(t) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Shanghai",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date(t)).reduce((acc, p) => {
+    acc[p.type] = p.value;
+    return acc;
+  }, {});
+  return `${parts.year}-${parts.month}-${parts.day}`;
+}
+
+function calculateLiveExtraSeconds(row, to, now = Date.now()) {
+  if (!row || row.event_type === "page_leave") return 0;
+  const eventAt = Number(row.event_at || row.received_at || 0);
+  const receivedAt = Number(row.received_at || 0);
+  const liveUntil = Math.min(Number(to), now);
+  if (!Number.isFinite(eventAt) || eventAt <= 0 || !Number.isFinite(liveUntil)) return 0;
+  if (liveUntil <= eventAt) return 0;
+
+  const staleMs = now - Math.max(receivedAt, eventAt);
+  const extraMs = liveUntil - eventAt;
+  if (staleMs < 0 || staleMs > DUTY_GAP_GRACE_SEC * 1000) return 0;
+  if (extraMs < 0 || extraMs > DUTY_GAP_GRACE_SEC * 1000) return 0;
+  return Math.round(extraMs / 1000);
+}
+
+async function getLiveDwellAdjustments(env, from, to, uid = null, now = Date.now()) {
+  const liveUntil = Math.min(Number(to), now);
+  if (!Number.isFinite(liveUntil) || liveUntil < Number(from)) return [];
+
+  const uidClause = uid ? "AND e.uid = ?" : "";
+  const params = uid
+    ? [dwellLookbackFrom(from), to, uid]
+    : [dwellLookbackFrom(from), to];
+
+  const result = await env.DB.prepare(
+    `WITH ranked AS (
+      SELECT
+        e.uid,
+        e.sid,
+        e.url,
+        e.event_type,
+        COALESCE(e.client_ts, e.received_at) AS event_at,
+        e.received_at,
+        ROW_NUMBER() OVER (
+          PARTITION BY e.uid, COALESCE(e.sid, 'event:' || e.id)
+          ORDER BY COALESCE(e.client_ts, e.received_at) DESC, e.id DESC
+        ) AS rn
+      FROM exposure_events e
+      WHERE e.received_at >= ? AND e.received_at <= ?
+        AND e.uid IS NOT NULL AND e.uid <> ''
+        AND e.sid IS NOT NULL AND e.sid <> ''
+        ${uidClause}
+    )
+    SELECT uid, sid, url, event_type, event_at, received_at
+    FROM ranked
+    WHERE rn = 1`
+  ).bind(...params).all();
+
+  return (result.results || [])
+    .map((row) => {
+      const extra = calculateLiveExtraSeconds(row, to, now);
+      return {
+        uid: row.uid,
+        sid: row.sid,
+        url: row.url,
+        event_type: row.event_type,
+        event_at: Number(row.event_at || 0),
+        received_at: Number(row.received_at || 0),
+        live_extra_seconds: extra,
+      };
+    })
+    .filter((row) => row.live_extra_seconds > 0);
+}
+
+function sumLiveExtra(adjustments, predicate = () => true) {
+  return (adjustments || []).reduce((acc, row) => (
+    predicate(row) ? acc + Number(row.live_extra_seconds || 0) : acc
+  ), 0);
+}
+
+function applyLiveExtraToOperatorSummaries(operators, adjustments) {
+  const extraByUid = new Map();
+  for (const row of adjustments || []) {
+    extraByUid.set(row.uid, (extraByUid.get(row.uid) || 0) + Number(row.live_extra_seconds || 0));
+  }
+  return (operators || []).map((op) => {
+    const extra = extraByUid.get(op.uid) || 0;
+    if (!extra) return op;
+    return {
+      ...op,
+      dwell_seconds: Number(op.dwell_seconds || 0) + extra,
+      live_extra_seconds: extra,
+      is_live_projected: true,
+    };
+  });
+}
+
+function applyLiveExtraToUrlBreakdown(urls, adjustments) {
+  const byUrl = new Map((urls || []).map((row) => [row.url, { ...row }]));
+  for (const row of adjustments || []) {
+    const extra = Number(row.live_extra_seconds || 0);
+    if (!extra) continue;
+    const existing = byUrl.get(row.url);
+    if (existing) {
+      existing.dwell_seconds = Number(existing.dwell_seconds || 0) + extra;
+      existing.live_extra_seconds = Number(existing.live_extra_seconds || 0) + extra;
+      existing.is_live_projected = true;
+      if (Number(row.received_at || 0) > Number(existing.last_seen || 0)) {
+        existing.last_seen = Number(row.received_at || 0);
+        existing.last_seen_iso = toIsoOrNull(existing.last_seen);
+      }
+    } else {
+      byUrl.set(row.url, {
+        url: row.url,
+        dwell_seconds: extra,
+        live_extra_seconds: extra,
+        visits: 0,
+        sessions: 1,
+        last_seen: Number(row.received_at || 0),
+        last_seen_iso: toIsoOrNull(row.received_at),
+        is_live_projected: true,
+      });
+    }
+  }
+  return [...byUrl.values()].sort((a, b) => {
+    if (Number(b.dwell_seconds || 0) !== Number(a.dwell_seconds || 0)) {
+      return Number(b.dwell_seconds || 0) - Number(a.dwell_seconds || 0);
+    }
+    return String(a.url || "").localeCompare(String(b.url || ""));
+  });
+}
+
+function applyLiveExtraToSessions(sessions, adjustments) {
+  const extraBySid = new Map();
+  for (const row of adjustments || []) {
+    extraBySid.set(row.sid, (extraBySid.get(row.sid) || 0) + Number(row.live_extra_seconds || 0));
+  }
+  return (sessions || []).map((session) => {
+    const extra = extraBySid.get(session.sid) || 0;
+    if (!extra) return session;
+    return {
+      ...session,
+      dwell_seconds: Number(session.dwell_seconds || 0) + extra,
+      live_extra_seconds: extra,
+      is_live_projected: true,
+    };
+  });
+}
+
+function applyLiveExtraToDaily(daily, adjustments, liveUntil) {
+  const day = shanghaiDayFromMs(liveUntil);
+  const extra = sumLiveExtra(adjustments);
+  if (!extra) return daily;
+  let found = false;
+  const next = (daily || []).map((row) => {
+    if (row.day !== day) return row;
+    found = true;
+    return {
+      ...row,
+      dwell_seconds: Number(row.dwell_seconds || 0) + extra,
+      live_extra_seconds: Number(row.live_extra_seconds || 0) + extra,
+      is_live_projected: true,
+    };
+  });
+  if (!found) {
+    next.push({
+      day,
+      dwell_seconds: extra,
+      sessions: new Set((adjustments || []).map((row) => row.sid)).size,
+      urls_visited: new Set((adjustments || []).map((row) => row.url)).size,
+      live_extra_seconds: extra,
+      is_live_projected: true,
+    });
+  }
+  return next.sort((a, b) => String(a.day).localeCompare(String(b.day)));
+}
+
 async function getOperatorSummaries(env, from, to) {
   const result = await env.DB.prepare(
     `WITH scoped AS (
@@ -1082,7 +1273,8 @@ async function handleSessionEvents(req, env, headers) {
 
   const result = await env.DB.prepare(
     `SELECT id, event_type, url, page_index, ip, ua, device_type,
-            screen_w, screen_h, tz_offset, client_ts, received_at
+            screen_w, screen_h, tz_offset, session_start_ms,
+            session_elapsed_ms, client_ts, received_at
      FROM exposure_events
      WHERE sid = ?
      ORDER BY received_at ASC, id ASC
@@ -1100,6 +1292,8 @@ async function handleSessionEvents(req, env, headers) {
     screen_w: r.screen_w == null ? null : Number(r.screen_w),
     screen_h: r.screen_h == null ? null : Number(r.screen_h),
     tz_offset: r.tz_offset == null ? null : Number(r.tz_offset),
+    session_start_ms: r.session_start_ms == null ? null : Number(r.session_start_ms),
+    session_elapsed_ms: r.session_elapsed_ms == null ? null : Number(r.session_elapsed_ms),
     client_ts: r.client_ts == null ? null : Number(r.client_ts),
     received_at: Number(r.received_at),
     event_at: r.client_ts == null ? Number(r.received_at) : Number(r.client_ts),
@@ -1157,7 +1351,11 @@ async function handleOperatorReport(req, env, headers) {
   const uid = normalizeUrl(url.searchParams.get("uid"));
 
   if (!uid) {
-    const operators = await getOperatorSummaries(env, range.from, range.to);
+    const liveAdjustments = await getLiveDwellAdjustments(env, range.from, range.to);
+    const operators = applyLiveExtraToOperatorSummaries(
+      await getOperatorSummaries(env, range.from, range.to),
+      liveAdjustments
+    );
     const totalDwell = operators.reduce((acc, op) => acc + op.dwell_seconds, 0);
     return json(
       {
@@ -1175,20 +1373,40 @@ async function handleOperatorReport(req, env, headers) {
     );
   }
 
-  const [summary, daily, urls, sessions] = await Promise.all([
+  const [summaryRaw, dailyRaw, urlsRaw, sessionsRaw, liveAdjustments] = await Promise.all([
     getOperatorSummaries(env, range.from, range.to).then((list) =>
       list.find((op) => op.uid === uid) || null
     ),
     getOperatorDailyDwell(env, range.from, range.to, uid),
     getOperatorUrlBreakdown(env, range.from, range.to, uid),
     getOperatorSessions(env, range.from, range.to, uid),
+    getLiveDwellAdjustments(env, range.from, range.to, uid),
   ]);
+  const liveExtra = sumLiveExtra(liveAdjustments);
+  const summary = summaryRaw && liveExtra
+    ? {
+        ...summaryRaw,
+        dwell_seconds: Number(summaryRaw.dwell_seconds || 0) + liveExtra,
+        live_extra_seconds: liveExtra,
+        is_live_projected: true,
+      }
+    : summaryRaw;
+  const liveUntil = Math.min(range.to, Date.now());
+  const daily = applyLiveExtraToDaily(dailyRaw, liveAdjustments, liveUntil);
+  const urls = applyLiveExtraToUrlBreakdown(urlsRaw, liveAdjustments);
+  const sessions = applyLiveExtraToSessions(sessionsRaw, liveAdjustments);
 
   return json(
     {
       ok: true,
       range: { from: range.from, to: range.to },
       uid,
+      live_projection: {
+        enabled: true,
+        extra_seconds: liveExtra,
+        as_of: liveUntil,
+        as_of_iso: toIsoOrNull(liveUntil),
+      },
       summary,
       daily,
       by_url: urls,
@@ -1419,6 +1637,8 @@ async function refreshAlertsForStatus(env, row, now = Date.now(), target = null,
 
 async function getTodayCoverage(env, uid) {
   const range = shanghaiDayRangeMs();
+  const liveAdjustments = await getLiveDwellAdjustments(env, range.from, range.to, uid);
+  const liveExtra = sumLiveExtra(liveAdjustments);
   const row = await env.DB.prepare(
     `WITH scoped AS (
       SELECT *, COALESCE(client_ts, received_at) AS event_at
@@ -1448,7 +1668,9 @@ async function getTodayCoverage(env, uid) {
     day: range.day,
     visited_urls: Number(row?.visited_urls || 0),
     sessions: Number(row?.sessions || 0),
-    dwell_seconds: Number(row?.dwell_seconds || 0),
+    dwell_seconds: Number(row?.dwell_seconds || 0) + liveExtra,
+    live_extra_seconds: liveExtra,
+    is_live_projected: liveExtra > 0,
     urls: (urls.results || []).map((r) => ({
       url: r.url,
       last_seen: Number(r.last_seen || 0),
@@ -1476,6 +1698,8 @@ function mapPlayerStatusRow(row, coverage, now = Date.now(), target = null) {
     visibility_state: row.visibility_state || null,
     navigation_slot: row.navigation_slot == null ? null : Number(row.navigation_slot),
     last_flush_ok: row.last_flush_ok == null ? null : Number(row.last_flush_ok) === 1,
+    session_start_ms: row.session_start_ms == null ? null : Number(row.session_start_ms),
+    last_session_elapsed_ms: row.last_session_elapsed_ms == null ? null : Number(row.last_session_elapsed_ms),
     device_type: row.device_type || "unknown",
     screen_w: row.screen_w == null ? null : Number(row.screen_w),
     screen_h: row.screen_h == null ? null : Number(row.screen_h),

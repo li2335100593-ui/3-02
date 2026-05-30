@@ -10,7 +10,7 @@
 
   var ANALYTICS_URL = 'https://exposure-analytics.li2335100593.workers.dev/api/exposure';
   var HEARTBEAT_INTERVAL_SEC = 30;
-  var SDK_VERSION = '3.1.2-session-timer';
+  var SDK_VERSION = '3.1.3-live-timer';
 
   // ===== 内置配置（直接注入模式用）=====
   // 如果 URL hash 里没有配置，就使用这里的默认值
@@ -203,6 +203,8 @@
         client_version: SDK_VERSION,
         queue_length: queueLength(),
         visibility_state: document.visibilityState || 'visible',
+        session_start_ms: state.st || null,
+        session_elapsed_ms: state.st ? Math.max(0, now() - state.st) : null,
         client_ts: now()
       };
       if (typeof pageSlotN !== 'undefined') payload.navigation_slot = pageSlotN;
@@ -800,13 +802,12 @@
     var rem = Math.ceil(remMs / 1000);
     var timeStr = formatDuration(rem);
     var pageLabel = (state.ci + 1) + '/' + state.urls.length;
-    var syncIn = Math.max(0, Math.ceil((nextHeartbeatAt - now()) / 1000));
     var qLen = queueLength();
     timerElapsedEl.textContent = formatDuration(sessionElapsed());
     timerSlotEl.textContent = '站点 ' + pageLabel + ' · 本页剩 ' + timeStr;
     timerSyncEl.textContent = (qLen > 0)
       ? ('离线队列 ' + qLen + ' 条 · 网络恢复自动补传')
-      : ('报表同步中 · 下次约 ' + syncIn + 's');
+      : '后台同口径 · 实时计时';
   }
 
   // ===== Boot =====
