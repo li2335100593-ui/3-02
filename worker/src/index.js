@@ -820,16 +820,38 @@ function checkInternalToken(req, env) {
 
 // ===== Operator-centric report =====
 // Heartbeats fire every HEARTBEAT_INTERVAL_SEC (30s) on each tracked page.
-// Working time = heartbeat_count * HEARTBEAT_INTERVAL_SEC. This is conservative:
-// it undercounts by up to 30s per session (we don't credit time before the first
-// heartbeat fires), which is the right bias for payroll / billing disputes.
+// Working time is derived from event timing, not raw heartbeat count:
+// each heartbeat credits the elapsed time since the previous event, capped at
+// 30s. This removes first-heartbeat overcount, duplicate/replayed heartbeat
+// inflation, and long offline gaps while remaining conservative for payroll.
 const HEARTBEAT_INTERVAL_SEC = 30;
+const DWELL_LOOKBACK_MS = HEARTBEAT_INTERVAL_SEC * 1000;
+const DWELL_CREDIT_SQL = `CASE
+  WHEN event_type = 'heartbeat' AND prev_event_at IS NOT NULL
+  THEN MAX(0, MIN(${HEARTBEAT_INTERVAL_SEC}, (event_at - prev_event_at) / 1000.0))
+  ELSE 0
+END`;
+
+function dwellLookbackFrom(from) {
+  return Math.max(0, Number(from) - DWELL_LOOKBACK_MS);
+}
 
 async function getOperatorSummaries(env, from, to) {
   const result = await env.DB.prepare(
-    `SELECT
+    `WITH scoped AS (
+      SELECT *, COALESCE(client_ts, received_at) AS event_at
+      FROM exposure_events
+      WHERE received_at >= ? AND received_at <= ?
+        AND uid IS NOT NULL AND uid <> ''
+    ),
+    ordered AS (
+      SELECT *,
+        LAG(event_at) OVER (PARTITION BY COALESCE(sid, 'event:' || id) ORDER BY event_at ASC, id ASC) AS prev_event_at
+      FROM scoped
+    )
+    SELECT
       uid,
-      SUM(CASE WHEN event_type = 'heartbeat' THEN 1 ELSE 0 END) * ${HEARTBEAT_INTERVAL_SEC} AS dwell_seconds,
+      CAST(ROUND(SUM(${DWELL_CREDIT_SQL})) AS INTEGER) AS dwell_seconds,
       COUNT(DISTINCT sid) AS sessions,
       COUNT(DISTINCT date(received_at / 1000, 'unixepoch', '+8 hours')) AS active_days,
       COUNT(DISTINCT url) AS urls_visited,
@@ -838,20 +860,19 @@ async function getOperatorSummaries(env, from, to) {
       MAX(received_at) AS last_seen,
       (
         SELECT device_type FROM exposure_events e2
-        WHERE e2.uid = exposure_events.uid
+        WHERE e2.uid = ordered.uid
           AND e2.received_at >= ? AND e2.received_at <= ?
           AND e2.device_type IS NOT NULL
         GROUP BY device_type
         ORDER BY COUNT(*) DESC
         LIMIT 1
       ) AS primary_device_type
-    FROM exposure_events
+    FROM ordered
     WHERE received_at >= ? AND received_at <= ?
-      AND uid IS NOT NULL AND uid <> ''
     GROUP BY uid
     ORDER BY dwell_seconds DESC, uid ASC`
   )
-    .bind(from, to, from, to)
+    .bind(dwellLookbackFrom(from), to, from, to, from, to)
     .all();
   return (result.results || []).map((r) => ({
     uid: r.uid,
@@ -870,18 +891,28 @@ async function getOperatorSummaries(env, from, to) {
 
 async function getOperatorDailyDwell(env, from, to, uid) {
   const result = await env.DB.prepare(
-    `SELECT
+    `WITH scoped AS (
+      SELECT *, COALESCE(client_ts, received_at) AS event_at
+      FROM exposure_events
+      WHERE received_at >= ? AND received_at <= ?
+        AND uid = ?
+    ),
+    ordered AS (
+      SELECT *,
+        LAG(event_at) OVER (PARTITION BY COALESCE(sid, 'event:' || id) ORDER BY event_at ASC, id ASC) AS prev_event_at
+      FROM scoped
+    )
+    SELECT
       date(received_at / 1000, 'unixepoch', '+8 hours') AS day,
-      SUM(CASE WHEN event_type = 'heartbeat' THEN 1 ELSE 0 END) * ${HEARTBEAT_INTERVAL_SEC} AS dwell_seconds,
+      CAST(ROUND(SUM(${DWELL_CREDIT_SQL})) AS INTEGER) AS dwell_seconds,
       COUNT(DISTINCT sid) AS sessions,
       COUNT(DISTINCT url) AS urls_visited
-    FROM exposure_events
+    FROM ordered
     WHERE received_at >= ? AND received_at <= ?
-      AND uid = ?
     GROUP BY day
     ORDER BY day ASC`
   )
-    .bind(from, to, uid)
+    .bind(dwellLookbackFrom(from), to, uid, from, to)
     .all();
   return (result.results || []).map((r) => ({
     day: r.day,
@@ -893,19 +924,29 @@ async function getOperatorDailyDwell(env, from, to, uid) {
 
 async function getOperatorUrlBreakdown(env, from, to, uid) {
   const result = await env.DB.prepare(
-    `SELECT
+    `WITH scoped AS (
+      SELECT *, COALESCE(client_ts, received_at) AS event_at
+      FROM exposure_events
+      WHERE received_at >= ? AND received_at <= ?
+        AND uid = ?
+    ),
+    ordered AS (
+      SELECT *,
+        LAG(event_at) OVER (PARTITION BY COALESCE(sid, 'event:' || id) ORDER BY event_at ASC, id ASC) AS prev_event_at
+      FROM scoped
+    )
+    SELECT
       url,
-      SUM(CASE WHEN event_type = 'heartbeat' THEN 1 ELSE 0 END) * ${HEARTBEAT_INTERVAL_SEC} AS dwell_seconds,
+      CAST(ROUND(SUM(${DWELL_CREDIT_SQL})) AS INTEGER) AS dwell_seconds,
       SUM(CASE WHEN event_type = 'page_enter' OR event_type IS NULL THEN 1 ELSE 0 END) AS enter_events,
       COUNT(DISTINCT sid) AS sessions,
       MAX(received_at) AS last_seen
-    FROM exposure_events
+    FROM ordered
     WHERE received_at >= ? AND received_at <= ?
-      AND uid = ?
     GROUP BY url
     ORDER BY dwell_seconds DESC, url ASC`
   )
-    .bind(from, to, uid)
+    .bind(dwellLookbackFrom(from), to, uid, from, to)
     .all();
   return (result.results || []).map((r) => ({
     url: r.url,
@@ -919,63 +960,73 @@ async function getOperatorUrlBreakdown(env, from, to, uid) {
 
 async function getOperatorSessions(env, from, to, uid) {
   const result = await env.DB.prepare(
-    `SELECT
+    `WITH scoped AS (
+      SELECT *, COALESCE(client_ts, received_at) AS event_at
+      FROM exposure_events
+      WHERE received_at >= ? AND received_at <= ?
+        AND uid = ?
+        AND sid IS NOT NULL
+    ),
+    ordered AS (
+      SELECT *,
+        LAG(event_at) OVER (PARTITION BY sid ORDER BY event_at ASC, id ASC) AS prev_event_at
+      FROM scoped
+    )
+    SELECT
       sid,
       (
         SELECT MIN(e0.received_at)
         FROM exposure_events e0
-        WHERE e0.sid = exposure_events.sid
+        WHERE e0.sid = ordered.sid
       ) AS started_at,
       MIN(received_at) AS range_started_at,
       MAX(received_at) AS last_event_at,
-      SUM(CASE WHEN event_type = 'heartbeat' THEN 1 ELSE 0 END) * ${HEARTBEAT_INTERVAL_SEC} AS dwell_seconds,
+      CAST(ROUND(SUM(${DWELL_CREDIT_SQL})) AS INTEGER) AS dwell_seconds,
       SUM(CASE WHEN event_type = 'page_enter' OR event_type IS NULL THEN 1 ELSE 0 END) AS enter_events,
       SUM(CASE WHEN event_type = 'page_leave' THEN 1 ELSE 0 END) AS clean_leaves,
       COUNT(DISTINCT url) AS unique_urls,
       (
         SELECT device_type FROM exposure_events e2
-        WHERE e2.sid = exposure_events.sid AND e2.device_type IS NOT NULL
+        WHERE e2.sid = ordered.sid AND e2.device_type IS NOT NULL
         LIMIT 1
       ) AS device_type,
       (
         SELECT vid FROM exposure_events e3
-        WHERE e3.sid = exposure_events.sid AND e3.vid IS NOT NULL
+        WHERE e3.sid = ordered.sid AND e3.vid IS NOT NULL
         LIMIT 1
       ) AS vid,
       (
         SELECT ip FROM exposure_events e4
-        WHERE e4.sid = exposure_events.sid AND e4.ip IS NOT NULL
+        WHERE e4.sid = ordered.sid AND e4.ip IS NOT NULL
         LIMIT 1
       ) AS ip,
       (
         SELECT screen_w FROM exposure_events e5
-        WHERE e5.sid = exposure_events.sid AND e5.screen_w IS NOT NULL
+        WHERE e5.sid = ordered.sid AND e5.screen_w IS NOT NULL
         LIMIT 1
       ) AS screen_w,
       (
         SELECT screen_h FROM exposure_events e6
-        WHERE e6.sid = exposure_events.sid AND e6.screen_h IS NOT NULL
+        WHERE e6.sid = ordered.sid AND e6.screen_h IS NOT NULL
         LIMIT 1
       ) AS screen_h,
       (
         SELECT ua FROM exposure_events e7
-        WHERE e7.sid = exposure_events.sid AND e7.ua IS NOT NULL AND e7.ua <> ''
+        WHERE e7.sid = ordered.sid AND e7.ua IS NOT NULL AND e7.ua <> ''
         LIMIT 1
       ) AS ua,
       (
         SELECT tz_offset FROM exposure_events e8
-        WHERE e8.sid = exposure_events.sid AND e8.tz_offset IS NOT NULL
+        WHERE e8.sid = ordered.sid AND e8.tz_offset IS NOT NULL
         LIMIT 1
       ) AS tz_offset
-    FROM exposure_events
+    FROM ordered
     WHERE received_at >= ? AND received_at <= ?
-      AND uid = ?
-      AND sid IS NOT NULL
     GROUP BY sid
     ORDER BY last_event_at DESC
     LIMIT 200`
   )
-    .bind(from, to, uid)
+    .bind(dwellLookbackFrom(from), to, uid, from, to)
     .all();
   return (result.results || []).map((r) => ({
     sid: r.sid,
@@ -1029,12 +1080,14 @@ async function handleSessionEvents(req, env, headers) {
     tz_offset: r.tz_offset == null ? null : Number(r.tz_offset),
     client_ts: r.client_ts == null ? null : Number(r.client_ts),
     received_at: Number(r.received_at),
+    event_at: r.client_ts == null ? Number(r.received_at) : Number(r.client_ts),
     received_iso: toIsoOrNull(r.received_at),
   }));
 
   // Compute per-page time blocks: group consecutive enter+heartbeats per url
   const pageBlocks = [];
   let block = null;
+  let prevEventAt = null;
   for (const ev of events) {
     if (ev.event_type === 'page_enter' || (ev.event_type !== 'heartbeat' && ev.event_type !== 'page_leave')) {
       if (block) pageBlocks.push(block);
@@ -1043,21 +1096,26 @@ async function handleSessionEvents(req, env, headers) {
         started_at: ev.received_at,
         last_heartbeat_at: ev.received_at,
         heartbeat_count: 0,
+        dwell_seconds: 0,
         ended_at: null,
         end_reason: null,
       };
     } else if (ev.event_type === 'heartbeat' && block && ev.url === block.url) {
       block.heartbeat_count += 1;
       block.last_heartbeat_at = ev.received_at;
+      if (prevEventAt != null) {
+        const delta = Math.max(0, Math.min(HEARTBEAT_INTERVAL_SEC, (ev.event_at - prevEventAt) / 1000));
+        block.dwell_seconds += Math.round(delta);
+      }
     } else if (ev.event_type === 'page_leave' && block && ev.url === block.url) {
       block.ended_at = ev.received_at;
       block.end_reason = 'normal';
     }
+    prevEventAt = ev.event_at;
   }
   if (block) pageBlocks.push(block);
 
   for (const b of pageBlocks) {
-    b.dwell_seconds = b.heartbeat_count * HEARTBEAT_INTERVAL_SEC;
     b.started_iso = toIsoOrNull(b.started_at);
     b.ended_iso = toIsoOrNull(b.ended_at);
     b.last_heartbeat_iso = toIsoOrNull(b.last_heartbeat_at);
@@ -1340,13 +1398,23 @@ async function refreshAlertsForStatus(env, row, now = Date.now(), target = null,
 async function getTodayCoverage(env, uid) {
   const range = shanghaiDayRangeMs();
   const row = await env.DB.prepare(
-    `SELECT
+    `WITH scoped AS (
+      SELECT *, COALESCE(client_ts, received_at) AS event_at
+      FROM exposure_events
+      WHERE uid = ? AND received_at >= ? AND received_at <= ?
+    ),
+    ordered AS (
+      SELECT *,
+        LAG(event_at) OVER (PARTITION BY COALESCE(sid, 'event:' || id) ORDER BY event_at ASC, id ASC) AS prev_event_at
+      FROM scoped
+    )
+    SELECT
       COUNT(DISTINCT url) AS visited_urls,
       COUNT(DISTINCT sid) AS sessions,
-      SUM(CASE WHEN event_type = 'heartbeat' THEN 1 ELSE 0 END) * ${HEARTBEAT_INTERVAL_SEC} AS dwell_seconds
-     FROM exposure_events
-     WHERE uid = ? AND received_at >= ? AND received_at <= ?`
-  ).bind(uid, range.from, range.to).first();
+      CAST(ROUND(SUM(${DWELL_CREDIT_SQL})) AS INTEGER) AS dwell_seconds
+     FROM ordered
+     WHERE received_at >= ? AND received_at <= ?`
+  ).bind(uid, dwellLookbackFrom(range.from), range.to, range.from, range.to).first();
   const urls = await env.DB.prepare(
     `SELECT url, MAX(received_at) AS last_seen
      FROM exposure_events
@@ -1650,9 +1718,19 @@ async function handleMonitorTargets(req, env, headers) {
 // ===== Site-centric report (operator breakdown per URL) =====
 async function getSiteSummaries(env, from, to) {
   const result = await env.DB.prepare(
-    `SELECT
+    `WITH scoped AS (
+      SELECT *, COALESCE(client_ts, received_at) AS event_at
+      FROM exposure_events
+      WHERE received_at >= ? AND received_at <= ?
+    ),
+    ordered AS (
+      SELECT *,
+        LAG(event_at) OVER (PARTITION BY COALESCE(sid, 'event:' || id) ORDER BY event_at ASC, id ASC) AS prev_event_at
+      FROM scoped
+    )
+    SELECT
       url,
-      SUM(CASE WHEN event_type = 'heartbeat' THEN 1 ELSE 0 END) * ${HEARTBEAT_INTERVAL_SEC} AS dwell_seconds,
+      CAST(ROUND(SUM(${DWELL_CREDIT_SQL})) AS INTEGER) AS dwell_seconds,
       SUM(CASE WHEN event_type = 'page_enter' OR event_type IS NULL THEN 1 ELSE 0 END) AS enter_events,
       COUNT(DISTINCT sid) AS sessions,
       COUNT(DISTINCT uid) AS unique_operators,
@@ -1661,19 +1739,19 @@ async function getSiteSummaries(env, from, to) {
       MAX(received_at) AS last_seen,
       (
         SELECT device_type FROM exposure_events e2
-        WHERE e2.url = exposure_events.url
+        WHERE e2.url = ordered.url
           AND e2.received_at >= ? AND e2.received_at <= ?
           AND e2.device_type IS NOT NULL
         GROUP BY device_type
         ORDER BY COUNT(*) DESC
         LIMIT 1
       ) AS primary_device_type
-    FROM exposure_events
+    FROM ordered
     WHERE received_at >= ? AND received_at <= ?
     GROUP BY url
     ORDER BY dwell_seconds DESC, url ASC`
   )
-    .bind(from, to, from, to)
+    .bind(dwellLookbackFrom(from), to, from, to, from, to)
     .all();
   return (result.results || []).map((r) => ({
     url: r.url,
@@ -1691,19 +1769,29 @@ async function getSiteSummaries(env, from, to) {
 
 async function getSiteOperatorBreakdown(env, from, to, siteUrl) {
   const result = await env.DB.prepare(
-    `SELECT
+    `WITH scoped AS (
+      SELECT *, COALESCE(client_ts, received_at) AS event_at
+      FROM exposure_events
+      WHERE received_at >= ? AND received_at <= ?
+        AND url = ?
+        AND uid IS NOT NULL AND uid <> ''
+    ),
+    ordered AS (
+      SELECT *,
+        LAG(event_at) OVER (PARTITION BY COALESCE(sid, 'event:' || id) ORDER BY event_at ASC, id ASC) AS prev_event_at
+      FROM scoped
+    )
+    SELECT
       uid,
-      SUM(CASE WHEN event_type = 'heartbeat' THEN 1 ELSE 0 END) * ${HEARTBEAT_INTERVAL_SEC} AS dwell_seconds,
+      CAST(ROUND(SUM(${DWELL_CREDIT_SQL})) AS INTEGER) AS dwell_seconds,
       COUNT(DISTINCT sid) AS sessions,
       MAX(received_at) AS last_seen
-    FROM exposure_events
+    FROM ordered
     WHERE received_at >= ? AND received_at <= ?
-      AND url = ?
-      AND uid IS NOT NULL AND uid <> ''
     GROUP BY uid
     ORDER BY dwell_seconds DESC, uid ASC`
   )
-    .bind(from, to, siteUrl)
+    .bind(dwellLookbackFrom(from), to, siteUrl, from, to)
     .all();
   return (result.results || []).map((r) => ({
     uid: r.uid,
@@ -1716,17 +1804,28 @@ async function getSiteOperatorBreakdown(env, from, to, siteUrl) {
 
 async function getSiteDailyDwell(env, from, to, siteUrl) {
   const result = await env.DB.prepare(
-    `SELECT
+    `WITH scoped AS (
+      SELECT *, COALESCE(client_ts, received_at) AS event_at
+      FROM exposure_events
+      WHERE received_at >= ? AND received_at <= ?
+        AND url = ?
+    ),
+    ordered AS (
+      SELECT *,
+        LAG(event_at) OVER (PARTITION BY COALESCE(sid, 'event:' || id) ORDER BY event_at ASC, id ASC) AS prev_event_at
+      FROM scoped
+    )
+    SELECT
       date(received_at / 1000, 'unixepoch', '+8 hours') AS day,
-      SUM(CASE WHEN event_type = 'heartbeat' THEN 1 ELSE 0 END) * ${HEARTBEAT_INTERVAL_SEC} AS dwell_seconds,
+      CAST(ROUND(SUM(${DWELL_CREDIT_SQL})) AS INTEGER) AS dwell_seconds,
       COUNT(DISTINCT sid) AS sessions,
       COUNT(DISTINCT uid) AS operators
-    FROM exposure_events
-    WHERE received_at >= ? AND received_at <= ? AND url = ?
+    FROM ordered
+    WHERE received_at >= ? AND received_at <= ?
     GROUP BY day
     ORDER BY day ASC`
   )
-    .bind(from, to, siteUrl)
+    .bind(dwellLookbackFrom(from), to, siteUrl, from, to)
     .all();
   return (result.results || []).map((r) => ({
     day: r.day,
@@ -1794,16 +1893,27 @@ async function handleOperatorHeatmap(req, env, headers) {
   if (!uid) return json({ ok: false, error: "uid is required" }, 400, headers);
 
   const result = await env.DB.prepare(
-    `SELECT
+    `WITH scoped AS (
+      SELECT *, COALESCE(client_ts, received_at) AS event_at
+      FROM exposure_events
+      WHERE received_at >= ? AND received_at <= ?
+        AND uid = ?
+    ),
+    ordered AS (
+      SELECT *,
+        LAG(event_at) OVER (PARTITION BY COALESCE(sid, 'event:' || id) ORDER BY event_at ASC, id ASC) AS prev_event_at
+      FROM scoped
+    )
+    SELECT
       CAST(strftime('%w', received_at / 1000, 'unixepoch', '+8 hours') AS INTEGER) AS weekday,
       CAST(strftime('%H', received_at / 1000, 'unixepoch', '+8 hours') AS INTEGER) AS hour,
-      SUM(CASE WHEN event_type = 'heartbeat' THEN 1 ELSE 0 END) * ${HEARTBEAT_INTERVAL_SEC} AS dwell_seconds
-    FROM exposure_events
-    WHERE received_at >= ? AND received_at <= ? AND uid = ?
+      CAST(ROUND(SUM(${DWELL_CREDIT_SQL})) AS INTEGER) AS dwell_seconds
+    FROM ordered
+    WHERE received_at >= ? AND received_at <= ?
     GROUP BY weekday, hour
     ORDER BY weekday, hour`
   )
-    .bind(range.from, range.to, uid)
+    .bind(dwellLookbackFrom(range.from), range.to, uid, range.from, range.to)
     .all();
 
   const matrix = Array.from({ length: 7 }, () => Array(24).fill(0));
@@ -1910,15 +2020,35 @@ async function handleSitesDelete(req, env, headers) {
 async function handleOperatorsList(req, env, headers) {
   const url = new URL(req.url);
   const includeInactive = url.searchParams.get("all") === "1";
-  const where = includeInactive ? "" : "WHERE is_active = 1";
+  const where = includeInactive ? "" : "WHERE o.is_active = 1";
 
   const result = await env.DB.prepare(
-    `SELECT
+    `WITH scoped AS (
+       SELECT *, COALESCE(client_ts, received_at) AS event_at
+       FROM exposure_events
+       WHERE uid IS NOT NULL AND uid <> ''
+     ),
+     ordered AS (
+       SELECT *,
+         LAG(event_at) OVER (PARTITION BY COALESCE(sid, 'event:' || id) ORDER BY event_at ASC, id ASC) AS prev_event_at
+       FROM scoped
+     ),
+     operator_dwell AS (
+       SELECT
+         uid,
+         MAX(received_at) AS last_seen,
+         COUNT(DISTINCT sid) AS total_sessions,
+         CAST(ROUND(SUM(${DWELL_CREDIT_SQL})) AS INTEGER) AS total_dwell_seconds
+       FROM ordered
+       GROUP BY uid
+     )
+     SELECT
        o.id, o.operator_code, o.name, o.phone, o.note, o.is_active, o.created_at,
-       (SELECT MAX(received_at) FROM exposure_events WHERE uid = o.operator_code) AS last_seen,
-       (SELECT COUNT(DISTINCT sid) FROM exposure_events WHERE uid = o.operator_code) AS total_sessions,
-       (SELECT SUM(CASE WHEN event_type = 'heartbeat' THEN 1 ELSE 0 END) FROM exposure_events WHERE uid = o.operator_code) AS total_heartbeats
+       d.last_seen,
+       d.total_sessions,
+       d.total_dwell_seconds
      FROM operators o
+     LEFT JOIN operator_dwell d ON d.uid = o.operator_code
      ${where}
      ORDER BY o.created_at DESC, o.id DESC`
   ).all();
@@ -1937,7 +2067,7 @@ async function handleOperatorsList(req, env, headers) {
         last_seen: r.last_seen ? Number(r.last_seen) : null,
         last_seen_iso: toIsoOrNull(r.last_seen),
         total_sessions: Number(r.total_sessions || 0),
-        total_dwell_seconds: Number(r.total_heartbeats || 0) * HEARTBEAT_INTERVAL_SEC,
+        total_dwell_seconds: Number(r.total_dwell_seconds || 0),
       })),
     },
     200,

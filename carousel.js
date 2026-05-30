@@ -10,7 +10,7 @@
 
   var ANALYTICS_URL = 'https://exposure-analytics.li2335100593.workers.dev/api/exposure';
   var HEARTBEAT_INTERVAL_SEC = 30;
-  var SDK_VERSION = '3.1.0-health';
+  var SDK_VERSION = '3.1.1-precise-dwell';
 
   // ===== 内置配置（直接注入模式用）=====
   // 如果 URL hash 里没有配置，就使用这里的默认值
@@ -462,7 +462,10 @@
   var intervalSec = state.iv;
   var pageStartTime = now();
   var tickTimer = null;
-  var nextHeartbeatAt = pageStartTime;
+  // Credit work only after the operator has actually stayed for a full
+  // heartbeat interval. Sending at pageStartTime would make each rotation
+  // count an extra 30 seconds.
+  var nextHeartbeatAt = pageStartTime + HEARTBEAT_INTERVAL_SEC * 1000;
 
   // Compute this page's slot ONCE at boot and lock it in.
   var pageSlotN = Math.floor((pageStartTime - state.ct) / (intervalSec * 1000));
