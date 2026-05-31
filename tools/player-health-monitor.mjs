@@ -122,6 +122,13 @@ function requiredProblems(health) {
   return problems;
 }
 
+function scopedOpenAlerts(alerts) {
+  const list = alerts || [];
+  if (!requiredUids.length) return list;
+  const required = new Set(requiredUids);
+  return list.filter((alert) => !alert.uid || required.has(alert.uid));
+}
+
 function shouldNotify(alert) {
   if (!alert.id) return true;
   if (!alert.notified_at) return true;
@@ -159,7 +166,7 @@ async function poll() {
   await ensureRequiredTargets(token);
   const health = await api(token, '/api/player-health');
   const alertsJson = await api(token, '/api/alerts?status=open&limit=300');
-  const openAlerts = alertsJson.alerts || [];
+  const openAlerts = scopedOpenAlerts(alertsJson.alerts || []);
   const problems = [...openAlerts, ...requiredProblems(health)];
   const summary = summarize(health, openAlerts);
   console.log(JSON.stringify({ ...summary, problem_count: problems.length }));
