@@ -103,6 +103,7 @@ function summarize(health, alerts) {
 
 function requiredProblems(health) {
   const problems = [];
+  const now = Date.now();
   const players = new Map((health.players || []).map((p) => [p.uid, p]));
   for (const uid of requiredUids) {
     const player = players.get(uid);
@@ -115,7 +116,11 @@ function requiredProblems(health) {
     }
     const seenUrls = new Set((player.today?.urls || []).map((u) => u.url));
     const missing = requiredUrls.filter((u) => !seenUrls.has(u));
-    if (missing.length) {
+    const targetCreatedAt = Number(player.monitor_target?.created_at || 0);
+    const sessionStartedAt = Number(player.session_start_ms || 0);
+    const coverageGraceStartedAt = targetCreatedAt || sessionStartedAt || 0;
+    const withinFirstRotationGrace = coverageGraceStartedAt > 0 && now - coverageGraceStartedAt < 7 * 60 * 1000;
+    if (missing.length && !withinFirstRotationGrace) {
       problems.push({ severity: 'warning', uid, type: 'required_url_missing', message: `${uid} 今日缺少 ${missing.length} 个预期站点`, details: { missing } });
     }
   }
