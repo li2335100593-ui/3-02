@@ -39,6 +39,28 @@ function normalizeUrl(v) {
   return t.length > 0 ? t : null;
 }
 
+function normalizeComparableUrl(v) {
+  const raw = normalizeUrl(v);
+  if (!raw) return null;
+  try {
+    const u = new URL(raw);
+    if (u.protocol !== "http:" && u.protocol !== "https:") return null;
+    let path = u.pathname || "/";
+    if (path === "/") return u.origin;
+    if (path.length > 1) path = path.replace(/\/+$/, "");
+    return `${u.origin}${path}`;
+  } catch {
+    return null;
+  }
+}
+
+function urlWithinRoot(actual, root) {
+  const a = normalizeComparableUrl(actual);
+  const r = normalizeComparableUrl(root);
+  if (!a || !r) return false;
+  return a === r || a.startsWith(`${r}/`);
+}
+
 function parseDeviceType(ua) {
   if (!ua) return "unknown";
   const lower = ua.toLowerCase();
@@ -236,19 +258,26 @@ async function handleExposure(req, env, headers) {
     return json({ ok: false, error: "`url` is required" }, 400, headers);
   }
 
+  const tokenCheck = await validatePlaybackToken(env, body, url);
+  if (!tokenCheck.ok) {
+    return json({ ok: false, error: tokenCheck.error }, tokenCheck.status || 401, headers);
+  }
+
   const deviceType = body.device_type || parseDeviceType(ua);
   const screenW = Number.isFinite(Number(body.screen_w)) ? Number(body.screen_w) : null;
   const screenH = Number.isFinite(Number(body.screen_h)) ? Number(body.screen_h) : null;
   const tzOffset = Number.isFinite(Number(body.tz_offset)) ? Number(body.tz_offset) : null;
   const sessionStartMs = Number.isFinite(Number(body.session_start_ms)) ? Number(body.session_start_ms) : null;
   const sessionElapsedMs = Number.isFinite(Number(body.session_elapsed_ms)) ? Number(body.session_elapsed_ms) : null;
+  const eventId = nullableString(body.event_id, 120);
   const insertRes = await env.DB.prepare(
-    `INSERT INTO exposure_events (
-      event_type, sid, vid, uid, url, page_index, ip, ua, device_type,
-      screen_w, screen_h, tz_offset, session_start_ms, session_elapsed_ms, client_ts, received_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    `INSERT OR IGNORE INTO exposure_events (
+      event_id, event_type, sid, vid, uid, url, page_index, ip, ua, device_type,
+      screen_w, screen_h, tz_offset, session_start_ms, session_elapsed_ms, client_ts, trusted, received_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   )
     .bind(
+      eventId,
       eventType,
       body.sid || null,
       body.vid || null,
@@ -264,6 +293,7 @@ async function handleExposure(req, env, headers) {
       sessionStartMs,
       sessionElapsedMs,
       body.client_ts == null ? null : Number(body.client_ts),
+      tokenCheck.trusted ? 1 : 0,
       now
     )
     .run();
@@ -288,7 +318,42 @@ async function handleExposure(req, env, headers) {
     console.log("player_status_update_failed", err && err.message ? err.message : String(err));
   }
 
-  return json({ ok: true, id: insertRes?.meta?.last_row_id ?? null, received_at: now }, 200, headers);
+  const duplicate = eventId && Number(insertRes?.meta?.changes || 0) === 0;
+  return json({
+    ok: true,
+    id: duplicate ? null : (insertRes?.meta?.last_row_id ?? null),
+    duplicate: !!duplicate,
+    trusted: !!tokenCheck.trusted,
+    received_at: now,
+  }, 200, headers);
+}
+
+async function validatePlaybackToken(env, body, eventUrl) {
+  const requireSigned = ["1", "true", "yes", "on"].includes(
+    String(env.REQUIRE_EXPOSURE_TOKEN || "").toLowerCase()
+  );
+  const token = nullableString(body?.task_token || body?.playback_token || body?.token, 4096);
+  if (!token) {
+    if (requireSigned) return { ok: false, status: 401, error: "playback token required" };
+    return { ok: true, trusted: false };
+  }
+
+  const secret = env.PLAYBACK_TOKEN_SECRET || env.AUTH_SECRET;
+  if (!secret) return { ok: false, status: 500, error: "playback token secret not configured" };
+
+  const payload = await verifyAuthToken(token, secret);
+  if (!payload || payload.typ !== "carousel_playback") {
+    return { ok: false, status: 401, error: "invalid playback token" };
+  }
+  const uid = nullableString(body?.uid, 200);
+  if (payload.uid && uid && String(payload.uid) !== uid) {
+    return { ok: false, status: 403, error: "playback token uid mismatch" };
+  }
+  const urls = Array.isArray(payload.urls) ? payload.urls : [];
+  if (urls.length > 0 && !urls.some((root) => urlWithinRoot(eventUrl, root))) {
+    return { ok: false, status: 403, error: "playback token url mismatch" };
+  }
+  return { ok: true, trusted: true, payload };
 }
 
 async function upsertPlayerStatus(env, body, derived) {
@@ -2559,6 +2624,49 @@ async function handleAuthMe(req, env, headers, user) {
   );
 }
 
+async function handlePlaybackToken(req, env, headers, user) {
+  const secret = env.PLAYBACK_TOKEN_SECRET || env.AUTH_SECRET;
+  if (!secret) return json({ ok: false, error: "playback token secret not configured" }, 500, headers);
+
+  let body;
+  try { body = await req.json(); } catch { return json({ ok: false, error: "invalid request" }, 400, headers); }
+  const uid = nullableString(body?.uid, 200);
+  if (!uid) return json({ ok: false, error: "uid is required" }, 400, headers);
+  if (!/^[a-zA-Z0-9_\-]+$/.test(uid)) {
+    return json({ ok: false, error: "uid can only contain letters, digits, _ and -" }, 400, headers);
+  }
+
+  let urls = Array.isArray(body?.urls)
+    ? body.urls.map((v) => normalizeComparableUrl(v)).filter(Boolean)
+    : [];
+  if (urls.length === 0) {
+    urls = (await getConfiguredUrls(env)).map((v) => normalizeComparableUrl(v)).filter(Boolean);
+  }
+  urls = [...new Set(urls)];
+  if (urls.length === 0) return json({ ok: false, error: "no active playback urls configured" }, 400, headers);
+
+  const nowSec = Math.floor(Date.now() / 1000);
+  const ttlSec = clampInt(body?.ttl_sec, 60, 30 * 24 * 3600, 7 * 24 * 3600);
+  const exp = nowSec + ttlSec;
+  const token = await signAuthToken({
+    typ: "carousel_playback",
+    uid,
+    urls,
+    by: user?.u || null,
+    iat: nowSec,
+    exp,
+  }, secret);
+
+  return json({
+    ok: true,
+    uid,
+    urls,
+    token,
+    expires_at: exp * 1000,
+    expires_iso: toIsoOrNull(exp * 1000),
+  }, 200, headers);
+}
+
 async function handleChangeOwnPassword(req, env, headers, user) {
   let body;
   try { body = await req.json(); } catch { return json({ ok: false, error: "invalid request" }, 400, headers); }
@@ -2724,7 +2832,14 @@ export default {
       // ---- Public: health, ingestion, sites read for scheduler ----
       if (url.pathname === "/health") return json({ ok: true, now: Date.now() }, 200, headers);
       if (url.pathname === "/api/exposure" && req.method === "POST") return await handleExposure(req, env, headers);
-      if (url.pathname === "/api/config/urls" && req.method === "POST") return await handleConfigUrls(req, env, headers);
+      if (url.pathname === "/api/config/urls" && req.method === "POST") {
+        const internal = env.INTERNAL_CONFIG_TOKEN &&
+          req.headers.get("x-internal-token") === env.INTERNAL_CONFIG_TOKEN;
+        if (!internal) {
+          const denied = requireAuth(); if (denied) return denied;
+        }
+        return await handleConfigUrls(req, env, headers);
+      }
       if (url.pathname === "/api/sites" && req.method === "GET") return await handleSitesList(req, env, headers);
 
       // ---- Auth ----
@@ -2738,6 +2853,10 @@ export default {
       if (url.pathname === "/api/auth/change-password" && req.method === "POST") {
         const denied = requireAuth(); if (denied) return denied;
         return await handleChangeOwnPassword(req, env, headers, user);
+      }
+      if (url.pathname === "/api/playback-token" && req.method === "POST") {
+        const denied = requireAuth(); if (denied) return denied;
+        return await handlePlaybackToken(req, env, headers, user);
       }
 
       // ---- Reports (auth required) ----

@@ -88,8 +88,8 @@
   var scriptEl = document.currentScript;
   var analyticsBase = "https://exposure-analytics.li2335100593.workers.dev";
 
-  // ===== 1. 读取播放人员身份 _u =====
-  // 优先级: ?u=xxx > #u=xxx > 空
+  // ===== 1. 读取播放人员身份 _u + 安全任务 token =====
+  // 优先级: ?u=xxx > #u=xxx > 空；?t=xxx 会透传给 carousel.js。
   function getUserId() {
     // 从 query string 读
     try {
@@ -106,11 +106,32 @@
   }
 
   var uid = getUserId();
+  var taskToken = getTaskToken();
 
   // 显示身份标识
   if (uid) {
     var badge = document.getElementById('uid-display');
-    if (badge) badge.innerHTML = '<div class="uid-badge">\uD83D\uDC64 ' + uid + '</div>';
+    if (badge) {
+      var el = document.createElement('div');
+      el.className = 'uid-badge';
+      el.appendChild(document.createTextNode('\uD83D\uDC64 ' + uid));
+      badge.appendChild(el);
+    }
+  }
+
+  function getTaskToken() {
+    try {
+      var qp = new URLSearchParams(window.location.search);
+      if (qp.get('t')) return qp.get('t');
+      if (qp.get('token')) return qp.get('token');
+    } catch (e) {}
+    try {
+      var hp = new URLSearchParams(window.location.hash.substring(1));
+      if (hp.get('t')) return hp.get('t');
+      if (hp.get('_t')) return hp.get('_t');
+      if (hp.get('token')) return hp.get('token');
+    } catch (e) {}
+    return null;
   }
 
   // ===== 2. 读取静态配置（仅作为 API 不可用时的降级） =====
@@ -150,6 +171,7 @@
         _sid: "sid_" + Date.now() + "_" + Math.random().toString(36).slice(2, 10)
       };
       if (uid) state._u = uid;
+      if (taskToken) state._t = taskToken;
 
       // 同步到后端 configured_urls（保留旧逻辑，方便老报表筛选）
       syncConfiguredUrls(urls).catch(function () {}).finally(startRedirect);

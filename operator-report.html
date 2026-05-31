@@ -1892,6 +1892,18 @@ async function api(path, options = {}) {
   return json;
 }
 
+async function signedSchedulerLink(uid) {
+  const json = await api('/api/playback-token', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ uid, ttl_sec: 7 * 24 * 3600 }),
+  });
+  const link = new URL(SCHEDULER_BASE);
+  link.searchParams.set('u', uid);
+  link.searchParams.set('t', json.token);
+  return link.toString();
+}
+
 // ===================== Tab switching =====================
 function switchTab(tab) {
   state.currentTab = tab;
@@ -2575,7 +2587,6 @@ function renderOperatorsTable(operators) {
   const rate = state.payrollRate;
 
   $('#operators-tbody').innerHTML = operators.map(op => {
-    const link = `${SCHEDULER_BASE}?u=${encodeURIComponent(op.operator_code)}`;
     const online = op.last_seen && (now - op.last_seen) < ONLINE_THRESHOLD_MS;
     const wage = (op.total_dwell_seconds / 3600) * rate;
     return `
@@ -2603,7 +2614,7 @@ function renderOperatorsTable(operators) {
         <td class="px-6 py-4 text-right tabular-nums">${op.total_sessions}</td>
         <td class="px-6 py-4 text-slate-600">${op.last_seen ? fmtRelative(op.last_seen) : '—'}</td>
         <td class="px-6 py-4">
-          <button class="text-xs px-2.5 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 inline-flex items-center gap-1.5 copy-link-btn" data-link="${escapeHtml(link)}">
+          <button class="text-xs px-2.5 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 inline-flex items-center gap-1.5 copy-link-btn" data-uid="${escapeHtml(op.operator_code)}">
             <i data-lucide="copy" class="w-3.5 h-3.5"></i>${t('operators.copy_link')}
           </button>
         </td>
@@ -2619,8 +2630,22 @@ function renderOperatorsTable(operators) {
   const totalWage = operators.reduce((acc, op) => acc + (op.total_dwell_seconds / 3600) * rate, 0);
   $('#payroll-total').textContent = fmtMoney(totalWage);
 
-  $$('.copy-link-btn').forEach(btn => btn.addEventListener('click', () => {
-    navigator.clipboard.writeText(btn.dataset.link).then(() => showToast(t('common.copied')));
+  $$('.copy-link-btn').forEach(btn => btn.addEventListener('click', async () => {
+    const original = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i data-lucide="loader-2" class="w-3.5 h-3.5 animate-spin"></i>生成中';
+    lucide.createIcons();
+    try {
+      const link = await signedSchedulerLink(btn.dataset.uid);
+      await navigator.clipboard.writeText(link);
+      showToast(t('common.copied'));
+    } catch (err) {
+      showToast(err.message || '生成安全链接失败', 'error');
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = original;
+      lucide.createIcons();
+    }
   }));
   $$('.delete-op-btn').forEach(btn => btn.addEventListener('click', async () => {
     if (!confirm(t('operators.deactivate_confirm', { code: btn.dataset.code }))) return;

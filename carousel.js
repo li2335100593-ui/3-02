@@ -10,7 +10,7 @@
 
   var ANALYTICS_URL = 'https://exposure-analytics.li2335100593.workers.dev/api/exposure';
   var HEARTBEAT_INTERVAL_SEC = 30;
-  var SDK_VERSION = '3.1.3-live-timer';
+  var SDK_VERSION = '3.2.0-signed-idempotent';
 
   // ===== 内置配置（直接注入模式用）=====
   // 如果 URL hash 里没有配置，就使用这里的默认值
@@ -38,6 +38,18 @@
 
   function createSid() {
     return 'sid_' + now() + '_' + Math.random().toString(36).slice(2, 10);
+  }
+
+  function randomId(prefix) {
+    try {
+      var buf = new Uint8Array(12);
+      crypto.getRandomValues(buf);
+      var hex = [];
+      for (var i = 0; i < buf.length; i++) hex.push(('0' + buf[i].toString(16)).slice(-2));
+      return prefix + '_' + now() + '_' + hex.join('');
+    } catch (e) {
+      return prefix + '_' + now() + '_' + Math.random().toString(36).slice(2, 14);
+    }
   }
 
   // ===== Cookie helpers =====
@@ -194,6 +206,7 @@
     try {
       if (!state) return;
       var payload = {
+        event_id: randomId('ev'),
         event_type: eventType,
         sid: state.sid || null,
         vid: getVid(),
@@ -207,6 +220,7 @@
         session_elapsed_ms: state.st ? Math.max(0, now() - state.st) : null,
         client_ts: now()
       };
+      if (state.token) payload.task_token = state.token;
       if (typeof pageSlotN !== 'undefined') payload.navigation_slot = pageSlotN;
       if (lastFlushOk !== null) payload.last_flush_ok = lastFlushOk;
       if (eventType === 'page_enter') {
@@ -333,6 +347,7 @@
         st: parseInt(p.get('_st'), 10) || null,
         sid: p.get('_sid') || createSid(),
         uid: p.get('_u') || null,
+        token: p.get('_t') || p.get('t') || null,
         urls: urls
       };
     } catch (e) { return null; }
@@ -363,6 +378,7 @@
       cu: cu,
       sid: createSid(),
       uid: null,
+      token: null,
       urls: BUILTIN_CONFIG.urls
     };
   }
@@ -383,6 +399,9 @@
   if (hashState && hashState.uid) {
     base.uid = hashState.uid;
   }
+  if (hashState && hashState.token) {
+    base.token = hashState.token;
+  }
 
   var cycleStart = getCycleStart(base.cy, base.ct);
 
@@ -395,6 +414,7 @@
     st: base.st || null,
     sid: base.sid,
     uid: base.uid,
+    token: base.token || null,
     urls: base.urls
   };
 
@@ -411,6 +431,7 @@
     if (st.st) p.set('_st', String(st.st));
     p.set('_sid', st.sid);
     if (st.uid) p.set('_u', st.uid);
+    if (st.token) p.set('_t', st.token);
     targetUrl.hash = p.toString();
     return targetUrl;
   }
