@@ -1892,16 +1892,28 @@ async function api(path, options = {}) {
   return json;
 }
 
-async function signedSchedulerLink(uid) {
-  const json = await api('/api/playback-token', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ uid, ttl_sec: 7 * 24 * 3600 }),
-  });
+function legacySchedulerLink(uid) {
   const link = new URL(SCHEDULER_BASE);
   link.searchParams.set('u', uid);
-  link.searchParams.set('t', json.token);
   return link.toString();
+}
+
+async function signedSchedulerLink(uid) {
+  try {
+    const json = await api('/api/playback-token', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ uid, ttl_sec: 7 * 24 * 3600 }),
+    });
+    const link = new URL(SCHEDULER_BASE);
+    link.searchParams.set('u', uid);
+    link.searchParams.set('t', json.token);
+    return { link: link.toString(), signed: true };
+  } catch (err) {
+    // Backward-compatible while the Worker deploy is pending. Once
+    // /api/playback-token is live this path is no longer used.
+    return { link: legacySchedulerLink(uid), signed: false, error: err };
+  }
 }
 
 // ===================== Tab switching =====================
@@ -2636,9 +2648,9 @@ function renderOperatorsTable(operators) {
     btn.innerHTML = '<i data-lucide="loader-2" class="w-3.5 h-3.5 animate-spin"></i>生成中';
     lucide.createIcons();
     try {
-      const link = await signedSchedulerLink(btn.dataset.uid);
-      await navigator.clipboard.writeText(link);
-      showToast(t('common.copied'));
+      const result = await signedSchedulerLink(btn.dataset.uid);
+      await navigator.clipboard.writeText(result.link);
+      showToast(result.signed ? t('common.copied') : '已复制兼容链接；Worker 发布后会自动生成安全链接', result.signed ? 'success' : 'error');
     } catch (err) {
       showToast(err.message || '生成安全链接失败', 'error');
     } finally {
