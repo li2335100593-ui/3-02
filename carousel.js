@@ -10,7 +10,7 @@
 
   var ANALYTICS_URL = 'https://exposure-analytics.li2335100593.workers.dev/api/exposure';
   var HEARTBEAT_INTERVAL_SEC = 30;
-  var SDK_VERSION = '3.2.0-signed-idempotent';
+  var SDK_VERSION = '3.2.1-beacon-fallback';
 
   // ===== 内置配置（直接注入模式用）=====
   // 如果 URL hash 里没有配置，就使用这里的默认值
@@ -129,30 +129,43 @@
     return readQueue().length;
   }
 
+  function sendBeaconPayload(body) {
+    try {
+      var nav = window.navigator;
+      if (!nav || typeof nav.sendBeacon !== 'function') return false;
+      return nav.sendBeacon(ANALYTICS_URL, new Blob([body], { type: 'application/json' }));
+    } catch (e) {
+      return false;
+    }
+  }
+
   function deliverPayload(payload, preferBeacon) {
     var body = JSON.stringify(payload);
-    if (preferBeacon && navigator.sendBeacon) {
-      try {
-        if (navigator.sendBeacon(ANALYTICS_URL, new Blob([body], { type: 'application/json' }))) {
-          return Promise.resolve(true);
-        }
-      } catch (e) {}
+    if (preferBeacon && sendBeaconPayload(body)) {
+      return Promise.resolve(true);
     }
-    return fetch(ANALYTICS_URL, {
+    var fetchFn = null;
+    try {
+      if (window.fetch && typeof window.fetch === 'function') fetchFn = window.fetch.bind(window);
+    } catch (e) {}
+    if (!fetchFn) {
+      return Promise.resolve(sendBeaconPayload(body));
+    }
+    return fetchFn(ANALYTICS_URL, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: body,
       keepalive: true
     }).then(function (res) {
-      return !!(res && res.ok);
+      if (res && res.ok) return true;
+      return sendBeaconPayload(body);
     }).catch(function () {
-      return false;
+      return sendBeaconPayload(body);
     });
   }
 
   var flushingQueue = false;
   function flushQueueBeaconSync() {
-    if (!navigator.sendBeacon) return false;
     var q = readQueue();
     if (!q.length) return true;
 
@@ -160,7 +173,7 @@
     for (var i = 0; i < q.length; i++) {
       try {
         var body = JSON.stringify(q[i]);
-        if (!navigator.sendBeacon(ANALYTICS_URL, new Blob([body], { type: 'application/json' }))) break;
+        if (!sendBeaconPayload(body)) break;
         sent += 1;
       } catch (e) {
         break;
@@ -230,10 +243,10 @@
       if (extra && typeof extra === 'object') {
         for (var k in extra) payload[k] = extra[k];
       }
-      if (eventType === 'page_leave' && navigator.sendBeacon) {
+      if (eventType === 'page_leave') {
         try {
           var leaveBody = JSON.stringify(payload);
-          if (navigator.sendBeacon(ANALYTICS_URL, new Blob([leaveBody], { type: 'application/json' }))) {
+          if (sendBeaconPayload(leaveBody)) {
             if (!flushingQueue) flushQueueBeaconSync();
             return;
           }
